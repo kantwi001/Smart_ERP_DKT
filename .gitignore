@@ -5,10 +5,20 @@ __pycache__/
 *.pyo
 *.pyd
 backend/.env
+backend.log
 
 # Node
 frontend/node_modules/
 frontend/.env
+frontend.log
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
 # OS
 .DS_Store

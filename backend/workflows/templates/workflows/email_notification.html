@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ stage_info.title }} - {{ workflow_instance.instance_id }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 10px 0;
+        }
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d4edda; color: #155724; }
+        .status-rejected { background-color: #f8d7da; color: #721c24; }
+        .status-in_progress { background-color: #cce5ff; color: #004085; }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .details-table th,
+        .details-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .details-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .action-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        .timeline {
+            margin: 20px 0;
+        }
+        .timeline-item {
+            padding: 10px;
+            border-left: 3px solid #2196F3;
+            margin-left: 10px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ stage_info.title }}</h1>
+            <p>{{ workflow_instance.template.name }} Request</p>
+        </div>
+
+        <p>Dear {{ recipient.first_name|default:recipient.username }},</p>
+
+        <p>{{ stage_info.description }} for your {{ workflow_instance.template.name }} request.</p>
+
+        <div class="status-badge status-{{ workflow_instance.status }}">
+            Status: {{ workflow_instance.status|title }}
+        </div>
+
+        <table class="details-table">
+            <tr>
+                <th>Request ID</th>
+                <td>{{ workflow_instance.instance_id }}</td>
+            </tr>
+            <tr>
+                <th>Request Type</th>
+                <td>{{ workflow_instance.template.name }}</td>
+            </tr>
+            <tr>
+                <th>Submitted By</th>
+                <td>{{ workflow_instance.requester.first_name|default:workflow_instance.requester.username }}</td>
+            </tr>
+            <tr>
+                <th>Submitted Date</th>
+                <td>{{ workflow_instance.created_at|date:"F d, Y H:i" }}</td>
+            </tr>
+            {% if workflow_instance.current_step %}
+            <tr>
+                <th>Current Step</th>
+                <td>{{ workflow_instance.current_step.name }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>Notification Time</th>
+                <td>{{ timestamp|date:"F d, Y H:i" }}</td>
+            </tr>
+        </table>
+
+        {% if additional_data.rejection_reason %}
+        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <strong>Rejection Reason:</strong> {{ additional_data.rejection_reason }}
+        </div>
+        {% endif %}
+
+        {% if additional_data.comments %}
+        <div style="background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <strong>Comments:</strong> {{ additional_data.comments }}
+        </div>
+        {% endif %}
+
+        {% if workflow_instance.status == 'in_progress' %}
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ settings.FRONTEND_URL }}/employee" class="action-button">
+                View in Dashboard
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="timeline">
+            <h3>Request Timeline</h3>
+            {% for approval in workflow_instance.approvals.all %}
+            <div class="timeline-item">
+                <strong>{{ approval.step.name }}</strong><br>
+                Approver: {{ approval.approver.first_name|default:approval.approver.username }}<br>
+                Status: {{ approval.action|title }}<br>
+                {% if approval.action_taken_at %}
+                Date: {{ approval.action_taken_at|date:"F d, Y H:i" }}<br>
+                {% endif %}
+                {% if approval.comments %}
+                Comments: {{ approval.comments }}
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="footer">
+            <p>This is an automated notification from the ERP System.</p>
+            <p>Please do not reply to this email. For support, contact your system administrator.</p>
+            <p>&copy; {{ timestamp|date:"Y" }} ERP System. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

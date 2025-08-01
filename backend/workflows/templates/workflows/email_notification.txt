@@ -1,0 +1,46 @@
+{{ stage_info.title }} - {{ workflow_instance.instance_id }}
+
+Dear {{ recipient.first_name|default:recipient.username }},
+
+{{ stage_info.description }} for your {{ workflow_instance.template.name }} request.
+
+Request Details:
+================
+Request ID: {{ workflow_instance.instance_id }}
+Request Type: {{ workflow_instance.template.name }}
+Status: {{ workflow_instance.status|title }}
+Submitted By: {{ workflow_instance.requester.first_name|default:workflow_instance.requester.username }}
+Submitted Date: {{ workflow_instance.created_at|date:"F d, Y H:i" }}
+{% if workflow_instance.current_step %}Current Step: {{ workflow_instance.current_step.name }}{% endif %}
+Notification Time: {{ timestamp|date:"F d, Y H:i" }}
+
+{% if additional_data.rejection_reason %}
+Rejection Reason: {{ additional_data.rejection_reason }}
+{% endif %}
+
+{% if additional_data.comments %}
+Comments: {{ additional_data.comments }}
+{% endif %}
+
+Request Timeline:
+================
+{% for approval in workflow_instance.approvals.all %}
+{{ approval.step.name }}
+- Approver: {{ approval.approver.first_name|default:approval.approver.username }}
+- Status: {{ approval.action|title }}
+{% if approval.action_taken_at %}- Date: {{ approval.action_taken_at|date:"F d, Y H:i" }}{% endif %}
+{% if approval.comments %}- Comments: {{ approval.comments }}{% endif %}
+
+{% endfor %}
+
+{% if workflow_instance.status == 'in_progress' %}
+To view more details and take action, please log in to the ERP System:
+{{ settings.FRONTEND_URL }}/employee
+{% endif %}
+
+Best regards,
+ERP System
+
+---
+This is an automated notification. Please do not reply to this email.
+For support, contact your system administrator.

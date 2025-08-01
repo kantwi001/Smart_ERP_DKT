@@ -1,0 +1,423 @@
+Watching for file changes with StatReloader
+[27/Jul/2025 05:35:04] "GET / HTTP/1.1" 200 640
+[27/Jul/2025 05:35:20] "GET / HTTP/1.1" 200 640
+[27/Jul/2025 05:35:22] "GET /admin/accounting/account/ HTTP/1.1" 302 0
+[27/Jul/2025 05:35:22] "GET /admin/login/?next=/admin/accounting/account/ HTTP/1.1" 200 4211
+[27/Jul/2025 05:35:22] "GET /static/admin/js/nav_sidebar.js HTTP/1.1" 304 0
+[27/Jul/2025 05:35:22] "GET /static/admin/css/login.css HTTP/1.1" 200 951
+[27/Jul/2025 05:35:22] "GET /static/admin/css/responsive.css HTTP/1.1" 304 0
+[27/Jul/2025 05:35:22] "GET /static/admin/css/nav_sidebar.css HTTP/1.1" 200 2810
+[27/Jul/2025 05:35:22] "GET /static/admin/js/theme.js HTTP/1.1" 200 1653
+[27/Jul/2025 05:35:22] "GET /static/admin/css/dark_mode.css HTTP/1.1" 200 2808
+[27/Jul/2025 05:35:22] "GET /static/admin/css/base.css HTTP/1.1" 200 22120
+[27/Jul/2025 05:35:56] "POST /admin/login/?next=/admin/accounting/account/ HTTP/1.1" 302 0
+[27/Jul/2025 05:35:56] "GET /admin/accounting/account/ HTTP/1.1" 200 19299
+[27/Jul/2025 05:35:56] "GET /static/admin/css/changelists.css HTTP/1.1" 200 6878
+[27/Jul/2025 05:35:56] "GET /static/admin/js/jquery.init.js HTTP/1.1" 304 0
+[27/Jul/2025 05:35:56] "GET /static/admin/js/prepopulate.js HTTP/1.1" 200 1531
+[27/Jul/2025 05:35:56] "GET /static/admin/js/core.js HTTP/1.1" 200 6208
+[27/Jul/2025 05:35:56] "GET /static/admin/js/admin/RelatedObjectLookups.js HTTP/1.1" 304 0
+[27/Jul/2025 05:35:56] "GET /static/admin/js/urlify.js HTTP/1.1" 304 0
+[27/Jul/2025 05:35:56] "GET /static/admin/js/actions.js HTTP/1.1" 200 8076
+[27/Jul/2025 05:35:56] "GET /static/admin/js/filters.js HTTP/1.1" 200 978
+[27/Jul/2025 05:35:56] "GET /static/admin/js/vendor/jquery/jquery.js HTTP/1.1" 304 0
+[27/Jul/2025 05:35:56] "GET /static/admin/js/vendor/xregexp/xregexp.js HTTP/1.1" 200 325171
+[27/Jul/2025 05:35:56] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:35:56] "GET /static/admin/img/icon-addlink.svg HTTP/1.1" 200 331
+[27/Jul/2025 05:35:56] "GET /static/admin/img/tooltag-add.svg HTTP/1.1" 304 0
+[27/Jul/2025 05:36:06] "GET /admin/accounting/account/ HTTP/1.1" 200 19299
+[27/Jul/2025 05:36:06] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:36:10] "GET /admin/accounting/account/1/change/ HTTP/1.1" 200 19992
+[27/Jul/2025 05:36:10] "GET /static/admin/js/change_form.js HTTP/1.1" 200 606
+[27/Jul/2025 05:36:10] "GET /static/admin/css/forms.css HTTP/1.1" 304 0
+[27/Jul/2025 05:36:10] "GET /static/admin/js/prepopulate_init.js HTTP/1.1" 304 0
+[27/Jul/2025 05:36:10] "GET /static/admin/css/widgets.css HTTP/1.1" 304 0
+[27/Jul/2025 05:36:10] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:36:14] "GET /admin/accounting/transaction/ HTTP/1.1" 200 34022
+[27/Jul/2025 05:36:14] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:36:35] "GET /admin/auth/group/ HTTP/1.1" 200 19287
+[27/Jul/2025 05:36:35] "GET /static/admin/img/search.svg HTTP/1.1" 304 0
+[27/Jul/2025 05:36:35] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:36:39] "GET /admin/auth/group/1/change/ HTTP/1.1" 200 39386
+[27/Jul/2025 05:36:39] "GET /static/admin/js/SelectBox.js HTTP/1.1" 200 4530
+[27/Jul/2025 05:36:39] "GET /static/admin/js/SelectFilter2.js HTTP/1.1" 200 15845
+[27/Jul/2025 05:36:39] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:36:39] "GET /static/admin/img/selector-icons.svg HTTP/1.1" 304 0
+[27/Jul/2025 05:37:07] "GET /admin/hr/department/ HTTP/1.1" 200 22758
+[27/Jul/2025 05:37:07] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:37:07] "GET /static/admin/img/icon-viewlink.svg HTTP/1.1" 304 0
+[27/Jul/2025 05:37:13] "GET /admin/hr/employee/ HTTP/1.1" 200 21958
+[27/Jul/2025 05:37:13] "GET /static/admin/img/icon-yes.svg HTTP/1.1" 200 436
+[27/Jul/2025 05:37:13] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:37:24] "GET /admin/hr/employee/1/change/ HTTP/1.1" 200 25233
+[27/Jul/2025 05:37:24] "GET /static/admin/css/vendor/select2/select2.css HTTP/1.1" 200 17358
+[27/Jul/2025 05:37:24] "GET /static/admin/js/calendar.js HTTP/1.1" 200 9141
+[27/Jul/2025 05:37:24] "GET /static/admin/js/admin/DateTimeShortcuts.js HTTP/1.1" 304 0
+[27/Jul/2025 05:37:24] "GET /static/admin/css/autocomplete.css HTTP/1.1" 304 0
+[27/Jul/2025 05:37:24] "GET /static/admin/img/icon-changelink.svg HTTP/1.1" 304 0
+[27/Jul/2025 05:37:24] "GET /static/admin/js/vendor/select2/i18n/en.js HTTP/1.1" 304 0
+[27/Jul/2025 05:37:24] "GET /static/admin/js/autocomplete.js HTTP/1.1" 200 1060
+[27/Jul/2025 05:37:24] "GET /static/admin/js/vendor/select2/select2.full.js HTTP/1.1" 200 173566
+[27/Jul/2025 05:37:24] "GET /static/admin/img/icon-deletelink.svg HTTP/1.1" 200 392
+[27/Jul/2025 05:37:24] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:37:24] "GET /static/admin/img/icon-calendar.svg HTTP/1.1" 200 1086
+[27/Jul/2025 05:37:34] "GET /admin/hr/department/2/change/?_to_field=id&_popup=1 HTTP/1.1" 200 7369
+[27/Jul/2025 05:37:34] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py:943: UnorderedObjectListWarning: Pagination may yield inconsistent results with an unordered object_list: <class 'users.models.User'> QuerySet.
+  return self.paginator(queryset, per_page, orphans, allow_empty_first_page)
+[27/Jul/2025 05:37:36] "GET /admin/autocomplete/?app_label=hr&model_name=department&field_name=supervisor HTTP/1.1" 200 254
+[27/Jul/2025 05:37:45] "GET /admin/users/user/add/?_to_field=id&_popup=1 HTTP/1.1" 200 35580
+[27/Jul/2025 05:37:45] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:37:45] "GET /static/admin/img/icon-clock.svg HTTP/1.1" 200 677
+[27/Jul/2025 05:38:28] "GET /admin/inventory/category/ HTTP/1.1" 200 19600
+[27/Jul/2025 05:38:28] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:38:31] "GET /admin/inventory/category/3/change/ HTTP/1.1" 200 19407
+[27/Jul/2025 05:38:31] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:38:35] "GET /admin/inventory/product/ HTTP/1.1" 200 21320
+[27/Jul/2025 05:38:35] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:38:38] "GET /admin/inventory/product/10/change/ HTTP/1.1" 200 22488
+[27/Jul/2025 05:38:38] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:38:52] "POST /admin/inventory/product/10/change/ HTTP/1.1" 302 0
+[27/Jul/2025 05:38:52] "GET /admin/inventory/product/ HTTP/1.1" 200 21539
+[27/Jul/2025 05:38:52] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:38:54] "GET /admin/inventory/product/8/change/ HTTP/1.1" 200 22511
+[27/Jul/2025 05:38:54] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:39:04] "POST /admin/inventory/product/8/change/ HTTP/1.1" 302 0
+[27/Jul/2025 05:39:04] "GET /admin/inventory/product/ HTTP/1.1" 200 21537
+[27/Jul/2025 05:39:04] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:39:06] "GET /admin/inventory/product/7/change/ HTTP/1.1" 200 22526
+[27/Jul/2025 05:39:06] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:39:18] "POST /admin/inventory/product/7/change/ HTTP/1.1" 302 0
+[27/Jul/2025 05:39:18] "GET /admin/inventory/product/ HTTP/1.1" 200 21537
+[27/Jul/2025 05:39:18] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+Internal Server Error: /admin/manufacturing/workorder/
+Traceback (most recent call last):
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+psycopg2.errors.UndefinedTable: relation "manufacturing_workorder" does not exist
+LINE 1: SELECT COUNT(*) AS "__count" FROM "manufacturing_workorder"
+                                          ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 719, in wrapper
+    return self.admin_site.admin_view(view)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/sites.py", line 246, in inner
+    return view(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 2024, in changelist_view
+    cl = self.get_changelist_instance(request)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 867, in get_changelist_instance
+    return ChangeList(
+        request,
+    ...<12 lines>...
+        self.search_help_text,
+    )
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/views/main.py", line 146, in __init__
+    self.get_results(request)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/views/main.py", line 313, in get_results
+    result_count = paginator.count
+                   ^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/functional.py", line 47, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+                                         ~~~~~~~~~^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/paginator.py", line 110, in count
+    return c()
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/query.py", line 604, in count
+    return self.query.get_count(using=self.db)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/query.py", line 644, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/query.py", line 626, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1623, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+django.db.utils.ProgrammingError: relation "manufacturing_workorder" does not exist
+LINE 1: SELECT COUNT(*) AS "__count" FROM "manufacturing_workorder"
+                                          ^
+
+[27/Jul/2025 05:39:21] "GET /admin/manufacturing/workorder/ HTTP/1.1" 500 183860
+[27/Jul/2025 05:39:29] "GET /admin/pos/possession/ HTTP/1.1" 200 17700
+[27/Jul/2025 05:39:29] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:39:33] "GET /admin/pos/sale/ HTTP/1.1" 200 17653
+[27/Jul/2025 05:39:33] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+Internal Server Error: /admin/purchasing/purchaseorder/
+Traceback (most recent call last):
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+psycopg2.errors.UndefinedTable: relation "purchasing_purchaseorder" does not exist
+LINE 1: SELECT COUNT(*) AS "__count" FROM "purchasing_purchaseorder"
+                                          ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 719, in wrapper
+    return self.admin_site.admin_view(view)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/sites.py", line 246, in inner
+    return view(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 2024, in changelist_view
+    cl = self.get_changelist_instance(request)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 867, in get_changelist_instance
+    return ChangeList(
+        request,
+    ...<12 lines>...
+        self.search_help_text,
+    )
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/views/main.py", line 146, in __init__
+    self.get_results(request)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/views/main.py", line 313, in get_results
+    result_count = paginator.count
+                   ^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/functional.py", line 47, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+                                         ~~~~~~~~~^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/paginator.py", line 110, in count
+    return c()
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/query.py", line 604, in count
+    return self.query.get_count(using=self.db)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/query.py", line 644, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/query.py", line 626, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1623, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+django.db.utils.ProgrammingError: relation "purchasing_purchaseorder" does not exist
+LINE 1: SELECT COUNT(*) AS "__count" FROM "purchasing_purchaseorder"
+                                          ^
+
+[27/Jul/2025 05:39:40] "GET /admin/purchasing/purchaseorder/ HTTP/1.1" 500 183947
+Internal Server Error: /admin/purchasing/supplier/
+Traceback (most recent call last):
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+psycopg2.errors.UndefinedTable: relation "purchasing_supplier" does not exist
+LINE 1: SELECT COUNT(*) AS "__count" FROM "purchasing_supplier"
+                                          ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 719, in wrapper
+    return self.admin_site.admin_view(view)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/sites.py", line 246, in inner
+    return view(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 2024, in changelist_view
+    cl = self.get_changelist_instance(request)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/options.py", line 867, in get_changelist_instance
+    return ChangeList(
+        request,
+    ...<12 lines>...
+        self.search_help_text,
+    )
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/views/main.py", line 146, in __init__
+    self.get_results(request)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/contrib/admin/views/main.py", line 313, in get_results
+    result_count = paginator.count
+                   ^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/utils/functional.py", line 47, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+                                         ~~~~~~~~~^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/core/paginator.py", line 110, in count
+    return c()
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/query.py", line 604, in count
+    return self.query.get_count(using=self.db)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/query.py", line 644, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/query.py", line 626, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1623, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 122, in execute
+    return super().execute(sql, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/Users/kwadwoantwi/CascadeProjects/erp-system/backend/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+django.db.utils.ProgrammingError: relation "purchasing_supplier" does not exist
+LINE 1: SELECT COUNT(*) AS "__count" FROM "purchasing_supplier"
+                                          ^
+
+[27/Jul/2025 05:39:44] "GET /admin/purchasing/supplier/ HTTP/1.1" 500 183657
+[27/Jul/2025 05:39:49] "GET /admin/reporting/report/ HTTP/1.1" 200 17691
+[27/Jul/2025 05:39:49] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:39:52] "GET /admin/sales/customer/ HTTP/1.1" 200 20436
+[27/Jul/2025 05:39:52] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:39:56] "GET /admin/sales/customer/6/change/ HTTP/1.1" 200 22849
+[27/Jul/2025 05:39:56] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:40:10] "GET /admin/users/user/ HTTP/1.1" 200 23551
+[27/Jul/2025 05:40:10] "GET /static/admin/img/icon-no.svg HTTP/1.1" 200 560
+[27/Jul/2025 05:40:10] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:40:23] "GET /admin/users/user/1/change/ HTTP/1.1" 200 49994
+[27/Jul/2025 05:40:23] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:40:41] "GET /admin/users/user/ HTTP/1.1" 200 23551
+[27/Jul/2025 05:40:41] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:40:47] "GET /admin/users/user/7/change/ HTTP/1.1" 200 50093
+[27/Jul/2025 05:40:47] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:40:57] "GET /admin/users/user/ HTTP/1.1" 200 23551
+[27/Jul/2025 05:40:57] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[27/Jul/2025 05:41:37] "OPTIONS /api/token/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:37] "POST /api/token/ HTTP/1.1" 200 483
+[27/Jul/2025 05:41:37] "OPTIONS /api/users/me/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:38] "GET /api/users/me/ HTTP/1.1" 200 185
+[27/Jul/2025 05:41:38] "OPTIONS /api/reporting/dashboard/revenue/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:38] "OPTIONS /api/reporting/dashboard/transactions-per-staff/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:38] "OPTIONS /api/sales/customers/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:38] "OPTIONS /api/reporting/dashboard/customer-balances/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:38] "GET /api/reporting/dashboard/revenue/ HTTP/1.1" 200 19
+[27/Jul/2025 05:41:38] "GET /api/reporting/dashboard/transactions-per-staff/ HTTP/1.1" 200 194
+[27/Jul/2025 05:41:38] "GET /api/sales/customers/ HTTP/1.1" 200 1000
+[27/Jul/2025 05:41:38] "GET /api/reporting/dashboard/customer-balances/ HTTP/1.1" 200 411
+[27/Jul/2025 05:41:45] "OPTIONS /api/inventory/transfers/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:45] "GET /api/inventory/transfers/ HTTP/1.1" 200 1736
+[27/Jul/2025 05:41:46] "GET /api/inventory/transfers/ HTTP/1.1" 200 1736
+Unauthorized: /api/surveys/
+[27/Jul/2025 05:41:47] "GET /api/surveys/ HTTP/1.1" 401 58
+Not Found: /api/routes/
+[27/Jul/2025 05:41:48] "GET /api/routes/ HTTP/1.1" 404 5321
+Not Found: /api/powerbi/embed/
+[27/Jul/2025 05:41:49] "GET /api/powerbi/embed/ HTTP/1.1" 404 5342
+[27/Jul/2025 05:41:55] "OPTIONS /api/token/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:55] "POST /api/token/ HTTP/1.1" 200 483
+[27/Jul/2025 05:41:55] "OPTIONS /api/users/me/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:55] "GET /api/users/me/ HTTP/1.1" 200 185
+[27/Jul/2025 05:41:55] "OPTIONS /api/reporting/dashboard/transactions-per-staff/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:55] "OPTIONS /api/reporting/dashboard/revenue/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:55] "OPTIONS /api/sales/customers/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:55] "OPTIONS /api/reporting/dashboard/customer-balances/ HTTP/1.1" 200 0
+[27/Jul/2025 05:41:55] "GET /api/reporting/dashboard/revenue/ HTTP/1.1" 200 19
+[27/Jul/2025 05:41:55] "GET /api/reporting/dashboard/transactions-per-staff/ HTTP/1.1" 200 194
+[27/Jul/2025 05:41:55] "GET /api/reporting/dashboard/customer-balances/ HTTP/1.1" 200 411
+[27/Jul/2025 05:41:55] "GET /api/sales/customers/ HTTP/1.1" 200 1000
+Performing system checks...
+
+System check identified no issues (0 silenced).
+July 27, 2025 - 05:34:37
+Django version 5.2.4, using settings 'config.settings'
+Starting development server at http://0.0.0.0:2025/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/

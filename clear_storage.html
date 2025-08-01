@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear ERP Storage</title>
+</head>
+<body>
+    <h2>Clear ERP System Storage</h2>
+    <button onclick="clearStorage()">Clear Storage & Redirect to Login</button>
+    <div id="result"></div>
+    
+    <script>
+        function clearStorage() {
+            // Clear localStorage
+            localStorage.clear();
+            
+            // Clear sessionStorage
+            sessionStorage.clear();
+            
+            // Show confirmation
+            document.getElementById('result').innerHTML = 
+                '<p style="color: green;">✅ Storage cleared successfully!</p>' +
+                '<p>Redirecting to ERP login...</p>';
+            
+            // Redirect to ERP login after 2 seconds
+            setTimeout(() => {
+                window.location.href = 'http://localhost:2026/login';
+            }, 2000);
+        }
+        
+        // Auto-clear on page load if requested
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('auto') === 'true') {
+            clearStorage();
+        }
+    </script>
+</body>
+</html>

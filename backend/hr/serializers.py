@@ -46,6 +46,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveRequest
         fields = '__all__'
+        read_only_fields = ['employee', 'status', 'approver', 'approved_date']
     
     def get_days_requested(self, obj):
         """Calculate number of days requested"""
@@ -396,6 +397,11 @@ class EnhancedAnnouncementSerializer(serializers.ModelSerializer):
             'attachment', 'image', 'is_published', 'is_pinned', 'created_by', 'created_by_name',
             'created_at', 'updated_at', 'is_active', 'read_count', 'is_read_by_user'
         ]
+        extra_kwargs = {
+            'created_by': {'read_only': True},
+            'created_at': {'read_only': True},
+            'updated_at': {'read_only': True},
+        }
     
     def get_target_department_names(self, obj):
         return [dept.get_name_display() for dept in obj.target_departments.all()]

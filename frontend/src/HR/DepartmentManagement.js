@@ -146,16 +146,52 @@ const UserRow = ({ user, departments, onUpdated }) => {
   const [dept, setDept] = useState(user.department || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleChange = e => setDept(e.target.value);
 
   const handleUpdate = async () => {
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
+      console.log(`🔄 Updating user ${user.id} department to ${dept}`);
       await api.patch(`/users/${user.id}/`, { department: dept });
+      
+      // Show success message
+      setSuccess('Department updated successfully!');
+      
+      // Trigger parent component refresh
       if (onUpdated) onUpdated();
+      
+      // IMPORTANT: Refresh user profile in AuthContext if this is the current user
+      // This ensures the department change is reflected throughout the app
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      if (currentUser.id === user.id) {
+        console.log(`🔄 Refreshing current user profile after department change`);
+        try {
+          const updatedUserResponse = await api.get('/users/me/');
+          const updatedUser = updatedUserResponse.data;
+          
+          // Update localStorage with new user data
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          
+          // Trigger a custom event to notify other components
+          window.dispatchEvent(new CustomEvent('userProfileUpdated', { 
+            detail: updatedUser 
+          }));
+          
+          console.log(`✅ User profile refreshed with new department: ${updatedUser.department_name}`);
+        } catch (refreshError) {
+          console.warn('Could not refresh user profile:', refreshError);
+        }
+      }
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+      
     } catch (err) {
+      console.error('Failed to update user department:', err);
       setError('Failed to update department.');
     }
     setLoading(false);
@@ -189,6 +225,7 @@ const UserRow = ({ user, departments, onUpdated }) => {
           {loading ? 'Updating...' : 'Update'}
         </Button>
         {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+        {success && <Alert severity="success" sx={{ mt: 1 }}>{success}</Alert>}
       </TableCell>
     </TableRow>
   );

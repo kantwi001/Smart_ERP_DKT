@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Alert } from '@mui/material';
 
 const EditEmployeeDialog = ({ open, onClose, employee, onSaved, onDeleted }) => {
@@ -23,7 +23,7 @@ const EditEmployeeDialog = ({ open, onClose, employee, onSaved, onDeleted }) => 
     setError('');
     setSuccess(false);
     try {
-      await axios.patch(`/api/hr/employees/${form.id}/`, form);
+      await api.patch(`/hr/employees/${form.id}/`, form);
       setSuccess(true);
       if (onSaved) onSaved();
       onClose();
@@ -37,11 +37,12 @@ const EditEmployeeDialog = ({ open, onClose, employee, onSaved, onDeleted }) => 
     setLoading(true);
     setError('');
     try {
-      await axios.delete(`/api/hr/employees/${form.id}/`);
+      await api.delete(`/hr/employees/${form.id}/`);
       if (onDeleted) onDeleted();
       onClose();
     } catch (err) {
-      setError('Failed to delete employee.');
+      console.error('Employee deletion error:', err);
+      setError(`Failed to delete employee: ${err.response?.data?.detail || err.message}`);
     }
     setLoading(false);
   };

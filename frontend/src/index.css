@@ -5,9 +5,106 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Mobile Responsiveness for ERP System */
+@media (max-width: 768px) {
+  /* General mobile optimizations */
+  .MuiContainer-root {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  
+  /* Typography responsive sizing */
+  .MuiTypography-h4 {
+    font-size: 1.5rem !important;
+  }
+  
+  .MuiTypography-h5 {
+    font-size: 1.25rem !important;
+  }
+  
+  .MuiTypography-h6 {
+    font-size: 1.1rem !important;
+  }
+  
+  /* Card optimizations */
+  .MuiCard-root {
+    margin-bottom: 12px !important;
+  }
+  
+  /* Table responsiveness */
+  .MuiTableContainer-root {
+    overflow-x: auto !important;
+  }
+  
+  .MuiTable-root {
+    min-width: 300px !important;
+  }
+  
+  /* Tab optimizations */
+  .MuiTabs-root {
+    min-height: 40px !important;
+  }
+  
+  .MuiTab-root {
+    min-width: 80px !important;
+    padding: 6px 8px !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Dialog optimizations */
+  .MuiDialog-paper {
+    margin: 8px !important;
+    width: calc(100% - 16px) !important;
+    max-height: calc(100% - 16px) !important;
+  }
+  
+  /* Grid spacing adjustments */
+  .MuiGrid-container {
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    width: 100% !important;
+  }
+  
+  .MuiGrid-item {
+    padding-left: 4px !important;
+    padding-top: 4px !important;
+  }
+  
+  /* Button optimizations */
+  .MuiButton-root {
+    min-width: auto !important;
+    padding: 6px 12px !important;
+  }
+  
+  /* Avatar sizing */
+  .MuiAvatar-root {
+    width: 60px !important;
+    height: 60px !important;
+  }
+}
+
+/* Extra small devices (phones, 600px and down) */
+@media (max-width: 600px) {
+  .MuiTypography-h4 {
+    font-size: 1.25rem !important;
+    text-align: center !important;
+  }
+  
+  .MuiPaper-root {
+    border-radius: 4px !important;
+  }
+  
+  /* Stack cards vertically on very small screens */
+  .MuiGrid-item {
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+  }
 }

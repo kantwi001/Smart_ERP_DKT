@@ -134,24 +134,104 @@ const HRCalendar = () => {
 
   const handleCreateAnnouncement = async () => {
     try {
+      console.log('🚀 Creating announcement with form data:', announcementForm);
+      
+      // Validate required fields
+      if (!announcementForm.title?.trim()) {
+        setError('Announcement title is required');
+        return;
+      }
+      
+      if (!announcementForm.content?.trim()) {
+        setError('Announcement content is required');
+        return;
+      }
+      
+      // Create FormData for file upload support
       const formData = new FormData();
+      
+      // Fields to exclude (backend will set these automatically)
+      const excludeFields = ['created_by', 'created_at', 'updated_at', 'id'];
+      
+      // Add all form fields to FormData
       Object.keys(announcementForm).forEach(key => {
-        if (announcementForm[key] !== null && announcementForm[key] !== undefined) {
-          if (Array.isArray(announcementForm[key])) {
-            announcementForm[key].forEach(item => formData.append(key, item));
+        // Skip fields that should be set by backend
+        if (excludeFields.includes(key)) {
+          return;
+        }
+        
+        const value = announcementForm[key];
+        if (value !== null && value !== undefined && value !== '') {
+          if (Array.isArray(value)) {
+            // Handle arrays (target_departments, target_users)
+            if (value.length > 0) {
+              value.forEach(item => formData.append(key, item));
+            }
+          } else if (value instanceof File) {
+            // Handle file uploads
+            formData.append(key, value);
           } else {
-            formData.append(key, announcementForm[key]);
+            // Handle regular fields
+            formData.append(key, value);
           }
         }
       });
       
-      await HRCalendarService.createAnnouncement(formData);
-      setSuccess('Announcement created successfully');
+      // Add default values if not set
+      if (!announcementForm.publish_date) {
+        formData.append('publish_date', new Date().toISOString());
+      }
+      
+      // Ensure is_published is set to true for immediate publishing
+      if (!formData.has('is_published')) {
+        formData.append('is_published', 'true');
+      }
+      
+      // Log FormData contents for debugging
+      console.log('📤 FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+      
+      console.log('📡 Making API call to create announcement...');
+      const response = await HRCalendarService.createAnnouncement(formData);
+      console.log('✅ Announcement created successfully:', response);
+      
+      setSuccess('Announcement created successfully and notifications sent!');
       setAnnouncementDialogOpen(false);
       resetForms();
-      loadData();
+      await loadData(); // Refresh data to show new announcement
+      
     } catch (err) {
-      setError('Failed to create announcement');
+      console.error('❌ Error creating announcement:', err);
+      console.error('❌ Error response:', err.response?.data);
+      console.error('❌ Error status:', err.response?.status);
+      
+      let errorMessage = 'Failed to create announcement';
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data) {
+        // Handle field-specific errors
+        const errors = err.response.data;
+        if (typeof errors === 'object') {
+          const errorMessages = Object.entries(errors)
+            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+            .join('; ');
+          errorMessage = `Validation errors: ${errorMessages}`;
+        }
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (err.response?.status === 403) {
+        errorMessage = 'You do not have permission to create announcements.';
+      } else if (err.response?.status === 400) {
+        errorMessage = 'Invalid announcement data. Please check all fields.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     }
   };
 
@@ -175,10 +255,65 @@ const HRCalendar = () => {
   };
 
   const resetForms = () => {
-    setEventForm({ title: '', description: '', event_type: 'other', start_date: '', end_date: '', start_time: '', end_time: '', is_all_day: false, location: '', priority: 'medium', is_public: true, send_notifications: true, notification_days_before: 1, assigned_to: [], departments: [] });
-    setHolidayForm({ name: '', description: '', holiday_type: 'company', date: '', is_recurring: true, is_work_day: false, departments: [] });
-    setDeadlineForm({ title: '', description: '', deadline_type: 'other', due_date: '', due_time: '', assigned_to: [], department: '', reminder_days: 3, send_reminders: true });
-    setAnnouncementForm({ title: '', content: '', announcement_type: 'general', priority: 'medium', audience_type: 'all', target_departments: [], target_users: [], publish_date: '', expiry_date: '', send_email: true, send_push: true, send_sms: false, attachment: null, image: null });
+    setEventForm({ 
+      title: '', 
+      description: '', 
+      event_type: 'other', 
+      start_date: '', 
+      end_date: '', 
+      start_time: '', 
+      end_time: '', 
+      is_all_day: false, 
+      location: '', 
+      priority: 'medium', 
+      is_public: true, 
+      send_notifications: true, 
+      notification_days_before: 1, 
+      assigned_to: [], 
+      departments: [] 
+    });
+    
+    setHolidayForm({ 
+      name: '', 
+      description: '', 
+      holiday_type: 'company', 
+      date: '', 
+      is_recurring: true, 
+      is_work_day: false, 
+      departments: [] 
+    });
+    
+    setDeadlineForm({ 
+      title: '', 
+      description: '', 
+      deadline_type: 'other', 
+      due_date: '', 
+      due_time: '', 
+      assigned_to: [], 
+      department: '', 
+      reminder_days: 3, 
+      send_reminders: true 
+    });
+    
+    setAnnouncementForm({ 
+      title: '', 
+      content: '', 
+      announcement_type: 'general', 
+      priority: 'medium', 
+      audience_type: 'all', 
+      target_departments: [], 
+      target_users: [], 
+      publish_date: '', 
+      expiry_date: '', 
+      send_email: true, 
+      send_push: true, 
+      send_sms: false, 
+      attachment: null, 
+      image: null 
+    });
+    
+    // Clear any error messages
+    setError('');
   };
 
   const formatDate = (dateString) => {

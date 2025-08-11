@@ -822,12 +822,22 @@ const POSDashboard = () => {
         <DialogContent>
           <TextField
             fullWidth
-            label="Items"
-            value={transactionForm.items}
-            onChange={(e) => setTransactionForm({...transactionForm, items: e.target.value})}
+            select
+            label="Product"
+            value={transactionForm.product || ''}
+            onChange={(e) => setTransactionForm({...transactionForm, product: e.target.value})}
             margin="normal"
-            placeholder="Enter items sold"
-          />
+            helperText={products.length === 0 ? "No products available" : `${products.length} products available`}
+          >
+            <MenuItem value="">
+              <em>Select a Product</em>
+            </MenuItem>
+            {products.map((product) => (
+              <MenuItem key={product.id} value={product.id}>
+                {product.name} - ₵{product.price || '0.00'}
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField
             fullWidth
             label="Total Amount"

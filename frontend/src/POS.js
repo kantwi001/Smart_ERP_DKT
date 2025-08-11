@@ -28,6 +28,13 @@ const CURRENCIES = [
   { code: 'GHS', label: 'Ghana Cedi' },
 ];
 
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'mobile_money', label: 'Mobile Money' },
+  { value: 'credit', label: 'Credit' },
+];
+
 const POS = () => {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -38,7 +45,7 @@ const POS = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ product: '', quantity: '', total: '', customer: '' });
+  const [form, setForm] = useState({ product: '', quantity: '', total: '', customer: '', payment_method: 'cash' });
   const [stockWarning, setStockWarning] = useState('');
   const [customerWarning, setCustomerWarning] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -95,7 +102,7 @@ const POS = () => {
   const handleOpen = () => setOpen(true);
   const handleClose = () => {
     setOpen(false);
-    setForm({ product: '', quantity: '', total: '', customer: '' });
+    setForm({ product: '', quantity: '', total: '', customer: '', payment_method: 'cash' });
     setCustomerWarning('');
     setSelectedCustomer(null);
   };
@@ -148,7 +155,9 @@ const POS = () => {
       setCustomerWarning('');
     }
   };
-
+  const handlePaymentMethodChange = (event, value) => {
+    setForm(f => ({ ...f, payment_method: value.value }));
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -274,12 +283,13 @@ const POS = () => {
                 <TableCell>Quantity</TableCell>
                 <TableCell>Total</TableCell>
                 <TableCell>Currency</TableCell>
+                <TableCell>Payment Method</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">No transactions found.</TableCell>
+                  <TableCell colSpan={7} align="center">No transactions found.</TableCell>
                 </TableRow>
               ) : (
                 transactions.map((tx, idx) => (
@@ -290,6 +300,7 @@ const POS = () => {
                     <TableCell>{tx.quantity}</TableCell>
                     <TableCell>{tx.total}</TableCell>
                     <TableCell>{tx.currency}</TableCell>
+                    <TableCell>{tx.payment_method || 'Cash'}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -327,6 +338,13 @@ const POS = () => {
               value={customers.find(c => c.id === form.customer) || null}
               onChange={handleCustomerChange}
               renderInput={params => <TextField {...params} label="Customer" margin="normal" required fullWidth />}
+            />
+            <Autocomplete
+              options={PAYMENT_METHODS}
+              getOptionLabel={option => option.label}
+              value={PAYMENT_METHODS.find(p => p.value === form.payment_method) || null}
+              onChange={handlePaymentMethodChange}
+              renderInput={params => <TextField {...params} label="Payment Method" margin="normal" required fullWidth />}
             />
             <TextField label="Quantity" name="quantity" value={form.quantity} onChange={handleQuantityChange} fullWidth margin="normal" type="number" required />
             <TextField label="Total" name="total" value={form.total} onChange={handleChange} fullWidth margin="normal" type="number" required />

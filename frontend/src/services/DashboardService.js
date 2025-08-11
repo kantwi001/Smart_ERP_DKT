@@ -4,6 +4,17 @@ class DashboardService {
   // Fetch data from all modules for dashboard summary
   static async getAllModulesSummary() {
     try {
+      console.log('[DashboardService] Starting modules summary fetch...');
+      
+      // Test API connectivity first
+      try {
+        await api.get('/auth/user/');
+        console.log('[DashboardService] API connectivity confirmed');
+      } catch (connectError) {
+        console.warn('[DashboardService] API connectivity failed, using fallback data:', connectError);
+        return this.getFallbackModulesSummary();
+      }
+
       const [
         inventoryData,
         salesData,
@@ -30,23 +41,164 @@ class DashboardService {
         this.getReportingSummary()
       ]);
 
-      return {
-        inventory: inventoryData.status === 'fulfilled' ? inventoryData.value : null,
-        sales: salesData.status === 'fulfilled' ? salesData.value : null,
-        hr: hrData.status === 'fulfilled' ? hrData.value : null,
-        procurement: procurementData.status === 'fulfilled' ? procurementData.value : null,
-        manufacturing: manufacturingData.status === 'fulfilled' ? manufacturingData.value : null,
-        pos: posData.status === 'fulfilled' ? posData.value : null,
-        accounting: accountingData.status === 'fulfilled' ? accountingData.value : null,
-        customers: customersData.status === 'fulfilled' ? customersData.value : null,
-        warehouse: warehouseData.status === 'fulfilled' ? warehouseData.value : null,
-        training: trainingData.status === 'fulfilled' ? trainingData.value : null,
-        reporting: reportingData.status === 'fulfilled' ? reportingData.value : null
+      console.log('[DashboardService] Module fetch results:', {
+        inventory: inventoryData.status,
+        sales: salesData.status,
+        hr: hrData.status,
+        procurement: procurementData.status,
+        manufacturing: manufacturingData.status,
+        pos: posData.status,
+        accounting: accountingData.status,
+        customers: customersData.status,
+        warehouse: warehouseData.status,
+        training: trainingData.status,
+        reporting: reportingData.status
+      });
+
+      const result = {
+        inventory: inventoryData.status === 'fulfilled' ? inventoryData.value : this.getFallbackInventory(),
+        sales: salesData.status === 'fulfilled' ? salesData.value : this.getFallbackSales(),
+        hr: hrData.status === 'fulfilled' ? hrData.value : this.getFallbackHR(),
+        procurement: procurementData.status === 'fulfilled' ? procurementData.value : this.getFallbackProcurement(),
+        manufacturing: manufacturingData.status === 'fulfilled' ? manufacturingData.value : this.getFallbackManufacturing(),
+        pos: posData.status === 'fulfilled' ? posData.value : this.getFallbackPOS(),
+        accounting: accountingData.status === 'fulfilled' ? accountingData.value : this.getFallbackAccounting(),
+        customers: customersData.status === 'fulfilled' ? customersData.value : this.getFallbackCustomers(),
+        warehouse: warehouseData.status === 'fulfilled' ? warehouseData.value : this.getFallbackWarehouse(),
+        training: trainingData.status === 'fulfilled' ? trainingData.value : this.getFallbackTraining(),
+        reporting: reportingData.status === 'fulfilled' ? reportingData.value : this.getFallbackReporting()
       };
+
+      console.log('[DashboardService] Modules summary completed successfully');
+      return result;
     } catch (error) {
-      console.error('Error fetching modules summary:', error);
-      return {};
+      console.error('[DashboardService] Error fetching modules summary:', error);
+      return this.getFallbackModulesSummary();
     }
+  }
+
+  // Fallback data methods
+  static getFallbackModulesSummary() {
+    return {
+      inventory: this.getFallbackInventory(),
+      sales: this.getFallbackSales(),
+      hr: this.getFallbackHR(),
+      procurement: this.getFallbackProcurement(),
+      manufacturing: this.getFallbackManufacturing(),
+      pos: this.getFallbackPOS(),
+      accounting: this.getFallbackAccounting(),
+      customers: this.getFallbackCustomers(),
+      warehouse: this.getFallbackWarehouse(),
+      training: this.getFallbackTraining(),
+      reporting: this.getFallbackReporting()
+    };
+  }
+
+  static getFallbackInventory() {
+    return {
+      totalProducts: 0,
+      lowStockProducts: 0,
+      pendingTransfers: 0,
+      recentMovements: [],
+      totalValue: 0,
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackSales() {
+    return {
+      totalOrders: 0,
+      pendingOrders: 0,
+      totalCustomers: 0,
+      monthlyRevenue: 0,
+      recentOrders: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackHR() {
+    return {
+      totalEmployees: 0,
+      pendingLeave: 0,
+      upcomingTraining: 0,
+      recentActivity: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackProcurement() {
+    return {
+      totalRequests: 0,
+      pendingRequests: 0,
+      totalValue: 0,
+      recentRequests: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackManufacturing() {
+    return {
+      totalOrders: 0,
+      inProgress: 0,
+      completed: 0,
+      recentOrders: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackPOS() {
+    return {
+      totalTransactions: 0,
+      dailyRevenue: 0,
+      recentTransactions: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackAccounting() {
+    return {
+      totalInvoices: 0,
+      pendingPayments: 0,
+      totalRevenue: 0,
+      recentTransactions: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackCustomers() {
+    return {
+      totalCustomers: 0,
+      activeCustomers: 0,
+      recentCustomers: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackWarehouse() {
+    return {
+      totalLocations: 0,
+      totalItems: 0,
+      recentMovements: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackTraining() {
+    return {
+      totalSessions: 0,
+      upcomingSessions: 0,
+      recentSessions: [],
+      status: 'No data available'
+    };
+  }
+
+  static getFallbackReporting() {
+    return {
+      totalReports: 0,
+      scheduledReports: 0,
+      recentReports: [],
+      status: 'No data available'
+    };
   }
 
   // Inventory Module Summary

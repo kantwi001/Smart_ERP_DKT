@@ -8,6 +8,48 @@
   user-select: none;
 }
 
+/* Enhanced Employee Dashboard Mobile Styles */
+@media (max-width: 768px) {
+  /* Employee Dashboard specific optimizations */
+  .employee-dashboard-container {
+    padding: 8px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  
+  .employee-profile-card {
+    margin-bottom: 16px !important;
+    padding: 16px !important;
+  }
+  
+  .employee-avatar {
+    width: 60px !important;
+    height: 60px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .leave-balance-card {
+    padding: 12px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .leave-balance-item {
+    padding: 8px !important;
+    text-align: center !important;
+  }
+  
+  .leave-balance-number {
+    font-size: 1.5rem !important;
+    font-weight: bold !important;
+  }
+  
+  .leave-balance-label {
+    font-size: 0.75rem !important;
+    margin-top: 4px !important;
+  }
+}
+
 /* Larger touch targets for mobile */
 @media (max-width: 768px) {
   .MuiButton-root {
@@ -29,6 +71,22 @@
   .MuiSelect-select {
     font-size: 16px !important;
     padding: 16px !important;
+  }
+  
+  /* Enhanced Tab Navigation for Mobile */
+  .MuiTabs-root {
+    min-height: 48px !important;
+  }
+  
+  .MuiTab-root {
+    min-height: 48px !important;
+    min-width: 80px !important;
+    padding: 8px 12px !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .MuiTab-iconWrapper {
+    margin-bottom: 4px !important;
   }
 }
 

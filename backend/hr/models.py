@@ -48,6 +48,7 @@ class LeaveRequest(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     reason = models.TextField()
+    calculated_days = models.PositiveIntegerField(default=0, help_text='Number of working days calculated for this request')
     status = models.CharField(max_length=20, choices=[('pending','Pending'),('approved','Approved'),('declined','Declined')], default='pending')
     approver = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='leave_approvals')
     approval_stage = models.CharField(max_length=30, choices=[('hod','HOD'),('hr','HR'),('complete','Complete')], default='hod')
@@ -55,11 +56,82 @@ class LeaveRequest(models.Model):
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        # Calculate working days if not provided
+        if not self.calculated_days and self.start_date and self.end_date:
+            self.calculated_days = self.calculate_working_days()
+        
         # On creation, set approver to employee's department supervisor (HOD)
         if not self.pk and self.employee and self.employee.department and self.employee.department.supervisor:
             self.approver = self.employee.department.supervisor
             self.approval_stage = 'hod'
+            
+        # Track status changes for leave balance updates
+        old_status = None
+        if self.pk:
+            try:
+                old_instance = LeaveRequest.objects.get(pk=self.pk)
+                old_status = old_instance.status
+            except LeaveRequest.DoesNotExist:
+                pass
+        
         super().save(*args, **kwargs)
+        
+        # Update leave balance when status changes
+        if old_status != self.status:
+            self.update_leave_balance(old_status, self.status)
+
+    def calculate_working_days(self):
+        """Calculate working days between start and end date (excluding weekends)"""
+        if not self.start_date or not self.end_date:
+            return 0
+        
+        from datetime import timedelta
+        current_date = self.start_date
+        working_days = 0
+        
+        while current_date <= self.end_date:
+            # Exclude weekends (Saturday = 5, Sunday = 6)
+            if current_date.weekday() < 5:
+                working_days += 1
+            current_date += timedelta(days=1)
+        
+        return working_days
+
+    def update_leave_balance(self, old_status, new_status):
+        """Update employee's leave balance based on status change"""
+        from datetime import datetime
+        current_year = datetime.now().year
+        
+        # Get or create leave balance for this employee, leave type, and year
+        leave_balance, created = LeaveBalance.objects.get_or_create(
+            employee=self.employee,
+            leave_type=self.leave_type,
+            year=current_year,
+            defaults={
+                'total_days': 21 if self.leave_type == 'annual' else 10,  # Default allocations
+                'used_days': 0,
+                'pending_days': 0
+            }
+        )
+        
+        # Handle status transitions
+        if old_status is None and new_status == 'pending':
+            # New request - add to pending
+            leave_balance.pending_days += self.calculated_days
+        elif old_status == 'pending' and new_status == 'approved':
+            # Approved - move from pending to used
+            leave_balance.pending_days = max(0, leave_balance.pending_days - self.calculated_days)
+            leave_balance.used_days += self.calculated_days
+            self.reviewed_at = datetime.now()
+        elif old_status == 'pending' and new_status == 'declined':
+            # Declined - remove from pending
+            leave_balance.pending_days = max(0, leave_balance.pending_days - self.calculated_days)
+            self.reviewed_at = datetime.now()
+        elif old_status == 'approved' and new_status == 'declined':
+            # Reverting approval - move from used back to nothing
+            leave_balance.used_days = max(0, leave_balance.used_days - self.calculated_days)
+        
+        leave_balance.save()
 
     def approve(self, user):
         if self.status != 'pending' or user != self.approver:

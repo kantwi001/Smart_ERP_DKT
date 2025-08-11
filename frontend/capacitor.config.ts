@@ -5,9 +5,18 @@ const config: CapacitorConfig = {
   appName: 'ERP System',
   webDir: 'build',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    cleartext: true,
+    allowNavigation: [
+      'http://192.168.2.126:2025',
+      'http://10.0.2.2:2025',
+      'http://localhost:2025'
+    ]
   },
   plugins: {
+    CapacitorHttp: {
+      enabled: true
+    },
     SplashScreen: {
       launchShowDuration: 3000,
       launchAutoHide: true,

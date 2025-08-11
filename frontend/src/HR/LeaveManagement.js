@@ -3,13 +3,14 @@ import {
   Box, Typography, Card, CardContent, Grid, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Chip, IconButton, Tabs, Tab, Alert, CircularProgress, Snackbar,
-  FormControl, InputLabel, Select, Tooltip, Badge
+  FormControl, InputLabel, Select, Tooltip, Badge, Divider
 } from '@mui/material';
 import {
   Edit as EditIcon, Add as AddIcon, Refresh as RefreshIcon, 
   TrendingUp as TrendingUpIcon, People as PeopleIcon, 
   CalendarToday as CalendarIcon, Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon, Schedule as ScheduleIcon
+  CheckCircle as CheckCircleIcon, Schedule as ScheduleIcon,
+  AccessTime as AccessTimeIcon, Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
          ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -23,6 +24,7 @@ const LeaveManagement = () => {
   
   // Data states
   const [leaveBalances, setLeaveBalances] = useState([]);
+  const [leaveRequests, setLeaveRequests] = useState([]);
   const [dashboardStats, setDashboardStats] = useState({});
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -30,7 +32,9 @@ const LeaveManagement = () => {
   // Dialog states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
+  const [requestDetailsDialog, setRequestDetailsDialog] = useState(false);
   const [selectedBalance, setSelectedBalance] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   
   // Form states
   const [editForm, setEditForm] = useState({
@@ -48,503 +52,494 @@ const LeaveManagement = () => {
     ]
   });
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7300'];
-
+  // Load all data
   useEffect(() => {
-    loadData();
+    loadAllData();
   }, []);
 
-  const loadData = async () => {
+  const loadAllData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
+      console.log('🔄 Loading leave management data...');
       
-      const [balancesRes, statsRes, employeesRes, departmentsRes] = await Promise.all([
+      const [balancesRes, requestsRes, statsRes, employeesRes, departmentsRes] = await Promise.allSettled([
         api.get('/hr/leave-balances/'),
-        api.get('/hr/leave-balances/dashboard_stats/'),
+        api.get('/hr/leave-requests/'),
+        api.get('/hr/leave-dashboard-stats/'),
         api.get('/hr/employees/'),
         api.get('/hr/departments/')
       ]);
 
-      setLeaveBalances(balancesRes.data.results || balancesRes.data);
-      setDashboardStats(statsRes.data);
-      setEmployees(employeesRes.data.results || employeesRes.data);
-      setDepartments(departmentsRes.data.results || departmentsRes.data);
+      // Handle each response individually with detailed logging
+      if (balancesRes.status === 'fulfilled') {
+        setLeaveBalances(balancesRes.value.data || []);
+        console.log('✅ Leave balances loaded:', balancesRes.value.data?.length || 0, 'records');
+      } else {
+        console.error('❌ Failed to load leave balances:', balancesRes.reason);
+        setLeaveBalances([]);
+      }
+
+      if (requestsRes.status === 'fulfilled') {
+        setLeaveRequests(requestsRes.value.data || []);
+        console.log('✅ Leave requests loaded:', requestsRes.value.data?.length || 0, 'records');
+      } else {
+        console.error('❌ Failed to load leave requests:', requestsRes.reason);
+        setLeaveRequests([]);
+      }
+
+      if (statsRes.status === 'fulfilled') {
+        setDashboardStats(statsRes.value.data || {});
+        console.log('✅ Dashboard stats loaded:', Object.keys(statsRes.value.data || {}).length, 'stats');
+      } else {
+        console.error('❌ Failed to load dashboard stats:', statsRes.reason);
+        setDashboardStats({});
+      }
+
+      if (employeesRes.status === 'fulfilled') {
+        setEmployees(employeesRes.value.data || []);
+        console.log('✅ Employees loaded:', employeesRes.value.data?.length || 0, 'records');
+      } else {
+        console.error('❌ Failed to load employees:', employeesRes.reason);
+        setEmployees([]);
+      }
+
+      if (departmentsRes.status === 'fulfilled') {
+        setDepartments(departmentsRes.value.data || []);
+        console.log('✅ Departments loaded:', departmentsRes.value.data?.length || 0, 'records');
+      } else {
+        console.error('❌ Failed to load departments:', departmentsRes.reason);
+        setDepartments([]);
+      }
+
+      // Check if any critical endpoints failed
+      const failedEndpoints = [];
+      if (balancesRes.status === 'rejected') failedEndpoints.push('Leave Balances');
+      if (requestsRes.status === 'rejected') failedEndpoints.push('Leave Requests');
+      if (statsRes.status === 'rejected') failedEndpoints.push('Dashboard Stats');
+      if (employeesRes.status === 'rejected') failedEndpoints.push('Employees');
+      if (departmentsRes.status === 'rejected') failedEndpoints.push('Departments');
+
+      if (failedEndpoints.length > 0) {
+        const errorMessage = `Some data failed to load: ${failedEndpoints.join(', ')}. Please check the console for details.`;
+        setError(errorMessage);
+        console.warn('⚠️ Partial data loading - failed endpoints:', failedEndpoints);
+      } else {
+        setError(null);
+        console.log('🎉 All leave management data loaded successfully');
+      }
+
     } catch (err) {
-      setError('Failed to load leave management data');
-      console.error('Error loading leave management data:', err);
+      console.error('💥 Critical error loading leave management data:', err);
+      setError(`Critical error loading data: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditBalance = (balance) => {
-    setSelectedBalance(balance);
-    setEditForm({
-      adjustment_type: 'set',
-      field: 'total_days',
-      days: balance.total_days,
-      reason: ''
-    });
-    setEditDialogOpen(true);
+  const handleApproveRequest = async (requestId) => {
+    try {
+      await api.post(`/hr/leave-requests/${requestId}/approve/`);
+      setSuccess('Leave request approved successfully');
+      loadAllData(); // Refresh all data to show updated balances
+    } catch (err) {
+      setError('Failed to approve leave request');
+    }
   };
 
-  const handleSaveEdit = async () => {
+  const handleDeclineRequest = async (requestId) => {
     try {
-      await api.post(`/hr/leave-balances/${selectedBalance.id}/adjust_balance/`, editForm);
+      await api.post(`/hr/leave-requests/${requestId}/decline/`);
+      setSuccess('Leave request declined successfully');
+      loadAllData(); // Refresh all data to show updated balances
+    } catch (err) {
+      setError('Failed to decline leave request');
+    }
+  };
+
+  const handleEditBalance = async () => {
+    try {
+      const payload = {
+        adjustment_type: editForm.adjustment_type,
+        field: editForm.field,
+        days: parseInt(editForm.days),
+        reason: editForm.reason
+      };
+
+      await api.patch(`/hr/leave-balances/${selectedBalance.id}/`, payload);
       setSuccess('Leave balance updated successfully');
       setEditDialogOpen(false);
-      loadData();
+      loadAllData(); // Refresh data
     } catch (err) {
       setError('Failed to update leave balance');
-      console.error('Error updating leave balance:', err);
     }
   };
 
-  const handleBulkCreate = async () => {
-    try {
-      const response = await api.post('/hr/leave-balances/bulk_create_balances/', bulkCreateForm);
-      setSuccess(response.data.message);
-      setBulkCreateDialogOpen(false);
-      loadData();
-    } catch (err) {
-      setError('Failed to create leave balances');
-      console.error('Error creating leave balances:', err);
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'approved': return 'success';
+      case 'declined': return 'error';
+      case 'pending': return 'warning';
+      default: return 'default';
     }
   };
 
-  const getStatusColor = (balance) => {
-    const utilization = balance.utilization_percentage;
-    if (utilization >= 80) return 'error';
-    if (utilization >= 60) return 'warning';
-    return 'success';
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
-  const getAvailabilityColor = (availableDays) => {
-    if (availableDays <= 0) return 'error';
-    if (availableDays <= 5) return 'warning';
-    return 'success';
+  const calculateWorkingDays = (startDate, endDate) => {
+    if (!startDate || !endDate) return 0;
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let workingDays = 0;
+    const currentDate = new Date(start);
+    
+    while (currentDate <= end) {
+      const dayOfWeek = currentDate.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        workingDays++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return workingDays;
   };
-
-  const renderDashboardStats = () => (
-    <Grid container spacing={3} sx={{ mb: 3 }}>
-      <Grid item xs={12} sm={6} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <PeopleIcon color="primary" sx={{ mr: 2, fontSize: 40 }} />
-              <Box>
-                <Typography variant="h4" color="primary">
-                  {dashboardStats.total_employees || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Employees
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-      
-      <Grid item xs={12} sm={6} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <CalendarIcon color="success" sx={{ mr: 2, fontSize: 40 }} />
-              <Box>
-                <Typography variant="h4" color="success.main">
-                  {dashboardStats.total_allocated_days || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Allocated Days
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-      
-      <Grid item xs={12} sm={6} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <CheckCircleIcon color="info" sx={{ mr: 2, fontSize: 40 }} />
-              <Box>
-                <Typography variant="h4" color="info.main">
-                  {dashboardStats.total_used_days || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Days Used
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-      
-      <Grid item xs={12} sm={6} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <ScheduleIcon color="warning" sx={{ mr: 2, fontSize: 40 }} />
-              <Box>
-                <Typography variant="h4" color="warning.main">
-                  {dashboardStats.total_pending_days || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pending Days
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  );
-
-  const renderAnalytics = () => (
-    <Grid container spacing={3} sx={{ mb: 3 }}>
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>Leave Type Distribution</Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={dashboardStats.leave_type_breakdown || []}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ display_name, total_allocated }) => `${display_name}: ${total_allocated}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="total_allocated"
-                >
-                  {(dashboardStats.leave_type_breakdown || []).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </Grid>
-      
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>Department Leave Usage</Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dashboardStats.department_breakdown || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="department" />
-                <YAxis />
-                <RechartsTooltip />
-                <Bar dataKey="total_used" fill="#8884d8" />
-                <Bar dataKey="total_allocated" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  );
-
-  const renderLeaveBalanceTable = () => (
-    <Card>
-      <CardContent>
-        <Box display="flex" justifyContent="between" alignItems="center" mb={2}>
-          <Typography variant="h6">Employee Leave Balances</Typography>
-          <Box>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setBulkCreateDialogOpen(true)}
-              sx={{ mr: 1 }}
-            >
-              Bulk Create
-            </Button>
-            <IconButton onClick={loadData}>
-              <RefreshIcon />
-            </IconButton>
-          </Box>
-        </Box>
-        
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Employee</TableCell>
-                <TableCell>Department</TableCell>
-                <TableCell>Leave Type</TableCell>
-                <TableCell>Year</TableCell>
-                <TableCell>Total Days</TableCell>
-                <TableCell>Used Days</TableCell>
-                <TableCell>Pending Days</TableCell>
-                <TableCell>Available Days</TableCell>
-                <TableCell>Utilization</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {leaveBalances.map((balance) => (
-                <TableRow key={balance.id}>
-                  <TableCell>{balance.employee_name}</TableCell>
-                  <TableCell>{balance.department_name || 'N/A'}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={balance.leave_type_display} 
-                      size="small" 
-                      color="primary" 
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>{balance.year}</TableCell>
-                  <TableCell>{balance.total_days}</TableCell>
-                  <TableCell>{balance.used_days}</TableCell>
-                  <TableCell>
-                    {balance.pending_days > 0 && (
-                      <Badge badgeContent={balance.pending_days} color="warning">
-                        <Typography variant="body2">{balance.pending_days}</Typography>
-                      </Badge>
-                    )}
-                    {balance.pending_days === 0 && balance.pending_days}
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={balance.available_days}
-                      size="small"
-                      color={getAvailabilityColor(balance.available_days)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={`${balance.utilization_percentage}%`}
-                      size="small"
-                      color={getStatusColor(balance)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title="Edit Balance">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleEditBalance(balance)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </CardContent>
-    </Card>
-  );
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Box p={3}>
-      <Typography variant="h4" gutterBottom>
-        Leave Management Dashboard
-      </Typography>
-      <Typography variant="body1" color="text.secondary" gutterBottom>
-        Manage and edit employee leave balances. This dashboard is for HR management only.
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)} sx={{ mb: 3 }}>
-        <Tab label="Overview" />
-        <Tab label="Analytics" />
-        <Tab label="Employee Balances" />
-      </Tabs>
-
-      {tabValue === 0 && (
-        <Box>
-          {renderDashboardStats()}
-          {renderLeaveBalanceTable()}
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CalendarIcon color="primary" />
+          Leave Management Dashboard
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={loadAllData}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setBulkCreateDialogOpen(true)}
+          >
+            Bulk Create Balances
+          </Button>
         </Box>
+      </Box>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {/* Dashboard Stats */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#e3f2fd' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" color="primary">
+                    {dashboardStats.total_employees || employees.length}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Total Employees
+                  </Typography>
+                </Box>
+                <PeopleIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#fff3e0' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" color="warning.main">
+                    {leaveRequests.filter(req => req.status === 'pending').length}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Pending Requests
+                  </Typography>
+                </Box>
+                <ScheduleIcon sx={{ fontSize: 40, color: 'warning.main' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#e8f5e8' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" color="success.main">
+                    {leaveRequests.filter(req => req.status === 'approved').length}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Approved This Month
+                  </Typography>
+                </Box>
+                <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#fce4ec' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" color="error.main">
+                    {leaveBalances.filter(balance => balance.available_days < 5).length}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Low Balance Alerts
+                  </Typography>
+                </Box>
+                <WarningIcon sx={{ fontSize: 40, color: 'error.main' }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+          <Tab label="Leave Balances" />
+          <Tab label="Leave Requests" />
+          <Tab label="Analytics" />
+        </Tabs>
+      </Box>
+
+      {/* Tab Content */}
+      {tabValue === 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Employee Leave Balances
+            </Typography>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Employee</TableCell>
+                    <TableCell>Department</TableCell>
+                    <TableCell>Leave Type</TableCell>
+                    <TableCell>Total Days</TableCell>
+                    <TableCell>Used Days</TableCell>
+                    <TableCell>Pending Days</TableCell>
+                    <TableCell>Available Days</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {leaveBalances.map((balance) => (
+                    <TableRow key={balance.id}>
+                      <TableCell>{balance.employee_name}</TableCell>
+                      <TableCell>{balance.department_name}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={balance.leave_type} 
+                          size="small" 
+                          color={balance.leave_type === 'annual' ? 'primary' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>{balance.total_days}</TableCell>
+                      <TableCell>{balance.used_days}</TableCell>
+                      <TableCell>{balance.pending_days}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography 
+                            color={balance.available_days < 5 ? 'error' : 'success'}
+                            fontWeight="bold"
+                          >
+                            {balance.available_days}
+                          </Typography>
+                          {balance.available_days < 5 && (
+                            <WarningIcon color="error" fontSize="small" />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSelectedBalance(balance);
+                            setEditDialogOpen(true);
+                          }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
       )}
 
       {tabValue === 1 && (
-        <Box>
-          {renderDashboardStats()}
-          {renderAnalytics()}
-        </Box>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Leave Requests Management
+            </Typography>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Employee</TableCell>
+                    <TableCell>Leave Type</TableCell>
+                    <TableCell>Dates</TableCell>
+                    <TableCell>Calculated Days</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Approval Stage</TableCell>
+                    <TableCell>Requested Date</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {leaveRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell>{request.employee_name}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={request.leave_type} 
+                          size="small" 
+                          color={request.leave_type === 'annual' ? 'primary' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {formatDate(request.start_date)} - {formatDate(request.end_date)}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <AccessTimeIcon fontSize="small" color="primary" />
+                          <Typography fontWeight="bold" color="primary">
+                            {request.calculated_days || calculateWorkingDays(request.start_date, request.end_date)} days
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={request.status} 
+                          color={getStatusColor(request.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>{request.approval_stage}</TableCell>
+                      <TableCell>{formatDate(request.requested_at)}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setRequestDetailsDialog(true);
+                            }}
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                          {request.status === 'pending' && (
+                            <>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                onClick={() => handleApproveRequest(request.id)}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => handleDeclineRequest(request.id)}
+                              >
+                                Decline
+                              </Button>
+                            </>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
       )}
 
-      {tabValue === 2 && renderLeaveBalanceTable()}
-
-      {/* Edit Balance Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Leave Balance</DialogTitle>
+      {/* Request Details Dialog */}
+      <Dialog 
+        open={requestDetailsDialog} 
+        onClose={() => setRequestDetailsDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Leave Request Details</DialogTitle>
         <DialogContent>
-          {selectedBalance && (
-            <Box>
-              <Typography variant="subtitle1" gutterBottom>
-                {selectedBalance.employee_name} - {selectedBalance.leave_type_display} ({selectedBalance.year})
-              </Typography>
-              
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Field to Edit</InputLabel>
-                    <Select
-                      value={editForm.field}
-                      onChange={(e) => setEditForm({...editForm, field: e.target.value})}
-                    >
-                      <MenuItem value="total_days">Total Days</MenuItem>
-                      <MenuItem value="used_days">Used Days</MenuItem>
-                      <MenuItem value="carry_over_days">Carry Over Days</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Action</InputLabel>
-                    <Select
-                      value={editForm.adjustment_type}
-                      onChange={(e) => setEditForm({...editForm, adjustment_type: e.target.value})}
-                    >
-                      <MenuItem value="set">Set To</MenuItem>
-                      <MenuItem value="add">Add</MenuItem>
-                      <MenuItem value="subtract">Subtract</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Days"
-                    type="number"
-                    value={editForm.days}
-                    onChange={(e) => setEditForm({...editForm, days: parseInt(e.target.value) || 0})}
-                  />
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Reason (Optional)"
-                    multiline
-                    rows={3}
-                    value={editForm.reason}
-                    onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
-                  />
-                </Grid>
+          {selectedRequest && (
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="textSecondary">Employee</Typography>
+                <Typography variant="body1" gutterBottom>{selectedRequest.employee_name}</Typography>
               </Grid>
-            </Box>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="textSecondary">Leave Type</Typography>
+                <Chip label={selectedRequest.leave_type} color="primary" size="small" />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="textSecondary">Start Date</Typography>
+                <Typography variant="body1" gutterBottom>{formatDate(selectedRequest.start_date)}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="textSecondary">End Date</Typography>
+                <Typography variant="body1" gutterBottom>{formatDate(selectedRequest.end_date)}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="textSecondary">Calculated Working Days</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AccessTimeIcon color="primary" />
+                  <Typography variant="h6" color="primary">
+                    {selectedRequest.calculated_days || calculateWorkingDays(selectedRequest.start_date, selectedRequest.end_date)} days
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="textSecondary">Status</Typography>
+                <Chip 
+                  label={selectedRequest.status} 
+                  color={getStatusColor(selectedRequest.status)}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" color="textSecondary">Reason</Typography>
+                <Typography variant="body1">{selectedRequest.reason}</Typography>
+              </Grid>
+            </Grid>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSaveEdit} variant="contained">Save Changes</Button>
+          <Button onClick={() => setRequestDetailsDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Bulk Create Dialog */}
-      <Dialog open={bulkCreateDialogOpen} onClose={() => setBulkCreateDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Bulk Create Leave Balances</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Create leave balances for all active employees for the specified year.
-          </Typography>
-          
-          <TextField
-            fullWidth
-            label="Year"
-            type="number"
-            value={bulkCreateForm.year}
-            onChange={(e) => setBulkCreateForm({...bulkCreateForm, year: parseInt(e.target.value)})}
-            sx={{ mt: 2, mb: 2 }}
-          />
-          
-          <Typography variant="subtitle1" gutterBottom>
-            Leave Types & Allocations:
-          </Typography>
-          
-          {bulkCreateForm.leave_types.map((leaveType, index) => (
-            <Grid container spacing={2} key={index} sx={{ mb: 2 }}>
-              <Grid item xs={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Leave Type</InputLabel>
-                  <Select
-                    value={leaveType.leave_type}
-                    onChange={(e) => {
-                      const newLeaveTypes = [...bulkCreateForm.leave_types];
-                      newLeaveTypes[index].leave_type = e.target.value;
-                      setBulkCreateForm({...bulkCreateForm, leave_types: newLeaveTypes});
-                    }}
-                  >
-                    <MenuItem value="annual">Annual Leave</MenuItem>
-                    <MenuItem value="sick">Sick Leave</MenuItem>
-                    <MenuItem value="maternity">Maternity Leave</MenuItem>
-                    <MenuItem value="paternity">Paternity Leave</MenuItem>
-                    <MenuItem value="compassionate">Compassionate Leave</MenuItem>
-                    <MenuItem value="study">Study Leave</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={4}>
-                <TextField
-                  fullWidth
-                  label="Days"
-                  type="number"
-                  value={leaveType.total_days}
-                  onChange={(e) => {
-                    const newLeaveTypes = [...bulkCreateForm.leave_types];
-                    newLeaveTypes[index].total_days = parseInt(e.target.value) || 0;
-                    setBulkCreateForm({...bulkCreateForm, leave_types: newLeaveTypes});
-                  }}
-                />
-              </Grid>
-              <Grid item xs={2}>
-                <Button
-                  color="error"
-                  onClick={() => {
-                    const newLeaveTypes = bulkCreateForm.leave_types.filter((_, i) => i !== index);
-                    setBulkCreateForm({...bulkCreateForm, leave_types: newLeaveTypes});
-                  }}
-                >
-                  Remove
-                </Button>
-              </Grid>
-            </Grid>
-          ))}
-          
-          <Button
-            onClick={() => {
-              setBulkCreateForm({
-                ...bulkCreateForm,
-                leave_types: [...bulkCreateForm.leave_types, { leave_type: 'annual', total_days: 21 }]
-              });
-            }}
-          >
-            Add Leave Type
-          </Button>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBulkCreateDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleBulkCreate} variant="contained">Create Balances</Button>
-        </DialogActions>
-      </Dialog>
-
+      {/* Success/Error Snackbar */}
       <Snackbar
         open={!!success}
         autoHideDuration={6000}

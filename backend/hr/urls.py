@@ -4,11 +4,12 @@ from .views import (
     DepartmentViewSet, EmployeeViewSet, JobPostingViewSet, ApplicationViewSet, 
     LeaveRequestViewSet, LeaveBalanceViewSet, NotificationViewSet, AttendanceViewSet, PayrollViewSet, 
     AnnouncementViewSet, TrainingSessionViewSet, TrainingMaterialViewSet, TrainingVideoViewSet, TrainingProgressViewSet, HRTaskViewSet, ExitInterviewViewSet, 
-    VisitLogViewSet, MeetingViewSet, PerformanceReviewViewSet, leave_balance,
+    VisitLogViewSet, MeetingViewSet, PerformanceReviewViewSet,
     OnboardingTemplateViewSet, OnboardingStepViewSet, OnboardingProcessViewSet,
     OnboardingStepInstanceViewSet, OnboardingDocumentViewSet, OnboardingFeedbackViewSet,
-    onboarding_dashboard_stats, HRCalendarEventViewSet, HRHolidayViewSet, HRDeadlineViewSet,
-    EnhancedAnnouncementViewSet, HRCalendarNotificationViewSet, hr_calendar_dashboard_stats
+    HRCalendarEventViewSet, HRHolidayViewSet, HRDeadlineViewSet,
+    EnhancedAnnouncementViewSet, HRCalendarNotificationViewSet, AnnouncementReadViewSet,
+    leave_dashboard_stats, leave_balance
 )
 
 router = routers.DefaultRouter()
@@ -46,9 +47,10 @@ router.register(r'holidays', HRHolidayViewSet)
 router.register(r'deadlines', HRDeadlineViewSet)
 router.register(r'enhanced-announcements', EnhancedAnnouncementViewSet)
 router.register(r'calendar-notifications', HRCalendarNotificationViewSet)
+router.register(r'announcement-reads', AnnouncementReadViewSet)
 
+# Add custom URL patterns for function-based views
 urlpatterns = [
+    path('leave-dashboard-stats/', leave_dashboard_stats, name='leave-dashboard-stats'),
     path('leave-balance/', leave_balance, name='leave-balance'),
-    path('onboarding-dashboard-stats/', onboarding_dashboard_stats, name='onboarding-dashboard-stats'),
-    path('calendar-dashboard-stats/', hr_calendar_dashboard_stats, name='hr-calendar-dashboard-stats'),
 ] + router.urls

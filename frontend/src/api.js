@@ -1,6 +1,30 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 
-const API_BASE_URL = 'http://localhost:2025/api';
+// Mobile-aware API base URL configuration
+const getApiBaseUrl = () => {
+  // Check if running in Capacitor (mobile app)
+  if (Capacitor.isNativePlatform()) {
+    // For Android emulator, use 10.0.2.2 to reach host machine
+    // For physical devices, you'll need to use your computer's IP address
+    const platform = Capacitor.getPlatform();
+    if (platform === 'android') {
+      // For Android emulator/device, use your computer's actual IP address
+      // Using your WiFi IP address: 192.168.2.126
+      return 'http://192.168.2.126:2025/api';
+    } else if (platform === 'ios') {
+      // iOS simulator uses localhost
+      return 'http://localhost:2025/api';
+    }
+  }
+  
+  // Default for web browsers
+  return 'http://localhost:2025/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('[API] Using base URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

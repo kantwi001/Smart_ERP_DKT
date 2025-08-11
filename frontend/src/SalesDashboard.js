@@ -19,6 +19,8 @@ import AddIcon from '@mui/icons-material/Add';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ContactsIcon from '@mui/icons-material/Contacts';
+import AddBoxIcon from '@mui/icons-material/AddBox';
+import PriceChangeIcon from '@mui/icons-material/PriceChange';
 import api from './api';
 import { AuthContext } from './AuthContext';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
@@ -142,7 +144,7 @@ const mockPieData3 = [
 ];
 
 const SalesDashboard = () => {
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -161,6 +163,9 @@ const SalesDashboard = () => {
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [salesOrderDialogOpen, setSalesOrderDialogOpen] = useState(false);
+  const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
+  const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
+  const [priceManagementDialogOpen, setPriceManagementDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
@@ -186,13 +191,77 @@ const SalesDashboard = () => {
     notes: '',
     discount: 0
   });
+
+  const [customerForm, setCustomerForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    customer_type: 'retailer',
+    warehouse: '',
+    contact_person: '',
+    tax_number: '',
+    credit_limit: '',
+    payment_terms: 'cash'
+  });
+
+  const [productForm, setProductForm] = useState({
+    name: '',
+    sku: '',
+    price: '',
+    description: ''
+  });
+
+  const [priceForm, setPriceForm] = useState({
+    product: '',
+    price: ''
+  });
+
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [recentSales, setRecentSales] = useState([]);
   const [filters, setFilters] = useState({});
   const [salesAgents, setSalesAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('all');
   const [agentAnalytics, setAgentAnalytics] = useState(null);
+
+  // Role-based access control for product management
+  const canManageProducts = () => {
+    if (!user) return false;
+    
+    // Check if user is superadmin or has specific roles
+    const allowedRoles = ['sales_manager', 'superadmin', 'sales_supervisor', 'logistics'];
+    const allowedDepartments = ['logistics'];
+    
+    return (
+      user.is_superuser ||
+      user.role === 'superadmin' ||
+      allowedRoles.includes(user.role?.toLowerCase()) ||
+      allowedDepartments.includes(user.department_name?.toLowerCase()) ||
+      user.role?.toLowerCase().includes('manager') ||
+      user.role?.toLowerCase().includes('supervisor')
+    );
+  };
+
+  // Separate access control for Add Product (more restrictive)
+  const canAddProducts = () => {
+    if (!user) return false;
+    
+    // Exclude regular sales department users, but allow specific roles
+    const allowedRoles = ['sales_manager', 'superadmin', 'sales_supervisor', 'logistics'];
+    
+    return (
+      user.is_superuser ||
+      user.role === 'superadmin' ||
+      allowedRoles.includes(user.role?.toLowerCase()) ||
+      user.department_name?.toLowerCase() === 'logistics' ||
+      (user.role?.toLowerCase().includes('manager') && user.department_name?.toLowerCase() !== 'sales') ||
+      (user.role?.toLowerCase().includes('supervisor') && user.department_name?.toLowerCase() !== 'sales') ||
+      (user.role?.toLowerCase() === 'sales_manager') ||
+      (user.role?.toLowerCase() === 'sales_supervisor')
+    );
+  };
 
   // Mock data for demonstration
   const recentActivity = [
@@ -203,8 +272,63 @@ const SalesDashboard = () => {
     { action: 'Product demo completed', timestamp: '3 hours ago', type: 'info' },
   ];
 
-  // Remove duplicate fetchData function - using the one defined below
-  
+  useEffect(() => {
+    loadDashboardData();
+    loadCustomers();
+    loadProducts();
+    loadWarehouses();
+    loadSalesAgents();
+  }, [token]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/sales/dashboard/');
+      setSalesData(response.data);
+    } catch (error) {
+      setError('Failed to load dashboard data');
+      console.error('Dashboard error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCustomers = async () => {
+    try {
+      const response = await api.get('/sales/customers/');
+      setCustomers(response.data.results || response.data);
+    } catch (error) {
+      console.error('Failed to load customers:', error);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const response = await api.get('/inventory/products/');
+      setProducts(response.data.results || response.data);
+    } catch (error) {
+      console.error('Failed to load products:', error);
+    }
+  };
+
+  const loadWarehouses = async () => {
+    try {
+      const response = await api.get('/warehouse/');
+      setWarehouses(response.data.results || response.data);
+    } catch (error) {
+      console.error('Failed to load warehouses:', error);
+    }
+  };
+
+  const loadSalesAgents = async () => {
+    try {
+      const response = await api.get('/sales/agents/');
+      setSalesAgents(response.data.results || response.data);
+    } catch (error) {
+      console.error('Failed to load sales agents:', error);
+    }
+  };
+
   // Quick Action Handlers
   const handleCreateSalesOrder = () => {
     // Open sales order creation dialog
@@ -256,7 +380,7 @@ const SalesDashboard = () => {
       });
       
       // Refresh sales data to show new order
-      fetchSalesData();
+      loadDashboardData();
     } catch (error) {
       console.error('Failed to create sales order:', error);
       setSnackbarMessage('Failed to create sales order');
@@ -264,14 +388,56 @@ const SalesDashboard = () => {
     }
   };
   
-  const handleAddCustomer = () => {
-    // Navigate to customers management with proper routing
+  const handleAddCustomer = async () => {
     try {
-      window.location.href = '/customers/management';
+      if (!customerForm.name || !customerForm.email) {
+        setSnackbarMessage('Please fill in name and email fields');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Create customer via backend API
+      const customerData = {
+        name: customerForm.name,
+        email: customerForm.email,
+        phone: customerForm.phone,
+        address: customerForm.address,
+        customer_type: customerForm.customer_type,
+        warehouse: customerForm.warehouse,
+        contact_person: customerForm.contact_person,
+        tax_number: customerForm.tax_number,
+        credit_limit: customerForm.credit_limit,
+        payment_terms: customerForm.payment_terms,
+        status: 'active'
+      };
+
+      const response = await api.post('/sales/customers/', customerData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('Customer created:', response.data);
+      setSnackbarMessage('Customer added successfully!');
+      setSnackbarOpen(true);
+      setAddCustomerDialogOpen(false);
+      setCustomerForm({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        customer_type: 'retailer',
+        warehouse: '',
+        contact_person: '',
+        tax_number: '',
+        credit_limit: '',
+        payment_terms: 'cash'
+      });
+      
+      // Refresh customers data to show new customer
+      loadCustomers();
     } catch (error) {
-      console.error('Navigation error:', error);
-      // Fallback: try direct navigation
-      window.open('/customers/management', '_blank');
+      console.error('Failed to add customer:', error);
+      setSnackbarMessage('Failed to add customer');
+      setSnackbarOpen(true);
     }
   };
   
@@ -303,7 +469,7 @@ const SalesDashboard = () => {
       setQuoteForm({ customer: '', product: '', quantity: '', notes: '' });
       
       // Refresh sales data to show new quote
-      fetchSalesData();
+      loadDashboardData();
     } catch (error) {
       console.error('Failed to generate quote:', error);
       setSnackbarMessage('Failed to generate quote');
@@ -340,7 +506,7 @@ const SalesDashboard = () => {
       setLeadForm({ name: '', email: '', phone: '', company: '', source: 'website' });
       
       // Refresh sales data to show new lead
-      fetchSalesData();
+      loadDashboardData();
     } catch (error) {
       console.error('Failed to add lead:', error);
       setSnackbarMessage('Failed to add lead');
@@ -348,9 +514,85 @@ const SalesDashboard = () => {
     }
   };
   
+  const handleAddProduct = async () => {
+    try {
+      if (!productForm.name || !productForm.sku || !productForm.price) {
+        setSnackbarMessage('Please fill in all required fields');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Create product via backend API
+      const productData = {
+        name: productForm.name,
+        sku: productForm.sku,
+        price: parseFloat(productForm.price),
+        description: productForm.description
+      };
+
+      const response = await api.post('/inventory/products/', productData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('Product created:', response.data);
+      setSnackbarMessage('Product added successfully!');
+      setSnackbarOpen(true);
+      setAddProductDialogOpen(false);
+      setProductForm({
+        name: '',
+        sku: '',
+        price: '',
+        description: ''
+      });
+      
+      // Refresh products data to show new product
+      loadProducts();
+    } catch (error) {
+      console.error('Failed to add product:', error);
+      setSnackbarMessage('Failed to add product');
+      setSnackbarOpen(true);
+    }
+  };
+  
+  const handlePriceManagement = async () => {
+    try {
+      if (!priceForm.product || !priceForm.price) {
+        setSnackbarMessage('Please select a product and enter a price');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Update price via backend API
+      const priceData = {
+        product: priceForm.product,
+        price: parseFloat(priceForm.price)
+      };
+
+      const response = await api.put('/inventory/products/price/', priceData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('Price updated:', response.data);
+      setSnackbarMessage('Price updated successfully!');
+      setSnackbarOpen(true);
+      setPriceManagementDialogOpen(false);
+      setPriceForm({
+        product: '',
+        price: ''
+      });
+      
+      // Refresh products data to show updated price
+      loadProducts();
+    } catch (error) {
+      console.error('Failed to update price:', error);
+      setSnackbarMessage('Failed to update price');
+      setSnackbarOpen(true);
+    }
+  };
+  
   const handleRefreshData = () => {
     setLoading(true);
-    fetchSalesData();
+    loadDashboardData();
   };
   
   const fetchSalesData = async () => {
@@ -452,7 +694,7 @@ const SalesDashboard = () => {
   
   useEffect(() => {
     if (token) {
-      fetchSalesData();
+      loadDashboardData();
     }
   }, [token]);
 
@@ -554,7 +796,7 @@ const SalesDashboard = () => {
               fullWidth
               variant="contained"
               startIcon={<PersonAddIcon />}
-              onClick={handleAddCustomer}
+              onClick={() => setAddCustomerDialogOpen(true)}
               sx={{ 
                 background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)',
                 color: 'white'
@@ -563,6 +805,38 @@ const SalesDashboard = () => {
               Add Customer
             </QuickActionButton>
           </Grid>
+          {canAddProducts() && (
+            <>
+              <Grid item xs={12} sm={6} md={3}>
+                <QuickActionButton
+                  fullWidth
+                  variant="contained"
+                  startIcon={<AddBoxIcon />}
+                  onClick={() => setAddProductDialogOpen(true)}
+                  sx={{ 
+                    background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
+                    color: 'white'
+                  }}
+                >
+                  Add Product
+                </QuickActionButton>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <QuickActionButton
+                  fullWidth
+                  variant="contained"
+                  startIcon={<PriceChangeIcon />}
+                  onClick={() => setPriceManagementDialogOpen(true)}
+                  sx={{ 
+                    background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
+                    color: 'white'
+                  }}
+                >
+                  Price Management
+                </QuickActionButton>
+              </Grid>
+            </>
+          )}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
@@ -1171,6 +1445,197 @@ const SalesDashboard = () => {
             sx={{ background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)' }}
           >
             Create Order
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Add Customer Dialog */}
+      <Dialog open={addCustomerDialogOpen} onClose={() => setAddCustomerDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Add New Customer</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Name"
+            value={customerForm.name}
+            onChange={(e) => setCustomerForm({...customerForm, name: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Email"
+            type="email"
+            value={customerForm.email}
+            onChange={(e) => setCustomerForm({...customerForm, email: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Phone Number"
+            value={customerForm.phone}
+            onChange={(e) => setCustomerForm({...customerForm, phone: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Address"
+            value={customerForm.address}
+            onChange={(e) => setCustomerForm({...customerForm, address: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            select
+            label="Customer Type"
+            value={customerForm.customer_type}
+            onChange={(e) => setCustomerForm({...customerForm, customer_type: e.target.value})}
+            margin="normal"
+          >
+            <MenuItem value="retailer">Retailer</MenuItem>
+            <MenuItem value="wholesaler">Wholesaler</MenuItem>
+            <MenuItem value="distributor">Distributor</MenuItem>
+          </TextField>
+          <TextField
+            fullWidth
+            select
+            label="Warehouse"
+            value={customerForm.warehouse}
+            onChange={(e) => setCustomerForm({...customerForm, warehouse: e.target.value})}
+            margin="normal"
+          >
+            {warehouses.map((warehouse) => (
+              <MenuItem key={warehouse.id} value={warehouse.id}>
+                {warehouse.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            label="Contact Person"
+            value={customerForm.contact_person}
+            onChange={(e) => setCustomerForm({...customerForm, contact_person: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Tax Number"
+            value={customerForm.tax_number}
+            onChange={(e) => setCustomerForm({...customerForm, tax_number: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            type="number"
+            label="Credit Limit"
+            value={customerForm.credit_limit}
+            onChange={(e) => setCustomerForm({...customerForm, credit_limit: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            select
+            label="Payment Terms"
+            value={customerForm.payment_terms}
+            onChange={(e) => setCustomerForm({...customerForm, payment_terms: e.target.value})}
+            margin="normal"
+          >
+            <MenuItem value="cash">Cash</MenuItem>
+            <MenuItem value="credit">Credit</MenuItem>
+            <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddCustomerDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleAddCustomer} 
+            variant="contained"
+            sx={{ background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)' }}
+          >
+            Add Customer
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Add Product Dialog */}
+      <Dialog open={addProductDialogOpen} onClose={() => setAddProductDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Add New Product</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Name"
+            value={productForm.name}
+            onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="SKU"
+            value={productForm.sku}
+            onChange={(e) => setProductForm({...productForm, sku: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            type="number"
+            label="Price"
+            value={productForm.price}
+            onChange={(e) => setProductForm({...productForm, price: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Description"
+            value={productForm.description}
+            onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+            margin="normal"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddProductDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleAddProduct} 
+            variant="contained"
+            sx={{ background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)' }}
+          >
+            Add Product
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Price Management Dialog */}
+      <Dialog open={priceManagementDialogOpen} onClose={() => setPriceManagementDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Price Management</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            select
+            label="Product"
+            value={priceForm.product}
+            onChange={(e) => setPriceForm({...priceForm, product: e.target.value})}
+            margin="normal"
+          >
+            {products.map((product) => (
+              <MenuItem key={product.id} value={product.id}>
+                {product.name} - {product.sku}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            type="number"
+            label="Price"
+            value={priceForm.price}
+            onChange={(e) => setPriceForm({...priceForm, price: e.target.value})}
+            margin="normal"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPriceManagementDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handlePriceManagement} 
+            variant="contained"
+            sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)' }}
+          >
+            Update Price
           </Button>
         </DialogActions>
       </Dialog>

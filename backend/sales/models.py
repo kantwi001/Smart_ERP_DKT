@@ -174,9 +174,18 @@ class Sale(models.Model):
         ('LRD', 'Liberian Dollar'),
         ('GHS', 'Ghana Cedi'),
     ]
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('cash', 'Cash'),
+        ('card', 'Card'),
+        ('mobile_money', 'Mobile Money'),
+        ('credit', 'Credit'),
+    ]
+    
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True)
     staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
     date = models.DateTimeField(auto_now_add=True)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50, default='pending')
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='SLL')
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')

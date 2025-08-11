@@ -273,10 +273,63 @@ function WarehouseDashboard() {
       }
       
       const warehousesData = warehousesResponse.data.results || warehousesResponse.data;
-      setWarehouses(warehousesData);
       
-      if (warehousesData.length > 0) {
-        const selectedWh = warehousesData[0];
+      // Fetch manager details for each warehouse
+      const warehousesWithManagers = await Promise.all(
+        warehousesData.map(async (warehouse) => {
+          try {
+            // Try to get manager information if manager_id exists
+            if (warehouse.manager || warehouse.manager_id) {
+              const managerId = warehouse.manager || warehouse.manager_id;
+              const managerResponse = await api.get(`/users/${managerId}/`);
+              return {
+                ...warehouse,
+                manager_name: managerResponse.data.first_name && managerResponse.data.last_name 
+                  ? `${managerResponse.data.first_name} ${managerResponse.data.last_name}`
+                  : managerResponse.data.username,
+                manager_details: managerResponse.data
+              };
+            }
+            
+            // Try to find assigned sales rep for this warehouse
+            const usersResponse = await api.get('/users/');
+            const users = usersResponse.data.results || usersResponse.data;
+            const assignedUser = users.find(user => 
+              user.assigned_warehouse === warehouse.id || 
+              user.warehouse === warehouse.id ||
+              (user.department_name?.toLowerCase() === 'sales' && user.warehouse_id === warehouse.id)
+            );
+            
+            if (assignedUser) {
+              return {
+                ...warehouse,
+                manager_name: assignedUser.first_name && assignedUser.last_name 
+                  ? `${assignedUser.first_name} ${assignedUser.last_name}`
+                  : assignedUser.username,
+                manager_details: assignedUser
+              };
+            }
+            
+            return {
+              ...warehouse,
+              manager_name: 'Unassigned',
+              manager_details: null
+            };
+          } catch (error) {
+            console.error(`Error fetching manager for warehouse ${warehouse.id}:`, error);
+            return {
+              ...warehouse,
+              manager_name: 'Unassigned',
+              manager_details: null
+            };
+          }
+        })
+      );
+      
+      setWarehouses(warehousesWithManagers);
+      
+      if (warehousesWithManagers.length > 0) {
+        const selectedWh = warehousesWithManagers[0];
         setSelectedWarehouse(selectedWh);
         if (!isSalesManager) {
           setUserWarehouse(selectedWh);

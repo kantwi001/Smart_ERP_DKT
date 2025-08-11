@@ -331,6 +331,7 @@ function AppShell() {
         { text: 'Categories', icon: <CategoryIcon />, path: '/categories', role: 'sales' },
         { text: 'Procurement', icon: <ShoppingCartIcon />, path: '/procurement' },
         { text: 'Users', icon: <SupervisorAccountIcon />, path: '/users' },
+        { text: 'Sync', icon: <SyncIcon />, path: '/sync' },
         { text: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' },
         { text: 'System Settings', icon: <SettingsIcon />, path: '/system-settings' }
       ];
@@ -339,48 +340,23 @@ function AppShell() {
     // Sales department users - consumer access to sales modules
     const isSalesUser = (user?.department_name && typeof user.department_name === 'string' && user.department_name.toLowerCase() === 'sales') || 
                        (user?.department && typeof user.department === 'string' && user.department.toLowerCase() === 'sales') ||
-                       user?.role === 'sales_rep' ||
                        user?.role === 'sales_manager' ||
-                       (user?.role === 'employee' && ((user?.department_name && typeof user.department_name === 'string' && user.department_name.toLowerCase() === 'sales') || (user?.department && typeof user.department === 'string' && user.department.toLowerCase() === 'sales')));
+                       user?.role === 'sales_rep';
 
-    console.log('🏢 Sales user check:', {
-      department_name: user?.department_name,
-      department: user?.department,
-      role: user?.role,
-      isSalesUser: isSalesUser,
-      'department_name_type': typeof user?.department_name,
-      'department_type': typeof user?.department,
-      'department_name_lower': (user?.department_name && typeof user.department_name === 'string') ? user.department_name.toLowerCase() : 'not_string',
-      'department_lower': (user?.department && typeof user.department === 'string') ? user.department.toLowerCase() : 'not_string'
-    });
-    
     if (isSalesUser) {
-      console.log('🔍 SALES USER DEBUG - Edmund Sekyere Check:', {
-        username: user?.username,
-        email: user?.email,
-        department_name: user?.department_name,
-        department: user?.department,
-        role: user?.role,
-        is_superuser: user?.is_superuser,
-        full_user_object: user,
-        isSalesUser: isSalesUser,
-        'department_name === Sales': user?.department_name === 'Sales',
-        'department === Sales': user?.department === 'Sales',
-        'role === sales_rep': user?.role === 'sales_rep',
-        'role === sales_manager': user?.role === 'sales_manager'
-      });
-
-      console.log('✅ SALES USER DETECTED - Showing Sales modules for:', user?.username);
       return [
         { text: 'Employee Dashboard', icon: <PersonIcon />, path: '/employee-dashboard' },
         {
           text: 'Sales', icon: <MonetizationOnIcon />, subItems: [
             { text: 'Sales Dashboard', icon: <MonetizationOnIcon />, path: '/sales' },
             { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
+            { text: 'Warehouse', icon: <InventoryIcon />, path: '/warehouse' },
             { text: 'POS', icon: <PointOfSaleIcon />, path: '/pos' },
             { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
             { text: 'Surveys', icon: <AssessmentIcon />, path: '/surveys' },
-            { text: 'Route Planning', icon: <LocationOnIcon />, path: '/route-planning' }
+            { text: 'Route Planning', icon: <LocationOnIcon />, path: '/route-planning' },
+            { text: 'Sync', icon: <SyncIcon />, path: '/sync' },
+            { text: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' }
           ]
         },
         { text: 'Payslips', icon: <MonetizationOnIcon />, path: '/hr/payslips' }, // Read-only payslips for Sales
@@ -397,8 +373,7 @@ function AppShell() {
     const isHRUser = (user?.department_name && typeof user.department_name === 'string' && user.department_name.toLowerCase() === 'hr') || 
                      (user?.department && typeof user.department === 'string' && user.department.toLowerCase() === 'hr') ||
                      user?.role === 'hr_manager' ||
-                     user?.role === 'hr_admin' ||
-                     user?.is_superuser;
+                     user?.role === 'hr_admin';
 
     // Regular employees - consumer access only
     return [
@@ -407,6 +382,7 @@ function AppShell() {
       { text: isHRUser ? 'HR Calendar' : 'HR Calendar', icon: <CalendarMonthIcon />, path: isHRUser ? '/hr/calendar-management' : '/hr/calendar' }, // HR gets full HR Calendar, others get read-only HR Calendar
       { text: 'Training', icon: <SchoolIcon />, path: '/hr/training' },
       { text: 'Task', icon: <AssignmentTurnedInIcon />, path: '/hr/task' },
+      { text: 'Sync', icon: <SyncIcon />, path: '/sync' },
       { text: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' }
     ];
   };
@@ -807,6 +783,7 @@ function AppShell() {
               <Route path="/procurement/management" element={<ProtectedRoute><Procurement /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><UsersDashboard /></ProtectedRoute>} />
               <Route path="/users/management" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+              <Route path="/sync" element={<ProtectedRoute><OfflineSync /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationCenter /></ProtectedRoute>} />
               <Route path="/system-settings" element={<ProtectedRoute><SystemSettingsDashboard /></ProtectedRoute>} />
               <Route path="/warehouse" element={<ProtectedRoute><WarehouseDashboard /></ProtectedRoute>} />
@@ -819,6 +796,7 @@ function AppShell() {
               <Route path="/powerbi" element={<ProtectedRoute><PowerBIDashboard /></ProtectedRoute>} />
               <Route path="/offline-sync" element={<ProtectedRoute><OfflineSync /></ProtectedRoute>} />
               <Route path="/route-planning-admin" element={<ProtectedRoute><RoutePlanningAdmin /></ProtectedRoute>} />
+              <Route path="/sync" element={<ProtectedRoute><OfflineSync /></ProtectedRoute>} />
               <Route path="*" element={user ? <Navigate to="/" replace /> : <Navigate to="/login" replace />} />
             </Routes>
           </Box>

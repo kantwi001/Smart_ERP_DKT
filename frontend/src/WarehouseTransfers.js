@@ -55,18 +55,44 @@ const WarehouseTransfers = () => {
   // Print waybill for a warehouse transfer
   const handlePrintWaybill = async (id) => {
     try {
+      // First get transfer details to create a better filename
+      const transferRes = await api.get(`/inventory/transfers/${id}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const transfer = transferRes.data;
+      
+      // Generate PDF waybill
       const res = await api.get(`/inventory/transfers/${id}/print_waybill/`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob',
       });
+      
+      // Create descriptive filename
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const transferDate = transfer.created_at ? new Date(transfer.created_at).toISOString().split('T')[0] : currentDate;
+      const fromWarehouse = transfer.from_warehouse_name || transfer.from_location || 'Unknown';
+      const toWarehouse = transfer.to_warehouse_name || transfer.to_location || 'Unknown';
+      const productSku = transfer.product_sku || transfer.sku || 'Multiple';
+      
+      // Clean warehouse names for filename (remove special characters)
+      const cleanFromWarehouse = fromWarehouse.replace(/[^a-zA-Z0-9]/g, '');
+      const cleanToWarehouse = toWarehouse.replace(/[^a-zA-Z0-9]/g, '');
+      const cleanProductSku = productSku.replace(/[^a-zA-Z0-9]/g, '');
+      
+      // Create professional filename: Waybill_TransferID_FromWarehouse_ToWarehouse_ProductSKU_Date.pdf
+      const filename = `Waybill_T${id}_${cleanFromWarehouse}_to_${cleanToWarehouse}_${cleanProductSku}_${transferDate}.pdf`;
+      
       const blob = new Blob([res.data], { type: 'application/pdf' });
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
-      link.download = `transfer_waybill_${id}.pdf`;
+      link.download = filename;
       link.click();
       window.URL.revokeObjectURL(link.href);
+      
+      console.log(`Waybill downloaded: ${filename}`);
     } catch (err) {
-      alert('Failed to print waybill.');
+      console.error('Failed to print waybill:', err);
+      alert('Failed to print waybill. Please try again.');
     }
   };
 
@@ -107,10 +133,10 @@ const WarehouseTransfers = () => {
                     <TableCell>{tr.to_location}</TableCell>
                     <TableCell>{tr.created_at ? new Date(tr.created_at).toLocaleString() : '-'}</TableCell>
                     <TableCell>
-  <Button size="small" variant="outlined" color="primary" onClick={() => handlePrintWaybill(tr.id)}>
-    Print Waybill
-  </Button>
-</TableCell>
+                      <Button size="small" variant="outlined" color="primary" onClick={() => handlePrintWaybill(tr.id)}>
+                        Print Waybill
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

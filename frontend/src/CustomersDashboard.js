@@ -659,7 +659,10 @@ const CustomersDashboard = () => {
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Customer List</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <GroupIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Customer List
+                  </Typography>
                   <Divider sx={{ mb: 2 }} />
                   {customers.length > 0 ? (
                     <List sx={{ py: 0 }}>
@@ -693,7 +696,10 @@ const CustomersDashboard = () => {
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Customer Analytics</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <TrendingUpIcon sx={{ mr: 1, color: '#FF9800' }} />
+                    Customer Analytics
+                  </Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={3}>
                     <Grid item xs={12} sm={6} md={3}>
@@ -742,98 +748,363 @@ const CustomersDashboard = () => {
         {/* Locations Tab */}
         <TabPanel value={tabValue} index={3}>
           <Grid container spacing={3}>
-            {/* Transaction Integration */}
+            {/* Customer Segmentation Analytics */}
             <Grid item xs={12} md={6}>
-              <TransactionIntegration 
-                moduleId="customers" 
-                title="Customer Transaction Flow"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <GroupIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Customer Segmentation Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Customer Type Distribution */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Customer Type Distribution
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                      {[
+                        { type: 'Retailers', count: 185, percentage: 60, color: '#4CAF50' },
+                        { type: 'Wholesalers', count: 78, percentage: 25, color: '#2196F3' },
+                        { type: 'Distributors', count: 47, percentage: 15, color: '#FF9800' }
+                      ].map((segment, idx) => (
+                        <Box key={segment.type}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {segment.type}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {segment.count} customers
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={segment.percentage} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': { bgcolor: segment.color }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {segment.percentage}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/* Regional Distribution */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Regional Distribution
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
+                      {[
+                        { region: 'Greater Accra', count: 170, color: '#4CAF50' },
+                        { region: 'Ashanti', count: 80, color: '#2196F3' },
+                        { region: 'Western', count: 60, color: '#FF9800' }
+                      ].map((region, idx) => (
+                        <Paper key={region.region} sx={{ p: 1.5, textAlign: 'center', bgcolor: `${region.color}20` }}>
+                          <Typography variant="h6" color={region.color}>
+                            {region.count}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {region.region}
+                          </Typography>
+                        </Paper>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Time-Based Analytics */}
+
+            {/* Customer Acquisition & Retention */}
             <Grid item xs={12} md={6}>
-              <TimeBasedAnalytics 
-                moduleId="customers" 
-                title="Customer Trends Analysis"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <TrendingUpIcon sx={{ mr: 1, color: '#FF9800' }} />
+                    Customer Acquisition & Retention
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Monthly Acquisition Chart */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Monthly Customer Acquisition (Last 4 Months)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                        {['Jan', 'Feb', 'Mar', 'Apr'].map((month, i) => {
+                          const newCustomers = [28, 35, 22, 41][i];
+                          const height = (newCustomers / 50) * 80;
+                          return (
+                            <Box key={month} sx={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <Box 
+                                sx={{ 
+                                  height: height, 
+                                  width: 20,
+                                  bgcolor: '#4CAF50', 
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  opacity: 0.8
+                                }} 
+                              />
+                              <Typography variant="caption">{month}</Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {newCustomers}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                    
+                    {/* Key Metrics */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                        <Typography variant="h4">126</Typography>
+                        <Typography variant="caption">New Customers</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                        <Typography variant="h4">94%</Typography>
+                        <Typography variant="caption">Retention Rate</Typography>
+                      </Paper>
+                    </Box>
+
+                    {/* Customer Lifetime Value */}
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Average Customer Lifetime Value
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={87} 
+                          sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                          color="success"
+                        />
+                        <Typography variant="h6" color="success.main">$12,450</Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Advanced Analytics with Charts */}
-            <Grid item xs={12}>
-              <AdvancedAnalytics 
-                moduleId="customers" 
-                title="Customer Performance Analytics"
-                data={{
-                  accra_customers: 170,
-                  kumasi_customers: 80,
-                  takoradi_customers: 60,
-                  total_customers: 310
-                }}
-              />
+
+            {/* Customer Activity & Engagement */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <AssessmentIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                    Customer Activity & Engagement
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Activity Levels */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Customer Activity Levels
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                      {[
+                        { level: 'Highly Active', count: 89, percentage: 29, color: '#4CAF50' },
+                        { level: 'Moderately Active', count: 156, percentage: 50, color: '#FF9800' },
+                        { level: 'Low Activity', count: 65, percentage: 21, color: '#F44336' }
+                      ].map((activity, idx) => (
+                        <Box key={activity.level}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {activity.level}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {activity.count} customers
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={activity.percentage} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': { bgcolor: activity.color }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {activity.percentage}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/* Engagement Metrics */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText', flex: 1, mr: 1 }}>
+                        <Typography variant="h6">4.2</Typography>
+                        <Typography variant="caption">Avg Orders/Month</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText', flex: 1, ml: 1 }}>
+                        <Typography variant="h6">$3,850</Typography>
+                        <Typography variant="caption">Avg Order Value</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Gantt Chart for Customer Projects */}
+
+            {/* Customer Satisfaction & Feedback */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <BusinessIcon sx={{ mr: 1, color: '#FF5722' }} />
+                    Customer Satisfaction & Feedback
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Overall Satisfaction Score */}
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                        4.6/5
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Overall Customer Satisfaction
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={92} 
+                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
+                        color="success"
+                      />
+                    </Box>
+
+                    {/* Satisfaction Breakdown */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { aspect: 'Product Quality', score: 4.8, percentage: 96 },
+                        { aspect: 'Service Quality', score: 4.5, percentage: 90 },
+                        { aspect: 'Delivery Time', score: 4.3, percentage: 86 },
+                        { aspect: 'Support Response', score: 4.7, percentage: 94 }
+                      ].map((item, idx) => (
+                        <Box key={item.aspect}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.aspect}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {item.score}/5
+                            </Typography>
+                          </Box>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={item.percentage} 
+                            sx={{ height: 6, borderRadius: 3 }}
+                            color={item.percentage >= 90 ? 'success' : item.percentage >= 80 ? 'primary' : 'warning'}
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Customer Performance Dashboard */}
             <Grid item xs={12}>
-              <GanttChart 
-                title="Customer Experience Project Timeline"
-                projects={[
-                  {
-                    id: 1,
-                    name: 'Customer Experience Enhancement',
-                    type: 'customers',
-                    manager: 'Customer Success Manager',
-                    status: 'in-progress',
-                    priority: 'high',
-                    startDate: new Date('2024-01-01'),
-                    endDate: new Date('2024-06-30'),
-                    progress: 65,
-                    budget: 70000,
-                    team: ['Customer Service Rep', 'Marketing Specialist', 'Data Analyst'],
-                    tasks: [
-                      {
-                        id: 601,
-                        name: 'Customer Survey',
-                        startDate: new Date('2024-01-01'),
-                        endDate: new Date('2024-01-31'),
-                        progress: 100,
-                        status: 'completed',
-                        assignee: 'Marketing Specialist',
-                        dependencies: []
-                      },
-                      {
-                        id: 602,
-                        name: 'Data Analysis',
-                        startDate: new Date('2024-02-01'),
-                        endDate: new Date('2024-02-28'),
-                        progress: 90,
-                        status: 'in-progress',
-                        assignee: 'Data Analyst',
-                        dependencies: [601]
-                      },
-                      {
-                        id: 603,
-                        name: 'Process Improvement',
-                        startDate: new Date('2024-03-01'),
-                        endDate: new Date('2024-05-31'),
-                        progress: 45,
-                        status: 'in-progress',
-                        assignee: 'Customer Service Rep',
-                        dependencies: [602]
-                      },
-                      {
-                        id: 604,
-                        name: 'Implementation & Monitoring',
-                        startDate: new Date('2024-06-01'),
-                        endDate: new Date('2024-06-30'),
-                        progress: 0,
-                        status: 'pending',
-                        assignee: 'Customer Success Manager',
-                        dependencies: [603]
-                      }
-                    ]
-                  }
-                ]}
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <LocationOnIcon sx={{ mr: 1, color: '#2196F3' }} />
+                    Customer Performance Dashboard
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={3}>
+                    {/* Top Performing Customers */}
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Top Performing Customers
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { name: 'MedSupply Ghana Ltd', revenue: 45000, growth: 23, type: 'Distributor' },
+                          { name: 'HealthCare Partners', revenue: 38000, growth: 18, type: 'Wholesaler' },
+                          { name: 'Pharmacy Network', revenue: 32000, growth: 15, type: 'Retailer' },
+                          { name: 'Medical Solutions', revenue: 28000, growth: 12, type: 'Wholesaler' }
+                        ].map((customer, idx) => (
+                          <Box key={customer.name} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                            <Avatar sx={{ bgcolor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'][idx] }}>
+                              {idx + 1}
+                            </Avatar>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {customer.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {customer.type} • ${customer.revenue.toLocaleString()} revenue
+                              </Typography>
+                            </Box>
+                            <Chip 
+                              label={`+${customer.growth}%`} 
+                              color="success" 
+                              size="small"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+
+                    {/* Customer Risk Analysis */}
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Customer Risk Analysis
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { risk: 'Low Risk', count: 245, percentage: 79, color: '#4CAF50' },
+                          { risk: 'Medium Risk', count: 52, percentage: 17, color: '#FF9800' },
+                          { risk: 'High Risk', count: 13, percentage: 4, color: '#F44336' }
+                        ].map((risk, idx) => (
+                          <Box key={risk.risk}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                {risk.risk}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {risk.count} customers
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Box sx={{ flex: 1 }}>
+                                <LinearProgress 
+                                  variant="determinate" 
+                                  value={risk.percentage} 
+                                  sx={{ 
+                                    height: 8, 
+                                    borderRadius: 4,
+                                    '& .MuiLinearProgress-bar': { bgcolor: risk.color }
+                                  }}
+                                />
+                              </Box>
+                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                                {risk.percentage}%
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
           </Grid>
         </TabPanel>

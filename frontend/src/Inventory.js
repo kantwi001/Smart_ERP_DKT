@@ -1,10 +1,16 @@
 import React, { useEffect, useState, useContext } from 'react';
 import api from './api';
 import { AuthContext } from './AuthContext';
-import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert, Box, Grid, Card, CardContent } from '@mui/material';
+import { 
+  Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  CircularProgress, Alert, Box, Grid, Card, CardContent, Button, Dialog, DialogTitle, 
+  DialogContent, DialogActions, TextField, MenuItem, Snackbar
+} from '@mui/material';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import WarningIcon from '@mui/icons-material/Warning';
 import RemoveShoppingCartIcon from '@mui/icons-material/RemoveShoppingCart';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Inventory = () => {
@@ -12,6 +18,22 @@ const Inventory = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Transfer functionality state
+  const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferHistoryOpen, setTransferHistoryOpen] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [transferForm, setTransferForm] = useState({
+    product: '',
+    quantity: '',
+    fromWarehouse: '',
+    toWarehouse: '',
+    notes: ''
+  });
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -30,6 +52,78 @@ const Inventory = () => {
     };
     fetchInventory();
   }, [token]);
+
+  // Load additional data for transfer functionality
+  useEffect(() => {
+    const loadTransferData = async () => {
+      try {
+        const [productsRes, warehousesRes, transfersRes] = await Promise.all([
+          api.get('/inventory/products/', { headers: { Authorization: `Bearer ${token}` } }),
+          api.get('/warehouse/', { headers: { Authorization: `Bearer ${token}` } }),
+          api.get('/inventory/transfers/', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        
+        setProducts(productsRes.data.results || productsRes.data);
+        setWarehouses(warehousesRes.data.results || warehousesRes.data);
+        setTransfers(transfersRes.data.results || transfersRes.data);
+      } catch (error) {
+        console.error('Failed to load transfer data:', error);
+      }
+    };
+
+    if (token) {
+      loadTransferData();
+    }
+  }, [token]);
+
+  // Transfer handlers
+  const handleTransferStock = async () => {
+    try {
+      if (!transferForm.product || !transferForm.quantity || !transferForm.fromWarehouse || !transferForm.toWarehouse) {
+        setSnackbarMessage('Please fill in all required fields');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      if (transferForm.fromWarehouse === transferForm.toWarehouse) {
+        setSnackbarMessage('Source and destination warehouses must be different');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      const transferData = {
+        product: transferForm.product,
+        quantity: parseInt(transferForm.quantity),
+        from_warehouse: transferForm.fromWarehouse,
+        to_warehouse: transferForm.toWarehouse,
+        notes: transferForm.notes
+      };
+
+      await api.post('/inventory/transfers/', transferData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setSnackbarMessage('Stock transfer initiated successfully!');
+      setSnackbarOpen(true);
+      setTransferDialogOpen(false);
+      
+      // Reset form
+      setTransferForm({
+        product: '',
+        quantity: '',
+        fromWarehouse: '',
+        toWarehouse: '',
+        notes: ''
+      });
+
+      // Refresh data
+      window.location.reload();
+    } catch (error) {
+      console.error('Transfer error:', error);
+      setSnackbarMessage('Failed to initiate stock transfer. Please try again.');
+      setSnackbarOpen(true);
+    }
+  };
 
   // Dashboard summary data
   const totalItems = items.length;
@@ -87,6 +181,32 @@ const Inventory = () => {
                       <Typography variant="h4">{outOfStock}</Typography>
                     </Box>
                   </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+          <Grid container spacing={2} mb={2}>
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" mb={1}>Transfer Quick Actions</Typography>
+                  <Button 
+                    startIcon={<SwapHorizIcon />} 
+                    variant="contained" 
+                    color="primary"
+                    onClick={() => setTransferDialogOpen(true)}
+                  >
+                    Transfer Stock
+                  </Button>
+                  <Button 
+                    startIcon={<VisibilityIcon />} 
+                    variant="contained" 
+                    color="secondary" 
+                    sx={{ ml: 1 }}
+                    onClick={() => setTransferHistoryOpen(true)}
+                  >
+                    View Transfer History
+                  </Button>
                 </CardContent>
               </Card>
             </Grid>
@@ -160,6 +280,138 @@ const Inventory = () => {
           </Table>
         </TableContainer>
       )}
+
+      {/* Transfer Stock Dialog */}
+      <Dialog open={transferDialogOpen} onClose={() => setTransferDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Transfer Stock</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            select
+            label="Product"
+            value={transferForm.product}
+            onChange={(e) => setTransferForm({...transferForm, product: e.target.value})}
+            margin="normal"
+          >
+            {products.map((product) => (
+              <MenuItem key={product.id} value={product.id}>
+                {product.name} - {product.sku} (Stock: {product.quantity || 0})
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            label="Quantity"
+            value={transferForm.quantity}
+            onChange={(e) => setTransferForm({...transferForm, quantity: e.target.value})}
+            margin="normal"
+            type="number"
+          />
+          <TextField
+            fullWidth
+            select
+            label="From Warehouse"
+            value={transferForm.fromWarehouse}
+            onChange={(e) => setTransferForm({...transferForm, fromWarehouse: e.target.value})}
+            margin="normal"
+          >
+            {warehouses.map((warehouse) => (
+              <MenuItem key={warehouse.id} value={warehouse.id}>
+                {warehouse.name} - {warehouse.code}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            select
+            label="To Warehouse"
+            value={transferForm.toWarehouse}
+            onChange={(e) => setTransferForm({...transferForm, toWarehouse: e.target.value})}
+            margin="normal"
+          >
+            {warehouses.map((warehouse) => (
+              <MenuItem key={warehouse.id} value={warehouse.id}>
+                {warehouse.name} - {warehouse.code}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            label="Notes (Optional)"
+            value={transferForm.notes}
+            onChange={(e) => setTransferForm({...transferForm, notes: e.target.value})}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTransferDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleTransferStock} variant="contained" color="primary">
+            Transfer Stock
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Transfer History Dialog */}
+      <Dialog open={transferHistoryOpen} onClose={() => setTransferHistoryOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Transfer History</DialogTitle>
+        <DialogContent>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Quantity</TableCell>
+                  <TableCell>From</TableCell>
+                  <TableCell>To</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Date</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {transfers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">No transfers found.</TableCell>
+                  </TableRow>
+                ) : (
+                  transfers.map((transfer) => (
+                    <TableRow key={transfer.id}>
+                      <TableCell>{transfer.product_name || 'N/A'}</TableCell>
+                      <TableCell>{transfer.quantity}</TableCell>
+                      <TableCell>{transfer.from_warehouse_name || 'N/A'}</TableCell>
+                      <TableCell>{transfer.to_warehouse_name || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color={transfer.status === 'completed' ? 'success' : 'warning'}
+                        >
+                          {transfer.status || 'pending'}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        {transfer.created_at ? new Date(transfer.created_at).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTransferHistoryOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success/Error Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+      />
     </Box>
   );
 };

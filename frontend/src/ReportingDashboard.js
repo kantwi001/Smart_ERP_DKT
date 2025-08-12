@@ -654,98 +654,309 @@ const ReportingDashboard = () => {
         {/* Exports Tab */}
         <TabPanel value={tabValue} index={3}>
           <Grid container spacing={3}>
-            {/* Transaction Integration */}
+            {/* Report Generation Analytics */}
             <Grid item xs={12} md={6}>
-              <TransactionIntegration 
-                moduleId="reporting" 
-                title="Reporting Transaction Flow"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Report Generation Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Overall Performance Score */}
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                        91.8%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Overall Reporting Performance
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={91.8} 
+                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
+                      />
+                    </Box>
+                    
+                    {/* Performance Breakdown */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { metric: 'Report Accuracy', score: 96, color: '#4CAF50' },
+                        { metric: 'Generation Speed', score: 89, color: '#2196F3' },
+                        { metric: 'Data Freshness', score: 93, color: '#FF9800' },
+                        { metric: 'User Satisfaction', score: 89, color: '#9C27B0' }
+                      ].map((item, idx) => (
+                        <Box key={item.metric} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ minWidth: 120 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.metric}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={item.score} 
+                              sx={{ 
+                                height: 6, 
+                                borderRadius: 3,
+                                '& .MuiLinearProgress-bar': { bgcolor: item.color }
+                              }} 
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                            {item.score}%
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Time-Based Analytics */}
+
+            {/* Export Format Analytics */}
             <Grid item xs={12} md={6}>
-              <TimeBasedAnalytics 
-                moduleId="reporting" 
-                title="Reporting Trends Analysis"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <FileDownloadIcon sx={{ mr: 1, color: '#FF9800' }} />
+                    Export Format Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Export Format Chart */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Export Format Usage (Last 30 Days)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                        {['PDF', 'Excel', 'CSV', 'JSON'].map((format, i) => {
+                          const usage = [45, 32, 18, 5][i];
+                          const height = (usage / 50) * 80;
+                          return (
+                            <Box key={format} sx={{ flex: 1, textAlign: 'center' }}>
+                              <Box 
+                                sx={{ 
+                                  height: height, 
+                                  bgcolor: format === 'PDF' ? '#F44336' : format === 'Excel' ? '#4CAF50' : format === 'CSV' ? '#FF9800' : '#2196F3', 
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  opacity: 0.8
+                                }} 
+                              />
+                              <Typography variant="caption">{format}</Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {usage}%
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                    
+                    {/* Export Summary */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                        <Typography variant="h5">1,247</Typography>
+                        <Typography variant="caption">Total Exports</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                        <Typography variant="h5">2.3s</Typography>
+                        <Typography variant="caption">Avg Export Time</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Advanced Analytics with Charts */}
-            <Grid item xs={12}>
-              <AdvancedAnalytics 
-                moduleId="reporting" 
-                title="Reporting Performance Analytics"
-                data={{
-                  total_reports: 18,
-                  pdf_exports: 8,
-                  excel_exports: 7,
-                  csv_exports: 3
-                }}
-              />
+
+            {/* Report Usage Analytics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <BarChartIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                    Report Usage Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Most Used Reports */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { report: 'Sales Summary', usage: 95, views: 342, frequency: 'Daily' },
+                        { report: 'Inventory Report', usage: 87, views: 298, frequency: 'Weekly' },
+                        { report: 'Financial Statement', usage: 92, views: 156, frequency: 'Monthly' },
+                        { report: 'HR Analytics', usage: 78, views: 189, frequency: 'Weekly' },
+                        { report: 'Customer Report', usage: 83, views: 234, frequency: 'Daily' }
+                      ].map((report, idx) => (
+                        <Box key={report.report}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {report.report}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {report.views} views • {report.frequency}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={report.usage} 
+                                sx={{ height: 6, borderRadius: 3 }}
+                                color={report.usage > 90 ? 'success' : report.usage > 80 ? 'primary' : 'warning'}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {report.usage}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Gantt Chart for Reporting Projects */}
+
+            {/* Data Quality Analytics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <DataUsageIcon sx={{ mr: 1, color: '#FF5722' }} />
+                    Data Quality Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Key Metrics */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                        <Typography variant="h4">98.5%</Typography>
+                        <Typography variant="caption">Data Accuracy</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
+                        <Typography variant="h4">99.2%</Typography>
+                        <Typography variant="caption">Data Completeness</Typography>
+                      </Paper>
+                    </Box>
+
+                    {/* Data Quality Breakdown */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Data Freshness Score
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={93} 
+                            sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                            color="success"
+                          />
+                          <Typography variant="h6" color="success.main">93%</Typography>
+                        </Box>
+                      </Box>
+
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Average Data Latency
+                        </Typography>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="h4" color="info.main">1.2 min</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            -0.3 min from last month
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText', flex: 1, mr: 1 }}>
+                          <Typography variant="h6">2</Typography>
+                          <Typography variant="caption">Data Issues</Typography>
+                        </Paper>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, ml: 1 }}>
+                          <Typography variant="h6">15</Typography>
+                          <Typography variant="caption">Data Sources</Typography>
+                        </Paper>
+                      </Box>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Business Intelligence Analytics */}
             <Grid item xs={12}>
-              <GanttChart 
-                title="Business Intelligence Dashboard Timeline"
-                projects={[
-                  {
-                    id: 1,
-                    name: 'Business Intelligence Dashboard',
-                    type: 'reporting',
-                    manager: 'Analytics Manager',
-                    status: 'in-progress',
-                    priority: 'high',
-                    startDate: new Date('2024-01-15'),
-                    endDate: new Date('2024-05-15'),
-                    progress: 70,
-                    budget: 90000,
-                    team: ['Data Engineer', 'Business Analyst', 'Dashboard Developer'],
-                    tasks: [
-                      {
-                        id: 701,
-                        name: 'Data Integration',
-                        startDate: new Date('2024-01-15'),
-                        endDate: new Date('2024-02-15'),
-                        progress: 100,
-                        status: 'completed',
-                        assignee: 'Data Engineer',
-                        dependencies: []
-                      },
-                      {
-                        id: 702,
-                        name: 'Dashboard Design',
-                        startDate: new Date('2024-02-10'),
-                        endDate: new Date('2024-03-20'),
-                        progress: 95,
-                        status: 'in-progress',
-                        assignee: 'Dashboard Developer',
-                        dependencies: [701]
-                      },
-                      {
-                        id: 703,
-                        name: 'Business Logic Implementation',
-                        startDate: new Date('2024-03-15'),
-                        endDate: new Date('2024-04-30'),
-                        progress: 60,
-                        status: 'in-progress',
-                        assignee: 'Business Analyst',
-                        dependencies: [702]
-                      },
-                      {
-                        id: 704,
-                        name: 'User Training & Rollout',
-                        startDate: new Date('2024-05-01'),
-                        endDate: new Date('2024-05-15'),
-                        progress: 0,
-                        status: 'pending',
-                        assignee: 'Analytics Manager',
-                        dependencies: [703]
-                      }
-                    ]
-                  }
-                ]}
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <InsightsIcon sx={{ mr: 1, color: '#2196F3' }} />
+                    Business Intelligence Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={3}>
+                    {/* Dashboard Usage */}
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                          87%
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Dashboard Adoption Rate
+                        </Typography>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={87} 
+                          sx={{ height: 8, borderRadius: 4 }} 
+                        />
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                          Target: 90%
+                        </Typography>
+                      </Box>
+                    </Grid>
+
+                    {/* BI Insights Performance */}
+                    <Grid item xs={12} md={8}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Business Intelligence Insights Performance
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { insight: 'Sales Trends', accuracy: 94, impact: 'High', usage: 89 },
+                          { insight: 'Customer Behavior', accuracy: 91, impact: 'High', usage: 85 },
+                          { insight: 'Inventory Optimization', accuracy: 88, impact: 'Medium', usage: 78 },
+                          { insight: 'Financial Forecasting', accuracy: 96, impact: 'High', usage: 92 },
+                          { insight: 'Operational Efficiency', accuracy: 87, impact: 'Medium', usage: 74 }
+                        ].map((insight, idx) => (
+                          <Box key={insight.insight} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ minWidth: 140 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                {insight.insight}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {insight.accuracy}% accuracy • {insight.impact} impact
+                              </Typography>
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={insight.usage} 
+                                sx={{ height: 8, borderRadius: 4 }}
+                                color={insight.usage > 85 ? 'success' : insight.usage > 75 ? 'primary' : 'warning'}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {insight.usage}%
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
           </Grid>
         </TabPanel>

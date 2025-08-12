@@ -26,6 +26,22 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
+  // Listen for token expiration events from API interceptor
+  useEffect(() => {
+    const handleTokenExpired = (event) => {
+      console.log(' AuthContext: Token expired event received');
+      setToken(null);
+      setUser(null);
+      setError('Your session has expired. Please login again.');
+    };
+
+    window.addEventListener('authTokenExpired', handleTokenExpired);
+
+    return () => {
+      window.removeEventListener('authTokenExpired', handleTokenExpired);
+    };
+  }, []);
+
   // Listen for user profile updates (e.g., department changes)
   useEffect(() => {
     const handleUserProfileUpdate = (event) => {

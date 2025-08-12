@@ -607,98 +607,312 @@ const ManufacturingDashboard = () => {
         {/* Analytics Tab */}
         <TabPanel value={tabValue} index={3}>
           <Grid container spacing={3}>
-            {/* Transaction Integration */}
+            {/* Production Efficiency Analytics */}
             <Grid item xs={12} md={6}>
-              <TransactionIntegration 
-                moduleId="manufacturing" 
-                title="Manufacturing Transaction Flow"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Production Efficiency Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Overall Efficiency Score */}
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                        92.5%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Overall Production Efficiency
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={92.5} 
+                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
+                      />
+                    </Box>
+                    
+                    {/* Efficiency Breakdown */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { metric: 'Equipment Utilization', score: 95, color: '#4CAF50' },
+                        { metric: 'Labor Productivity', score: 88, color: '#2196F3' },
+                        { metric: 'Material Efficiency', score: 94, color: '#FF9800' },
+                        { metric: 'Energy Efficiency', score: 89, color: '#9C27B0' }
+                      ].map((item, idx) => (
+                        <Box key={item.metric} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ minWidth: 120 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.metric}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={item.score} 
+                              sx={{ 
+                                height: 6, 
+                                borderRadius: 3,
+                                '& .MuiLinearProgress-bar': { bgcolor: item.color }
+                              }} 
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                            {item.score}%
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Time-Based Analytics */}
+
+            {/* Quality Control Analytics */}
             <Grid item xs={12} md={6}>
-              <TimeBasedAnalytics 
-                moduleId="manufacturing" 
-                title="Manufacturing Trends Analysis"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <QualityIcon sx={{ mr: 1, color: '#FF9800' }} />
+                    Quality Control Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Quality Score Chart */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Weekly Quality Score (Last 4 Weeks)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                        {['Week 1', 'Week 2', 'Week 3', 'Week 4'].map((week, i) => {
+                          const quality = [94, 96, 93, 97][i];
+                          const height = (quality / 100) * 80;
+                          return (
+                            <Box key={week} sx={{ flex: 1, textAlign: 'center' }}>
+                              <Box 
+                                sx={{ 
+                                  height: height, 
+                                  bgcolor: quality > 95 ? '#4CAF50' : quality > 90 ? '#FF9800' : '#F44336', 
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  opacity: 0.8
+                                }} 
+                              />
+                              <Typography variant="caption">{week}</Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {quality}%
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                    
+                    {/* Quality Metrics */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                        <Typography variant="h5">95.2%</Typography>
+                        <Typography variant="caption">Pass Rate</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText' }}>
+                        <Typography variant="h5">2.1%</Typography>
+                        <Typography variant="caption">Defect Rate</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Advanced Analytics with Charts */}
-            <Grid item xs={12}>
-              <AdvancedAnalytics 
-                moduleId="manufacturing" 
-                title="Manufacturing Performance Analytics"
-                data={{
-                  efficiency_rate: 92,
-                  quality_score: 95,
-                  production_lines: 3,
-                  downtime_hours: 8
-                }}
-              />
+
+            {/* Production Line Performance */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <FactoryIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                    Production Line Performance
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Production Line Comparison */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { line: 'Line A', efficiency: 95, output: 420, downtime: 2 },
+                        { line: 'Line B', efficiency: 89, output: 380, downtime: 5 },
+                        { line: 'Line C', efficiency: 92, output: 400, downtime: 3 },
+                        { line: 'Line D', efficiency: 87, output: 350, downtime: 8 }
+                      ].map((line, idx) => (
+                        <Box key={line.line}>
+                          <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
+                            {line.line}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Efficiency</Typography>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={line.efficiency} 
+                                sx={{ height: 4, borderRadius: 2 }}
+                                color="primary"
+                              />
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Output</Typography>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={(line.output / 450) * 100} 
+                                sx={{ height: 4, borderRadius: 2 }}
+                                color="success"
+                              />
+                            </Box>
+                            <Box sx={{ minWidth: 60, textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Downtime</Typography>
+                              <Typography variant="body2" color={line.downtime > 5 ? 'error.main' : 'text.primary'}>
+                                {line.downtime}h
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Gantt Chart for Manufacturing Projects */}
+
+            {/* Equipment & Maintenance Analytics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <BuildIcon sx={{ mr: 1, color: '#FF5722' }} />
+                    Equipment & Maintenance Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Key Metrics */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                        <Typography variant="h4">18</Typography>
+                        <Typography variant="caption">Active Equipment</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                        <Typography variant="h4">3</Typography>
+                        <Typography variant="caption">Maintenance Due</Typography>
+                      </Paper>
+                    </Box>
+
+                    {/* Equipment Health */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Overall Equipment Health
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={87} 
+                            sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                            color="success"
+                          />
+                          <Typography variant="h6" color="success.main">87%</Typography>
+                        </Box>
+                      </Box>
+
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Average Maintenance Interval
+                        </Typography>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="h4" color="info.main">45 days</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            +2 days from last quarter
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, mr: 1 }}>
+                          <Typography variant="h6">96%</Typography>
+                          <Typography variant="caption">Uptime</Typography>
+                        </Paper>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText', flex: 1, ml: 1 }}>
+                          <Typography variant="h6">4%</Typography>
+                          <Typography variant="caption">Downtime</Typography>
+                        </Paper>
+                      </Box>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Production Planning & Scheduling */}
             <Grid item xs={12}>
-              <GanttChart 
-                title="Manufacturing Project Timeline"
-                projects={[
-                  {
-                    id: 1,
-                    name: 'Production Line Optimization',
-                    type: 'manufacturing',
-                    manager: 'Production Manager',
-                    status: 'in-progress',
-                    priority: 'high',
-                    startDate: new Date('2024-01-01'),
-                    endDate: new Date('2024-03-31'),
-                    progress: 75,
-                    budget: 150000,
-                    team: ['Production Engineer', 'Quality Control', 'Maintenance Team'],
-                    tasks: [
-                      {
-                        id: 101,
-                        name: 'Equipment Setup',
-                        startDate: new Date('2024-01-01'),
-                        endDate: new Date('2024-01-20'),
-                        progress: 100,
-                        status: 'completed',
-                        assignee: 'Production Engineer',
-                        dependencies: []
-                      },
-                      {
-                        id: 102,
-                        name: 'Process Optimization',
-                        startDate: new Date('2024-01-15'),
-                        endDate: new Date('2024-02-15'),
-                        progress: 90,
-                        status: 'in-progress',
-                        assignee: 'Quality Control',
-                        dependencies: [101]
-                      },
-                      {
-                        id: 103,
-                        name: 'Quality Testing',
-                        startDate: new Date('2024-02-10'),
-                        endDate: new Date('2024-03-10'),
-                        progress: 60,
-                        status: 'in-progress',
-                        assignee: 'Quality Control',
-                        dependencies: [102]
-                      },
-                      {
-                        id: 104,
-                        name: 'Full Production Run',
-                        startDate: new Date('2024-03-01'),
-                        endDate: new Date('2024-03-31'),
-                        progress: 20,
-                        status: 'pending',
-                        assignee: 'Production Manager',
-                        dependencies: [103]
-                      }
-                    ]
-                  }
-                ]}
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <ScheduleIcon sx={{ mr: 1, color: '#2196F3' }} />
+                    Production Planning & Scheduling Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={3}>
+                    {/* Schedule Adherence */}
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                          91%
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Schedule Adherence Rate
+                        </Typography>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={91} 
+                          sx={{ height: 8, borderRadius: 4 }} 
+                        />
+                      </Box>
+                    </Grid>
+
+                    {/* Production Orders Status */}
+                    <Grid item xs={12} md={8}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Production Orders Status
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { status: 'Completed', count: 28, total: 45, progress: 62, color: 'success' },
+                          { status: 'In Progress', count: 12, total: 45, progress: 27, color: 'primary' },
+                          { status: 'Pending', count: 3, total: 45, progress: 7, color: 'warning' },
+                          { status: 'Delayed', count: 2, total: 45, progress: 4, color: 'error' }
+                        ].map((order, idx) => (
+                          <Box key={order.status} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ minWidth: 100 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                {order.status}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {order.count}/{order.total} orders
+                              </Typography>
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={order.progress} 
+                                sx={{ height: 8, borderRadius: 4 }}
+                                color={order.color}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {order.progress}%
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
           </Grid>
         </TabPanel>

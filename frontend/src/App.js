@@ -108,6 +108,7 @@ import SurveyAdminDashboard from './SurveyAdminDashboard';
 import UsersDashboard from './UsersDashboard';
 import NotificationCenter from './components/NotificationCenter';
 import SystemSettingsDashboard from './SystemSettingsDashboard';
+import MobileEmployeeApp from './MobileEmployeeApp';
 import { createTheme } from '@mui/material/styles';
 
 const drawerWidth = 260;
@@ -124,7 +125,7 @@ const theme = createTheme({
 });
 
 function AppShell() {
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout, token } = useContext(AuthContext);
   const location = useLocation();
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -556,6 +557,14 @@ function AppShell() {
     });
   }
 
+  // Add authentication status check
+  const isAuthenticated = user && token;
+  
+  // If not authenticated, show login screen instead of dashboards
+  if (!isAuthenticated && location.pathname !== '/login') {
+    return <Login />;
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -737,10 +746,11 @@ function AppShell() {
               <Route path="/register" element={<Register />} />
               <Route path="/" element={
                 <ProtectedRoute>
-                  {user?.role === 'admin' || user?.role === 'manager' || user?.role === 'superadmin' ? <Dashboard /> : <EmployeeDashboard />}
+                  {user?.role === 'admin' || user?.role === 'manager' || user?.role === 'superadmin' ? <Dashboard /> : <MobileEmployeeApp />}
                 </ProtectedRoute>
               } />
               <Route path="/employee-dashboard" element={<ProtectedRoute><EmployeeDashboard /></ProtectedRoute>} />
+              <Route path="/mobile-employee" element={<ProtectedRoute><MobileEmployeeApp /></ProtectedRoute>} />
               <Route path="/inventory" element={<ProtectedRoute><InventoryDashboard /></ProtectedRoute>} />
               <Route path="/inventory/management" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
               <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />

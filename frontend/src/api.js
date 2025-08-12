@@ -36,6 +36,9 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      // Temporary debug: log requests without token
+      console.warn('⚠️ API Request without token:', config.url);
     }
     return config;
   },
@@ -57,22 +60,29 @@ api.interceptors.response.use(
       
       // Handle token expiration
       if (error.response.status === 401) {
-        console.log('🔐 401 Unauthorized - token may be expired');
-        const token = localStorage.getItem('token');
-        if (token) {
-          console.log('🗑️ Clearing expired token from localStorage');
-          localStorage.removeItem('token');
-          // Optionally redirect to login page
-          if (window.location.pathname !== '/login') {
-            console.log('🔄 Redirecting to login page due to expired token');
-            window.location.href = '/login';
-          }
+        console.log(' 401 Unauthorized - token may be expired');
+        
+        // Clear expired token immediately
+        localStorage.removeItem('token');
+        
+        // Dispatch custom event to notify AuthContext
+        window.dispatchEvent(new CustomEvent('authTokenExpired', {
+          detail: { message: 'Token expired, please login again' }
+        }));
+        
+        // Redirect to login if not already there
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
         }
       }
-    } else {
-      console.error('[API ERROR - No Response]', error);
+    } else if (error.request) {
+      console.error('[API NETWORK ERROR]', {
+        message: 'No response received from server',
+        url: error.config && error.config.url,
+        method: error.config && error.config.method
+      });
     }
-    // Always reject to propagate error
+    
     return Promise.reject(error);
   }
 );

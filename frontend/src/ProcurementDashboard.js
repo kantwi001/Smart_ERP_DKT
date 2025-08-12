@@ -586,98 +586,323 @@ const ProcurementDashboard = () => {
         {/* Analytics Tab */}
         <TabPanel value={tabValue} index={3}>
           <Grid container spacing={3}>
-            {/* Transaction Integration */}
+            {/* Procurement Performance Analytics */}
             <Grid item xs={12} md={6}>
-              <TransactionIntegration 
-                moduleId="procurement" 
-                title="Procurement Transaction Flow"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Procurement Performance Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Overall Performance Score */}
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                        89.3%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Overall Procurement Performance
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={89.3} 
+                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
+                      />
+                    </Box>
+                    
+                    {/* Performance Breakdown */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { metric: 'Cost Savings', score: 92, color: '#4CAF50' },
+                        { metric: 'Delivery Performance', score: 88, color: '#2196F3' },
+                        { metric: 'Quality Score', score: 94, color: '#FF9800' },
+                        { metric: 'Vendor Compliance', score: 83, color: '#9C27B0' }
+                      ].map((item, idx) => (
+                        <Box key={item.metric} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ minWidth: 120 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.metric}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={item.score} 
+                              sx={{ 
+                                height: 6, 
+                                borderRadius: 3,
+                                '& .MuiLinearProgress-bar': { bgcolor: item.color }
+                              }} 
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                            {item.score}%
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Time-Based Analytics */}
+
+            {/* Spend Analytics */}
             <Grid item xs={12} md={6}>
-              <TimeBasedAnalytics 
-                moduleId="procurement" 
-                title="Procurement Trends Analysis"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <RequestQuoteIcon sx={{ mr: 1, color: '#FF9800' }} />
+                    Spend Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Monthly Spend Chart */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Monthly Spend (Last 4 Months)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                        {['Jan', 'Feb', 'Mar', 'Apr'].map((month, i) => {
+                          const spend = [85000, 92000, 78000, 88000][i];
+                          const height = (spend / 100000) * 80;
+                          return (
+                            <Box key={month} sx={{ flex: 1, textAlign: 'center' }}>
+                              <Box 
+                                sx={{ 
+                                  height: height, 
+                                  bgcolor: spend > 90000 ? '#F44336' : spend > 80000 ? '#FF9800' : '#4CAF50', 
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  opacity: 0.8
+                                }} 
+                              />
+                              <Typography variant="caption">{month}</Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                ${(spend/1000).toFixed(0)}K
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                    
+                    {/* Spend Summary */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                        <Typography variant="h5">$343K</Typography>
+                        <Typography variant="caption">Total Spend (YTD)</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                        <Typography variant="h5">12%</Typography>
+                        <Typography variant="caption">Cost Savings</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Advanced Analytics with Charts */}
-            <Grid item xs={12}>
-              <AdvancedAnalytics 
-                moduleId="procurement" 
-                title="Procurement Performance Analytics"
-                data={{
-                  total_spend: 85000,
-                  active_vendors: 18,
-                  purchase_orders: 42,
-                  delivery_rate: 94
-                }}
-              />
+
+            {/* Vendor Performance Comparison */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <BusinessIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                    Vendor Performance Comparison
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Vendor Performance Table */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { vendor: 'Supplier A', delivery: 95, quality: 92, cost: 88 },
+                        { vendor: 'Supplier B', delivery: 89, quality: 94, cost: 91 },
+                        { vendor: 'Supplier C', delivery: 92, quality: 87, cost: 95 },
+                        { vendor: 'Supplier D', delivery: 87, quality: 89, cost: 85 },
+                        { vendor: 'Supplier E', delivery: 91, quality: 91, cost: 89 }
+                      ].map((vendor, idx) => (
+                        <Box key={vendor.vendor}>
+                          <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
+                            {vendor.vendor}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Delivery</Typography>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={vendor.delivery} 
+                                sx={{ height: 4, borderRadius: 2 }}
+                                color="primary"
+                              />
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Quality</Typography>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={vendor.quality} 
+                                sx={{ height: 4, borderRadius: 2 }}
+                                color="success"
+                              />
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Cost</Typography>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={vendor.cost} 
+                                sx={{ height: 4, borderRadius: 2 }}
+                                color="warning"
+                              />
+                            </Box>
+                            <Typography variant="caption" sx={{ minWidth: 30 }}>
+                              {Math.round((vendor.delivery + vendor.quality + vendor.cost) / 3)}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Gantt Chart for Procurement Projects */}
+
+            {/* Purchase Order Analytics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <ShoppingCartIcon sx={{ mr: 1, color: '#FF5722' }} />
+                    Purchase Order Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Key Metrics */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                        <Typography variant="h4">42</Typography>
+                        <Typography variant="caption">Active POs</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                        <Typography variant="h4">5</Typography>
+                        <Typography variant="caption">Overdue POs</Typography>
+                      </Paper>
+                    </Box>
+
+                    {/* PO Status Breakdown */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          On-Time Delivery Rate
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={88} 
+                            sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                            color="success"
+                          />
+                          <Typography variant="h6" color="success.main">88%</Typography>
+                        </Box>
+                      </Box>
+
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Average Processing Time
+                        </Typography>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="h4" color="info.main">5.2 days</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            -0.8 days from last month
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, mr: 1 }}>
+                          <Typography variant="h6">94%</Typography>
+                          <Typography variant="caption">Approval Rate</Typography>
+                        </Paper>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText', flex: 1, ml: 1 }}>
+                          <Typography variant="h6">$2.1K</Typography>
+                          <Typography variant="caption">Avg PO Value</Typography>
+                        </Paper>
+                      </Box>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Procurement Cycle Analytics */}
             <Grid item xs={12}>
-              <GanttChart 
-                title="Procurement Project Timeline"
-                projects={[
-                  {
-                    id: 1,
-                    name: 'Supplier Evaluation Process',
-                    type: 'procurement',
-                    manager: 'Procurement Manager',
-                    status: 'in-progress',
-                    priority: 'medium',
-                    startDate: new Date('2024-01-15'),
-                    endDate: new Date('2024-04-15'),
-                    progress: 55,
-                    budget: 80000,
-                    team: ['Procurement Officer', 'Quality Assessor', 'Contract Specialist'],
-                    tasks: [
-                      {
-                        id: 201,
-                        name: 'Market Research',
-                        startDate: new Date('2024-01-15'),
-                        endDate: new Date('2024-02-05'),
-                        progress: 100,
-                        status: 'completed',
-                        assignee: 'Procurement Officer',
-                        dependencies: []
-                      },
-                      {
-                        id: 202,
-                        name: 'Supplier Identification',
-                        startDate: new Date('2024-02-01'),
-                        endDate: new Date('2024-02-20'),
-                        progress: 85,
-                        status: 'in-progress',
-                        assignee: 'Procurement Officer',
-                        dependencies: [201]
-                      },
-                      {
-                        id: 203,
-                        name: 'Quality Assessment',
-                        startDate: new Date('2024-02-15'),
-                        endDate: new Date('2024-03-15'),
-                        progress: 40,
-                        status: 'in-progress',
-                        assignee: 'Quality Assessor',
-                        dependencies: [202]
-                      },
-                      {
-                        id: 204,
-                        name: 'Contract Negotiation',
-                        startDate: new Date('2024-03-10'),
-                        endDate: new Date('2024-04-15'),
-                        progress: 10,
-                        status: 'pending',
-                        assignee: 'Contract Specialist',
-                        dependencies: [203]
-                      }
-                    ]
-                  }
-                ]}
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <LocalShippingIcon sx={{ mr: 1, color: '#2196F3' }} />
+                    Procurement Cycle Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={3}>
+                    {/* Cycle Time Performance */}
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                          12.5
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Average Cycle Time (Days)
+                        </Typography>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={75} 
+                          sx={{ height: 8, borderRadius: 4 }} 
+                        />
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                          Target: 10 days
+                        </Typography>
+                      </Box>
+                    </Grid>
+
+                    {/* Procurement Stages */}
+                    <Grid item xs={12} md={8}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Procurement Stage Performance
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { stage: 'Requisition', avgTime: 1.5, target: 1, efficiency: 67 },
+                          { stage: 'Approval', avgTime: 2.8, target: 2, efficiency: 71 },
+                          { stage: 'Sourcing', avgTime: 4.2, target: 3, efficiency: 71 },
+                          { stage: 'PO Creation', avgTime: 1.8, target: 1.5, efficiency: 83 },
+                          { stage: 'Delivery', avgTime: 2.2, target: 2.5, efficiency: 114 }
+                        ].map((stage, idx) => (
+                          <Box key={stage.stage} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ minWidth: 100 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                {stage.stage}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {stage.avgTime}d avg (target: {stage.target}d)
+                              </Typography>
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={Math.min(stage.efficiency, 100)} 
+                                sx={{ height: 8, borderRadius: 4 }}
+                                color={stage.efficiency >= 100 ? 'success' : stage.efficiency >= 80 ? 'primary' : 'warning'}
+                              />
+                            </Box>
+                            <Typography variant="body2" color={stage.efficiency >= 100 ? 'success.main' : stage.efficiency >= 80 ? 'primary.main' : 'warning.main'} sx={{ minWidth: 50 }}>
+                              {stage.efficiency}%
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
           </Grid>
         </TabPanel>

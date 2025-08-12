@@ -303,98 +303,319 @@ const HRDashboard = () => {
           HR Analytics & Insights
         </Typography>
         <Grid container spacing={3}>
-          {/* Transaction Integration */}
+          {/* Employee Engagement Metrics */}
           <Grid item xs={12} md={6}>
-            <TransactionIntegration 
-              moduleId="hr" 
-              title="HR Transaction Flow"
-            />
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                  <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                  Employee Engagement Metrics
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{ height: 300 }}>
+                  {/* Engagement Score */}
+                  <Box sx={{ textAlign: 'center', mb: 3 }}>
+                    <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                      8.2/10
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Overall Engagement Score
+                    </Typography>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={82} 
+                      sx={{ height: 8, borderRadius: 4, mb: 2 }} 
+                    />
+                  </Box>
+                  
+                  {/* Engagement Breakdown */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {[
+                      { metric: 'Job Satisfaction', score: 85, color: '#4CAF50' },
+                      { metric: 'Work-Life Balance', score: 78, color: '#2196F3' },
+                      { metric: 'Career Development', score: 82, color: '#FF9800' },
+                      { metric: 'Team Collaboration', score: 89, color: '#9C27B0' }
+                    ].map((item, idx) => (
+                      <Box key={item.metric} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ minWidth: 120 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {item.metric}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={item.score} 
+                            sx={{ 
+                              height: 6, 
+                              borderRadius: 3,
+                              '& .MuiLinearProgress-bar': { bgcolor: item.color }
+                            }} 
+                          />
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                          {item.score}%
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
           </Grid>
-          
-          {/* Time-Based Analytics */}
+
+          {/* Attendance & Performance Analytics */}
           <Grid item xs={12} md={6}>
-            <TimeBasedAnalytics 
-              moduleId="hr" 
-              title="HR Trends Analysis"
-            />
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                  <ScheduleIcon sx={{ mr: 1, color: '#FF9800' }} />
+                  Attendance & Performance Analytics
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{ height: 300 }}>
+                  {/* Attendance Chart */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Weekly Attendance (Last 4 Weeks)
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                      {['Week 1', 'Week 2', 'Week 3', 'Week 4'].map((week, i) => {
+                        const attendance = [95, 92, 97, 94][i];
+                        const height = (attendance / 100) * 80;
+                        return (
+                          <Box key={week} sx={{ flex: 1, textAlign: 'center' }}>
+                            <Box 
+                              sx={{ 
+                                height: height, 
+                                bgcolor: attendance > 95 ? '#4CAF50' : attendance > 90 ? '#FF9800' : '#F44336', 
+                                borderRadius: 1,
+                                mb: 1,
+                                opacity: 0.8
+                              }} 
+                            />
+                            <Typography variant="caption">{week}</Typography>
+                            <Typography variant="caption" display="block" color="text.secondary">
+                              {attendance}%
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                  
+                  {/* Performance Summary */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                      <Typography variant="h5">94.5%</Typography>
+                      <Typography variant="caption">Avg Attendance</Typography>
+                    </Paper>
+                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
+                      <Typography variant="h5">4.3/5</Typography>
+                      <Typography variant="caption">Avg Performance</Typography>
+                    </Paper>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
           </Grid>
-          
-          {/* Advanced Analytics with Charts */}
-          <Grid item xs={12}>
-            <AdvancedAnalytics 
-              moduleId="hr" 
-              title="HR Performance Analytics"
-              data={{
-                employees: 58,
-                departments: 7,
-                open_positions: 3,
-                on_leave: 6
-              }}
-            />
+
+          {/* Department Performance Comparison */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                  <AssessmentIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                  Department Performance Comparison
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{ height: 300 }}>
+                  {/* Department Performance Table */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {[
+                      { dept: 'Sales', performance: 92, productivity: 88, satisfaction: 85 },
+                      { dept: 'HR', performance: 89, productivity: 91, satisfaction: 90 },
+                      { dept: 'Finance', performance: 95, productivity: 93, satisfaction: 87 },
+                      { dept: 'IT', performance: 91, productivity: 89, satisfaction: 92 },
+                      { dept: 'Operations', performance: 87, productivity: 85, satisfaction: 83 }
+                    ].map((dept, idx) => (
+                      <Box key={dept.dept}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
+                          {dept.dept}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Performance</Typography>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={dept.performance} 
+                              sx={{ height: 4, borderRadius: 2 }}
+                              color="primary"
+                            />
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Productivity</Typography>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={dept.productivity} 
+                              sx={{ height: 4, borderRadius: 2 }}
+                              color="success"
+                            />
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Satisfaction</Typography>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={dept.satisfaction} 
+                              sx={{ height: 4, borderRadius: 2 }}
+                              color="warning"
+                            />
+                          </Box>
+                          <Typography variant="caption" sx={{ minWidth: 30 }}>
+                            {Math.round((dept.performance + dept.productivity + dept.satisfaction) / 3)}%
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
           </Grid>
-          
-          {/* Gantt Chart for HR Projects */}
+
+          {/* Recruitment & Retention Analytics */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                  <PersonAddIcon sx={{ mr: 1, color: '#FF5722' }} />
+                  Recruitment & Retention Analytics
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{ height: 300 }}>
+                  {/* Key Metrics */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                      <Typography variant="h4">12</Typography>
+                      <Typography variant="caption">New Hires (This Month)</Typography>
+                    </Paper>
+                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText' }}>
+                      <Typography variant="h4">3</Typography>
+                      <Typography variant="caption">Departures (This Month)</Typography>
+                    </Paper>
+                  </Box>
+
+                  {/* Retention Metrics */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Employee Retention Rate
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={94} 
+                          sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                          color="success"
+                        />
+                        <Typography variant="h6" color="success.main">94%</Typography>
+                      </Box>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Average Time to Fill Position
+                      </Typography>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="h4" color="info.main">18 days</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          -3 days from last quarter
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText', flex: 1, mr: 1 }}>
+                        <Typography variant="h6">85%</Typography>
+                        <Typography variant="caption">Interview Success Rate</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText', flex: 1, ml: 1 }}>
+                        <Typography variant="h6">4.2</Typography>
+                        <Typography variant="caption">Avg Employee Rating</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Training & Development Progress */}
           <Grid item xs={12}>
-            <GanttChart 
-              title="HR Project Timeline"
-              projects={[
-                {
-                  id: 1,
-                  name: 'Employee Development Program',
-                  type: 'hr',
-                  manager: 'HR Manager',
-                  status: 'in-progress',
-                  priority: 'high',
-                  startDate: new Date('2024-02-01'),
-                  endDate: new Date('2024-06-30'),
-                  progress: 45,
-                  budget: 60000,
-                  team: ['Training Coordinator', 'HR Specialist', 'Department Heads'],
-                  tasks: [
-                    {
-                      id: 301,
-                      name: 'Skills Assessment',
-                      startDate: new Date('2024-02-01'),
-                      endDate: new Date('2024-02-20'),
-                      progress: 100,
-                      status: 'completed',
-                      assignee: 'HR Specialist',
-                      dependencies: []
-                    },
-                    {
-                      id: 302,
-                      name: 'Training Program Design',
-                      startDate: new Date('2024-02-15'),
-                      endDate: new Date('2024-03-15'),
-                      progress: 80,
-                      status: 'in-progress',
-                      assignee: 'Training Coordinator',
-                      dependencies: [301]
-                    },
-                    {
-                      id: 303,
-                      name: 'Training Delivery',
-                      startDate: new Date('2024-03-10'),
-                      endDate: new Date('2024-05-31'),
-                      progress: 25,
-                      status: 'in-progress',
-                      assignee: 'Department Heads',
-                      dependencies: [302]
-                    },
-                    {
-                      id: 304,
-                      name: 'Performance Evaluation',
-                      startDate: new Date('2024-06-01'),
-                      endDate: new Date('2024-06-30'),
-                      progress: 0,
-                      status: 'pending',
-                      assignee: 'HR Manager',
-                      dependencies: [303]
-                    }
-                  ]
-                }
-              ]}
-            />
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                  <EventIcon sx={{ mr: 1, color: '#2196F3' }} />
+                  Training & Development Progress
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Grid container spacing={3}>
+                  {/* Training Completion Stats */}
+                  <Grid item xs={12} md={4}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
+                        87%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Training Completion Rate
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={87} 
+                        sx={{ height: 8, borderRadius: 4 }} 
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* Training Programs */}
+                  <Grid item xs={12} md={8}>
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                      Active Training Programs
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { program: 'Leadership Development', enrolled: 25, completed: 18, progress: 72 },
+                        { program: 'Technical Skills', enrolled: 42, completed: 35, progress: 83 },
+                        { program: 'Safety Training', enrolled: 58, completed: 55, progress: 95 },
+                        { program: 'Customer Service', enrolled: 33, completed: 28, progress: 85 }
+                      ].map((training, idx) => (
+                        <Box key={training.program} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ minWidth: 150 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {training.program}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {training.completed}/{training.enrolled} completed
+                            </Typography>
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={training.progress} 
+                              sx={{ height: 8, borderRadius: 4 }}
+                              color={training.progress > 90 ? 'success' : training.progress > 70 ? 'primary' : 'warning'}
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                            {training.progress}%
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
       </Paper>

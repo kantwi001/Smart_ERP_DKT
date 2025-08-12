@@ -2,25 +2,28 @@ import React, { useState, useEffect, useContext } from 'react';
 import { 
   Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
   Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PeopleIcon from '@mui/icons-material/People';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import SellIcon from '@mui/icons-material/Sell';
-import AddIcon from '@mui/icons-material/Add';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import DescriptionIcon from '@mui/icons-material/Description';
-import ContactsIcon from '@mui/icons-material/Contacts';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import PersonIcon from '@mui/icons-material/Person';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import PriceChangeIcon from '@mui/icons-material/PriceChange';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ContactsIcon from '@mui/icons-material/Contacts';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import CloseIcon from '@mui/icons-material/Close';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import AddIcon from '@mui/icons-material/Add';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import api from './api';
 import { AuthContext } from './AuthContext';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
@@ -166,6 +169,8 @@ const SalesDashboard = () => {
   const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
   const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
   const [priceManagementDialogOpen, setPriceManagementDialogOpen] = useState(false);
+  const [transferStockDialogOpen, setTransferStockDialogOpen] = useState(false);
+  const [viewTransfersDialogOpen, setViewTransfersDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
@@ -205,6 +210,14 @@ const SalesDashboard = () => {
     payment_terms: 'cash'
   });
 
+  const [transferForm, setTransferForm] = useState({
+    product: '',
+    quantity: '',
+    fromWarehouse: '',
+    toWarehouse: '',
+    notes: ''
+  });
+
   const [productForm, setProductForm] = useState({
     name: '',
     sku: '',
@@ -225,6 +238,7 @@ const SalesDashboard = () => {
   const [salesAgents, setSalesAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('all');
   const [agentAnalytics, setAgentAnalytics] = useState(null);
+  const [transfers, setTransfers] = useState([]);
 
   // Role-based access control for product management
   const canManageProducts = () => {
@@ -277,6 +291,7 @@ const SalesDashboard = () => {
     loadCustomers();
     loadProducts();
     loadWarehouses();
+    loadTransfers();
     loadSalesAgents();
   }, [token]);
 
@@ -317,6 +332,15 @@ const SalesDashboard = () => {
       setWarehouses(response.data.results || response.data);
     } catch (error) {
       console.error('Failed to load warehouses:', error);
+    }
+  };
+
+  const loadTransfers = async () => {
+    try {
+      const response = await api.get('/inventory/transfers/');
+      setTransfers(response.data.results || response.data);
+    } catch (error) {
+      console.error('Failed to load transfers:', error);
     }
   };
 
@@ -586,6 +610,56 @@ const SalesDashboard = () => {
     } catch (error) {
       console.error('Failed to update price:', error);
       setSnackbarMessage('Failed to update price');
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleTransferStock = async () => {
+    try {
+      // Validate transfer form
+      if (!transferForm.product || !transferForm.quantity || !transferForm.fromWarehouse || !transferForm.toWarehouse) {
+        setSnackbarMessage('Please fill in all required fields');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      if (transferForm.fromWarehouse === transferForm.toWarehouse) {
+        setSnackbarMessage('Source and destination warehouses must be different');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      const transferData = {
+        product: transferForm.product,
+        quantity: parseInt(transferForm.quantity),
+        from_warehouse: transferForm.fromWarehouse,
+        to_warehouse: transferForm.toWarehouse,
+        notes: transferForm.notes,
+        requested_by: user?.id
+      };
+
+      const response = await api.post('/inventory/transfers/', transferData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setSnackbarMessage('Stock transfer initiated successfully!');
+      setSnackbarOpen(true);
+      setTransferStockDialogOpen(false);
+      
+      // Reset form
+      setTransferForm({
+        product: '',
+        quantity: '',
+        fromWarehouse: '',
+        toWarehouse: '',
+        notes: ''
+      });
+
+      // Refresh data
+      loadDashboardData();
+    } catch (error) {
+      console.error('Transfer stock error:', error);
+      setSnackbarMessage('Failed to initiate stock transfer. Please try again.');
       setSnackbarOpen(true);
     }
   };
@@ -865,6 +939,34 @@ const SalesDashboard = () => {
               Add Lead
             </QuickActionButton>
           </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<SwapHorizIcon />}
+              onClick={() => setTransferStockDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #FF5722 30%, #D84315 90%)',
+                color: 'white'
+              }}
+            >
+              Transfer Stock
+            </QuickActionButton>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<InventoryIcon />}
+              onClick={() => setViewTransfersDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #607D8B 30%, #455A64 90%)',
+                color: 'white'
+              }}
+            >
+              View Transfers
+            </QuickActionButton>
+          </Grid>
         </Grid>
       </Paper>
 
@@ -974,10 +1076,7 @@ const SalesDashboard = () => {
             <Grid item xs={12} md={8}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <SellIcon sx={{ mr: 1, color: '#FF9800' }} />
-                    Recent Sales Activity
-                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent Sales Activity</Typography>
                   <Divider sx={{ mb: 2 }} />
                   <List sx={{ py: 0 }}>
                     {recentActivity.map((item, idx) => (
@@ -1012,21 +1111,35 @@ const SalesDashboard = () => {
                         <Typography variant="body2">Monthly Target</Typography>
                         <Typography variant="body2" color="success.main">85%</Typography>
                       </Box>
-                      <LinearProgress variant="determinate" value={85} color="success" sx={{ borderRadius: 1, height: 8 }} />
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={85} 
+                        color="success" 
+                        sx={{ borderRadius: 1, height: 8 }} 
+                      />
                     </Box>
                     <Box sx={{ mb: 2 }}>
                       <Box display="flex" justifyContent="space-between" mb={1}>
                         <Typography variant="body2">Conversion Rate</Typography>
                         <Typography variant="body2" color="primary">72%</Typography>
                       </Box>
-                      <LinearProgress variant="determinate" value={72} sx={{ borderRadius: 1, height: 8 }} />
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={72} 
+                        sx={{ borderRadius: 1, height: 8 }} 
+                      />
                     </Box>
                     <Box>
                       <Box display="flex" justifyContent="space-between" mb={1}>
                         <Typography variant="body2">Customer Satisfaction</Typography>
                         <Typography variant="body2" color="warning.main">94%</Typography>
                       </Box>
-                      <LinearProgress variant="determinate" value={94} color="warning" sx={{ borderRadius: 1, height: 8 }} />
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={94} 
+                        color="warning" 
+                        sx={{ borderRadius: 1, height: 8 }} 
+                      />
                     </Box>
                   </Box>
                 </CardContent>
@@ -1106,98 +1219,372 @@ const SalesDashboard = () => {
         {/* Analytics Tab */}
         <TabPanel value={tabValue} index={3}>
           <Grid container spacing={3}>
-            {/* Transaction Integration */}
+            {/* Sales Revenue Trends */}
             <Grid item xs={12} md={6}>
-              <TransactionIntegration 
-                moduleId="sales" 
-                title="Sales Transaction Flow"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Sales Revenue Trends
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Live Sales Revenue Chart */}
+                    <Box sx={{ width: '100%', textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h4" color="primary" sx={{ mb: 1 }}>
+                        GHS {(salesData.reduce((sum, order) => sum + (order.total_amount || 0), 0)).toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Total Sales Revenue
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={85} 
+                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
+                      />
+                    </Box>
+
+                    {/* Revenue Breakdown by Period */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                      {[
+                        { period: 'This Month', amount: 145000, percentage: 92, color: '#4CAF50' },
+                        { period: 'Last Month', amount: 132000, percentage: 84, color: '#2196F3' },
+                        { period: 'This Quarter', amount: 420000, percentage: 95, color: '#FF9800' },
+                        { period: 'YTD Growth', amount: 18.3, percentage: 73, color: '#9C27B0', isPercentage: true }
+                      ].map((item, idx) => (
+                        <Box key={item.period}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.period}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {item.isPercentage ? `+${item.amount}%` : `GHS ${item.amount.toLocaleString()}`}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={item.percentage} 
+                                color={item.percentage >= 90 ? 'success' : item.percentage >= 80 ? 'primary' : 'warning'} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': { bgcolor: item.color }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {item.percentage}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Time-Based Analytics */}
+
+            {/* Sales Performance Analytics */}
             <Grid item xs={12} md={6}>
-              <TimeBasedAnalytics 
-                moduleId="sales" 
-                title="Sales Trends Analysis"
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <BarChartIcon sx={{ mr: 1, color: '#FF9800' }} />
+                    Sales Performance Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Monthly Sales Performance Chart */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Monthly Sales Performance (Last 6 Months)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                        {[85000, 92000, 78000, 105000, 118000, 145000].map((amount, i) => {
+                          const height = (amount / 150000) * 80;
+                          const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                          return (
+                            <Box key={months[i]} sx={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <Box 
+                                sx={{ 
+                                  height: height, 
+                                  width: 12,
+                                  bgcolor: '#FF9800', 
+                                  borderRadius: 1,
+                                  mb: 1,
+                                  opacity: 0.8
+                                }} 
+                              />
+                              <Typography variant="caption">{months[i]}</Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {(amount/1000).toFixed(0)}K
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                    
+                    {/* Performance Metrics */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                        <Typography variant="h5">623K</Typography>
+                        <Typography variant="caption">6-Month Total</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
+                        <Typography variant="h5">104K</Typography>
+                        <Typography variant="caption">Monthly Avg</Typography>
+                      </Paper>
+                    </Box>
+
+                    {/* Growth Indicators */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
+                          +23%
+                        </Typography>
+                        <Typography variant="caption">MoM Growth</Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
+                          +18.3%
+                        </Typography>
+                        <Typography variant="caption">YoY Growth</Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600 }}>
+                          94.2%
+                        </Typography>
+                        <Typography variant="caption">Target Achievement</Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Advanced Analytics with Charts */}
-            <Grid item xs={12}>
-              <AdvancedAnalytics 
-                moduleId="sales" 
-                title="Sales Performance Analytics"
-                data={{
-                  revenue: 125000,
-                  customers: 45,
-                  orders: 320,
-                  conversion_rate: 72
-                }}
-              />
+
+            {/* Customer Analytics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <PeopleIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                    Customer Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Customer Segmentation */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Customer Segmentation by Value
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                      {[
+                        { segment: 'High Value', count: 45, percentage: 35, color: '#4CAF50', value: 'GHS 5K+' },
+                        { segment: 'Medium Value', count: 78, percentage: 45, color: '#FF9800', value: 'GHS 1-5K' },
+                        { segment: 'Low Value', count: 87, percentage: 20, color: '#2196F3', value: 'GHS <1K' }
+                      ].map((segment, idx) => (
+                        <Box key={segment.segment}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {segment.segment}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {segment.count} customers ({segment.value})
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={segment.percentage} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': { bgcolor: segment.color }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {segment.percentage}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/* Customer Metrics */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, mr: 1 }}>
+                        <Typography variant="h6">{customers.length}</Typography>
+                        <Typography variant="caption">Total Customers</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
+                        <Typography variant="h6">28</Typography>
+                        <Typography variant="caption">New This Month</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
-            
-            {/* Gantt Chart for Sales Projects */}
+
+            {/* Product Performance Analytics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <SellIcon sx={{ mr: 1, color: '#FF5722' }} />
+                    Product Performance Analytics
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Box sx={{ height: 300 }}>
+                    {/* Top Selling Categories */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Top Selling Product Categories
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                      {[
+                        { category: 'Condoms', sales: 125000, percentage: 40, color: '#4CAF50' },
+                        { category: 'Contraceptives', sales: 95000, percentage: 30, color: '#2196F3' },
+                        { category: 'Medical Supplies', sales: 62000, percentage: 20, color: '#FF9800' },
+                        { category: 'Other Products', sales: 31000, percentage: 10, color: '#9C27B0' }
+                      ].map((item, idx) => (
+                        <Box key={item.category}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.category}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              GHS {item.sales.toLocaleString()}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={item.percentage} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': { bgcolor: item.color }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {item.percentage}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/* Product Metrics */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText', flex: 1, mr: 1 }}>
+                        <Typography variant="h6">18</Typography>
+                        <Typography variant="caption">Active Products</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText', flex: 1, ml: 1 }}>
+                        <Typography variant="h6">3</Typography>
+                        <Typography variant="caption">Low Performers</Typography>
+                      </Paper>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Sales Team Performance Dashboard */}
             <Grid item xs={12}>
-              <GanttChart 
-                title="Sales Project Timeline"
-                projects={[
-                  {
-                    id: 1,
-                    name: 'Q1 Sales Campaign',
-                    type: 'sales',
-                    manager: 'Sales Manager',
-                    status: 'in-progress',
-                    priority: 'high',
-                    startDate: new Date('2024-01-01'),
-                    endDate: new Date('2024-03-31'),
-                    progress: 65,
-                    budget: 50000,
-                    team: ['Sales Rep 1', 'Sales Rep 2', 'Marketing Lead'],
-                    tasks: [
-                      {
-                        id: 101,
-                        name: 'Lead Generation',
-                        startDate: new Date('2024-01-01'),
-                        endDate: new Date('2024-01-31'),
-                        progress: 100,
-                        status: 'completed',
-                        assignee: 'Sales Rep 1',
-                        dependencies: []
-                      },
-                      {
-                        id: 102,
-                        name: 'Proposal Development',
-                        startDate: new Date('2024-01-15'),
-                        endDate: new Date('2024-02-15'),
-                        progress: 80,
-                        status: 'in-progress',
-                        assignee: 'Sales Rep 2',
-                        dependencies: [101]
-                      },
-                      {
-                        id: 103,
-                        name: 'Client Meetings',
-                        startDate: new Date('2024-02-01'),
-                        endDate: new Date('2024-03-15'),
-                        progress: 40,
-                        status: 'in-progress',
-                        assignee: 'Marketing Lead',
-                        dependencies: [102]
-                      },
-                      {
-                        id: 104,
-                        name: 'Contract Finalization',
-                        startDate: new Date('2024-03-01'),
-                        endDate: new Date('2024-03-31'),
-                        progress: 10,
-                        status: 'pending',
-                        assignee: 'Sales Manager',
-                        dependencies: [103]
-                      }
-                    ]
-                  }
-                ]}
-              />
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <PersonIcon sx={{ mr: 1, color: '#2196F3' }} />
+                    Sales Team Performance Dashboard
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={3}>
+                    {/* Top Performing Sales Reps */}
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Top Performing Sales Representatives
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { name: 'Kwame Asante', sales: 85000, target: 120, region: 'Greater Accra' },
+                          { name: 'Ama Osei', sales: 72000, target: 96, region: 'Ashanti' },
+                          { name: 'Kofi Mensah', sales: 68000, target: 91, region: 'Western' },
+                          { name: 'Akosua Boateng', sales: 61000, target: 87, region: 'Central' }
+                        ].map((rep, idx) => (
+                          <Box key={rep.name} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                            <Avatar sx={{ bgcolor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'][idx] }}>
+                              {idx + 1}
+                            </Avatar>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                {rep.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {rep.region} • GHS {rep.sales.toLocaleString()} sales
+                              </Typography>
+                            </Box>
+                            <Chip 
+                              label={`${rep.target}% of target`} 
+                              color={rep.target >= 100 ? 'success' : rep.target >= 80 ? 'primary' : 'warning'} 
+                              size="small"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+
+                    {/* Sales Targets & Achievement */}
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                        Sales Targets & Achievement
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[
+                          { metric: 'Monthly Target', achieved: 145000, target: 150000, percentage: 97 },
+                          { metric: 'Quarterly Target', achieved: 420000, target: 450000, percentage: 93 },
+                          { metric: 'Annual Target', achieved: 1680000, target: 1800000, percentage: 93 },
+                          { metric: 'Team Performance', achieved: 94, target: 100, percentage: 94, isScore: true }
+                        ].map((target, idx) => (
+                          <Box key={target.metric}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                {target.metric}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {target.isScore ? 
+                                  `${target.achieved}% (target: ${target.target}%)` : 
+                                  `GHS ${target.achieved.toLocaleString()} / ${target.target.toLocaleString()}`
+                                }
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Box sx={{ flex: 1 }}>
+                                <LinearProgress 
+                                  variant="determinate" 
+                                  value={target.percentage} 
+                                  sx={{ height: 8, borderRadius: 4 }}
+                                  color={target.percentage >= 95 ? 'success' : target.percentage >= 85 ? 'primary' : 'warning'}
+                                />
+                              </Box>
+                              <Typography variant="body2" color={target.percentage >= 95 ? 'success.main' : target.percentage >= 85 ? 'primary.main' : 'warning.main'} sx={{ minWidth: 50, fontWeight: 600 }}>
+                                {target.percentage}%
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </AnalyticsCard>
             </Grid>
           </Grid>
         </TabPanel>
@@ -1640,6 +2027,120 @@ const SalesDashboard = () => {
         </DialogActions>
       </Dialog>
       
+      {/* Transfer Stock Dialog */}
+      <Dialog open={transferStockDialogOpen} onClose={() => setTransferStockDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Transfer Stock</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            select
+            label="Product"
+            value={transferForm.product}
+            onChange={(e) => setTransferForm({...transferForm, product: e.target.value})}
+            margin="normal"
+          >
+            {products.map((product) => (
+              <MenuItem key={product.id} value={product.id}>
+                {product.name} - {product.sku} (Stock: {product.quantity})
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            label="Quantity"
+            value={transferForm.quantity}
+            onChange={(e) => setTransferForm({...transferForm, quantity: e.target.value})}
+            margin="normal"
+            type="number"
+          />
+          <TextField
+            fullWidth
+            select
+            label="From Warehouse"
+            value={transferForm.fromWarehouse}
+            onChange={(e) => setTransferForm({...transferForm, fromWarehouse: e.target.value})}
+            margin="normal"
+          >
+            {warehouses.map((warehouse) => (
+              <MenuItem key={warehouse.id} value={warehouse.id}>
+                {warehouse.name} - {warehouse.code}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            select
+            label="To Warehouse"
+            value={transferForm.toWarehouse}
+            onChange={(e) => setTransferForm({...transferForm, toWarehouse: e.target.value})}
+            margin="normal"
+          >
+            {warehouses.map((warehouse) => (
+              <MenuItem key={warehouse.id} value={warehouse.id}>
+                {warehouse.name} - {warehouse.code}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            label="Notes (Optional)"
+            value={transferForm.notes}
+            onChange={(e) => setTransferForm({...transferForm, notes: e.target.value})}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTransferStockDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleTransferStock} variant="contained" color="primary">
+            Transfer Stock
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Transfers Dialog */}
+      <Dialog open={viewTransfersDialogOpen} onClose={() => setViewTransfersDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Recent Stock Transfers</DialogTitle>
+        <DialogContent>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Quantity</TableCell>
+                  <TableCell>From</TableCell>
+                  <TableCell>To</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Date</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {transfers.map((transfer) => (
+                  <TableRow key={transfer.id}>
+                    <TableCell>{transfer.product_name}</TableCell>
+                    <TableCell>{transfer.quantity}</TableCell>
+                    <TableCell>{transfer.from_warehouse_name}</TableCell>
+                    <TableCell>{transfer.to_warehouse_name}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={transfer.status} 
+                        color={transfer.status === 'completed' ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{new Date(transfer.created_at).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewTransfersDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Success/Error Snackbar */}
       <Snackbar
         open={snackbarOpen}

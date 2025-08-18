@@ -2,8 +2,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from .models import Customer, Sale, CustomerApproval, Quote, Lead
-from .serializers import CustomerSerializer, SaleSerializer, CustomerApprovalSerializer, CustomerApprovalActionSerializer, QuoteSerializer, LeadSerializer
+from django.db.models import Sum, Count, Q
+from datetime import datetime, timedelta
+from .models import Customer, Sale, CustomerApproval, Quote, Lead, Promotion, PromotionProduct
+from .serializers import CustomerSerializer, SaleSerializer, CustomerApprovalSerializer, CustomerApprovalActionSerializer, QuoteSerializer, LeadSerializer, PromotionSerializer, PromotionProductSerializer
 
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all()
@@ -357,3 +359,117 @@ class LeadViewSet(viewsets.ModelViewSet):
             })
         else:
             return Response(customer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class PromotionViewSet(viewsets.ModelViewSet):
+    queryset = Promotion.objects.all()
+    serializer_class = PromotionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter promotions based on user permissions and query parameters"""
+        queryset = Promotion.objects.all()
+        
+        # Filter by status if provided
+        status_filter = self.request.query_params.get('status', None)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by active promotions
+        active_only = self.request.query_params.get('active_only', None)
+        if active_only == 'true':
+            queryset = [p for p in queryset if p.is_active()]
+        
+        return queryset
+    
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activate a promotion"""
+        promotion = self.get_object()
+        promotion.status = 'active'
+        promotion.save()
+        
+        return Response({
+            'message': 'Promotion activated successfully',
+            'status': promotion.status
+        })
+    
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        """Deactivate a promotion"""
+        promotion = self.get_object()
+        promotion.status = 'inactive'
+        promotion.save()
+        
+        return Response({
+            'message': 'Promotion deactivated successfully',
+            'status': promotion.status
+        })
+    
+    @action(detail=True, methods=['get'])
+    def calculate_discount(self, request, pk=None):
+        """Calculate discount for a given order amount"""
+        promotion = self.get_object()
+        amount = float(request.query_params.get('amount', 0))
+        
+        discount = promotion.calculate_discount(amount)
+        
+        return Response({
+            'promotion_name': promotion.name,
+            'order_amount': amount,
+            'discount_amount': discount,
+            'final_amount': amount - discount,
+            'is_applicable': discount > 0
+        })
+    
+    @action(detail=False, methods=['get'])
+    def active_promotions(self, request):
+        """Get all currently active promotions"""
+        active_promotions = [p for p in self.get_queryset() if p.is_active()]
+        serializer = self.get_serializer(active_promotions, many=True)
+        
+        return Response({
+            'count': len(active_promotions),
+            'results': serializer.data
+        })
+
+class PromotionProductViewSet(viewsets.ModelViewSet):
+    queryset = PromotionProduct.objects.all()
+    serializer_class = PromotionProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter promotion products by promotion if specified"""
+        queryset = PromotionProduct.objects.all()
+        
+        promotion_id = self.request.query_params.get('promotion', None)
+        if promotion_id:
+            queryset = queryset.filter(promotion_id=promotion_id)
+        
+        return queryset
+
+class DashboardViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def sales_dashboard(self, request):
+        """Provide sales dashboard data"""
+        # Sales statistics
+        total_sales = Sale.objects.aggregate(total=Sum('total'))['total']
+        total_customers = Customer.objects.count()
+        total_leads = Lead.objects.count()
+        
+        # Recent sales
+        recent_sales = Sale.objects.order_by('-date')[:10]
+        
+        # Analytics
+        sales_by_month = Sale.objects.extra({'month': "EXTRACT(MONTH FROM date)"}).values('month').annotate(total=Sum('total')).order_by('month')
+        
+        return Response({
+            'sales_statistics': {
+                'total_sales': total_sales,
+                'total_customers': total_customers,
+                'total_leads': total_leads,
+            },
+            'recent_sales': SaleSerializer(recent_sales, many=True).data,
+            'analytics': list(sales_by_month),
+        })

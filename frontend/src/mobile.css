@@ -1,4 +1,4 @@
-/* Mobile-Optimized Styles for ERP System */
+/* Mobile-Optimized Styles for ERP System - Universal Device Support */
 
 /* Touch-friendly buttons and inputs */
 .mobile-optimized {
@@ -8,337 +8,670 @@
   user-select: none;
 }
 
-/* Enhanced Employee Dashboard Mobile Styles */
+/* Base responsive variables */
+:root {
+  --mobile-padding-xs: 8px;
+  --mobile-padding-sm: 12px;
+  --mobile-padding-md: 16px;
+  --mobile-padding-lg: 24px;
+  --mobile-padding-xl: 32px;
+  
+  --mobile-font-xs: 0.7rem;
+  --mobile-font-sm: 0.8rem;
+  --mobile-font-md: 0.9rem;
+  --mobile-font-lg: 1rem;
+  --mobile-font-xl: 1.2rem;
+  
+  --mobile-touch-target: 44px;
+  --mobile-button-height: 48px;
+  --mobile-input-height: 48px;
+}
+
+/* Universal Mobile Login Interface */
+@media (max-width: 768px) {
+  /* Login page container - Universal fit */
+  .login-page-container {
+    padding: 0 !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important; /* Dynamic viewport height for mobile browsers */
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+    overflow-x: hidden !important;
+    position: relative !important;
+  }
+  
+  /* Login grid container - Flexible layout */
+  .login-grid-container {
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Branding section - Adaptive height */
+  .login-branding-section {
+    border-radius: 0 !important;
+    min-height: 35vh !important;
+    max-height: 45vh !important;
+    padding: var(--mobile-padding-lg) var(--mobile-padding-md) !important;
+    background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    overflow: hidden !important;
+  }
+  
+  /* Login form section - Flexible height */
+  .login-form-section {
+    border-radius: 0 !important;
+    padding: var(--mobile-padding-lg) var(--mobile-padding-md) !important;
+    background: white !important;
+    min-height: 55vh !important;
+    max-height: 65vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Login card - Full width adaptation */
+  .login-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  
+  /* Logo styling - Scalable */
+  .login-logo {
+    font-size: clamp(48px, 8vw, 64px) !important;
+    margin-bottom: var(--mobile-padding-md) !important;
+    color: white !important;
+  }
+  
+  /* Title styling - Responsive text */
+  .login-title {
+    font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+    margin-bottom: var(--mobile-padding-xs) !important;
+    color: white !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Subtitle styling - Adaptive */
+  .login-subtitle {
+    font-size: clamp(0.8rem, 3vw, 0.9rem) !important;
+    margin-bottom: var(--mobile-padding-md) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 300 !important;
+    text-align: center !important;
+    line-height: 1.3 !important;
+  }
+  
+  /* Feature icons grid - Compact layout */
+  .feature-icons-grid {
+    margin-top: var(--mobile-padding-sm) !important;
+    gap: var(--mobile-padding-xs) !important;
+    max-width: 100% !important;
+  }
+  
+  .feature-icon-item {
+    padding: var(--mobile-padding-xs) !important;
+    text-align: center !important;
+    opacity: 0.8 !important;
+    transition: all 0.3s ease !important;
+    min-height: auto !important;
+  }
+  
+  .feature-icon {
+    font-size: clamp(18px, 4vw, 24px) !important;
+    margin-bottom: 2px !important;
+    color: white !important;
+  }
+  
+  .feature-text {
+    font-size: clamp(0.6rem, 2vw, 0.7rem) !important;
+    color: white !important;
+    line-height: 1.1 !important;
+  }
+  
+  /* Form header - Centered and compact */
+  .form-header {
+    text-align: center !important;
+    margin-bottom: var(--mobile-padding-md) !important;
+  }
+  
+  .form-security-icon {
+    font-size: clamp(32px, 6vw, 40px) !important;
+    color: #1976d2 !important;
+    margin-bottom: var(--mobile-padding-sm) !important;
+  }
+  
+  .form-welcome-title {
+    font-size: clamp(1.2rem, 4vw, 1.5rem) !important;
+    color: #1976d2 !important;
+    font-weight: 600 !important;
+    margin-bottom: 4px !important;
+    line-height: 1.2 !important;
+  }
+  
+  .form-welcome-subtitle {
+    font-size: clamp(0.8rem, 3vw, 0.9rem) !important;
+    color: rgba(0, 0, 0, 0.6) !important;
+    line-height: 1.3 !important;
+  }
+  
+  /* Demo credentials - Compact layout */
+  .demo-credentials-section {
+    margin-bottom: var(--mobile-padding-md) !important;
+  }
+  
+  .demo-credentials-title {
+    font-size: var(--mobile-font-sm) !important;
+    color: rgba(0, 0, 0, 0.7) !important;
+    font-weight: 500 !important;
+    margin-bottom: var(--mobile-padding-sm) !important;
+    text-align: center !important;
+  }
+  
+  .demo-chips-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: var(--mobile-padding-xs) !important;
+    justify-content: center !important;
+  }
+  
+  .demo-chip {
+    font-size: var(--mobile-font-xs) !important;
+    padding: 6px 10px !important;
+    min-height: 28px !important;
+    border-radius: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    flex: 0 0 auto !important;
+  }
+  
+  /* Form inputs - Touch optimized */
+  .login-input {
+    margin-bottom: var(--mobile-padding-md) !important;
+    width: 100% !important;
+  }
+  
+  .login-input .MuiOutlinedInput-root {
+    border-radius: 8px !important;
+    font-size: var(--mobile-font-lg) !important;
+    min-height: var(--mobile-input-height) !important;
+  }
+  
+  .login-input .MuiInputLabel-root {
+    font-size: var(--mobile-font-lg) !important;
+  }
+  
+  .login-input .MuiInputAdornment-root {
+    margin-right: var(--mobile-padding-xs) !important;
+  }
+  
+  .login-input .MuiInputBase-input {
+    padding: 12px 14px !important;
+    font-size: var(--mobile-font-lg) !important;
+  }
+  
+  /* Login button - Touch friendly */
+  .login-button {
+    padding: 14px !important;
+    font-size: var(--mobile-font-lg) !important;
+    font-weight: 600 !important;
+    min-height: var(--mobile-button-height) !important;
+    border-radius: 8px !important;
+    text-transform: none !important;
+    margin-top: var(--mobile-padding-xs) !important;
+    width: 100% !important;
+    touch-action: manipulation !important;
+  }
+  
+  /* Forgot password link - Touch target */
+  .forgot-password-link {
+    padding: var(--mobile-padding-sm) !important;
+    margin-top: var(--mobile-padding-md) !important;
+    font-size: var(--mobile-font-md) !important;
+    text-transform: none !important;
+    min-height: var(--mobile-touch-target) !important;
+    touch-action: manipulation !important;
+  }
+  
+  /* Footer - Compact */
+  .login-footer {
+    margin-top: var(--mobile-padding-md) !important;
+    text-align: center !important;
+  }
+  
+  .login-footer-divider {
+    margin-bottom: var(--mobile-padding-sm) !important;
+  }
+  
+  .login-footer-text {
+    font-size: var(--mobile-font-xs) !important;
+    color: rgba(0, 0, 0, 0.5) !important;
+    line-height: 1.3 !important;
+  }
+  
+  /* Dialog optimizations - Full screen friendly */
+  .forgot-password-dialog {
+    margin: var(--mobile-padding-md) !important;
+  }
+  
+  .forgot-password-dialog .MuiDialog-paper {
+    border-radius: 12px !important;
+    margin: var(--mobile-padding-md) !important;
+    width: calc(100% - 32px) !important;
+    max-width: none !important;
+    max-height: 80vh !important;
+  }
+  
+  .dialog-title {
+    padding: 20px 24px 8px !important;
+    text-align: center !important;
+    font-size: var(--mobile-font-xl) !important;
+  }
+  
+  .dialog-content {
+    padding: 8px 24px 16px !important;
+    font-size: var(--mobile-font-md) !important;
+  }
+  
+  .dialog-actions {
+    padding: 8px 24px 20px !important;
+    gap: var(--mobile-padding-sm) !important;
+  }
+  
+  .dialog-button {
+    border-radius: 8px !important;
+    padding: 10px 20px !important;
+    font-size: var(--mobile-font-md) !important;
+    text-transform: none !important;
+    min-height: var(--mobile-touch-target) !important;
+    flex: 1 !important;
+  }
+}
+
+/* Small phones (320px - 480px) */
+@media (max-width: 480px) {
+  .login-branding-section {
+    min-height: 30vh !important;
+    padding: var(--mobile-padding-md) var(--mobile-padding-sm) !important;
+  }
+  
+  .login-form-section {
+    min-height: 70vh !important;
+    padding: var(--mobile-padding-md) var(--mobile-padding-sm) !important;
+  }
+  
+  .login-logo {
+    font-size: clamp(40px, 10vw, 56px) !important;
+  }
+  
+  .login-title {
+    font-size: clamp(1.2rem, 6vw, 1.6rem) !important;
+  }
+  
+  .feature-icons-grid {
+    gap: 4px !important;
+  }
+  
+  .feature-icon {
+    font-size: clamp(16px, 5vw, 20px) !important;
+  }
+  
+  .feature-text {
+    font-size: clamp(0.5rem, 2.5vw, 0.65rem) !important;
+  }
+  
+  .demo-chip {
+    font-size: 0.65rem !important;
+    padding: 4px 8px !important;
+    min-height: 24px !important;
+  }
+}
+
+/* Large phones (481px - 768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+  .login-branding-section {
+    min-height: 38vh !important;
+  }
+  
+  .login-form-section {
+    min-height: 62vh !important;
+  }
+}
+
+/* Portrait orientation specific styles */
+@media (max-width: 768px) and (orientation: portrait) {
+  .login-branding-section {
+    min-height: 35vh !important;
+    max-height: 40vh !important;
+  }
+  
+  .login-form-section {
+    min-height: 60vh !important;
+    max-height: 65vh !important;
+  }
+  
+  .feature-icons-grid {
+    margin-top: var(--mobile-padding-xs) !important;
+  }
+}
+
+/* Landscape orientation specific styles */
+@media (max-width: 768px) and (orientation: landscape) {
+  .login-grid-container {
+    flex-direction: row !important;
+  }
+  
+  .login-branding-section {
+    min-height: 100vh !important;
+    width: 35% !important;
+    padding: var(--mobile-padding-md) var(--mobile-padding-sm) !important;
+  }
+  
+  .login-form-section {
+    min-height: 100vh !important;
+    width: 65% !important;
+    padding: var(--mobile-padding-md) !important;
+  }
+  
+  .login-logo {
+    font-size: clamp(32px, 6vw, 48px) !important;
+  }
+  
+  .login-title {
+    font-size: clamp(1rem, 4vw, 1.4rem) !important;
+  }
+  
+  .login-subtitle {
+    font-size: clamp(0.7rem, 2.5vw, 0.8rem) !important;
+  }
+  
+  .feature-icons-grid {
+    gap: 4px !important;
+  }
+  
+  .feature-icon {
+    font-size: clamp(14px, 3vw, 18px) !important;
+  }
+  
+  .feature-text {
+    font-size: clamp(0.5rem, 2vw, 0.6rem) !important;
+  }
+}
+
+/* Tablet landscape (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
+  .login-grid-container {
+    max-width: 900px !important;
+    margin: 0 auto !important;
+  }
+  
+  .login-branding-section {
+    border-radius: 20px 0 0 20px !important;
+  }
+  
+  .login-form-section {
+    border-radius: 0 20px 20px 0 !important;
+  }
+}
+
+/* Enhanced Employee Dashboard Mobile Styles - Universal Device Support */
 @media (max-width: 768px) {
   /* Employee Dashboard specific optimizations */
   .employee-dashboard-container {
-    padding: 8px !important;
+    padding: var(--mobile-padding-xs) !important;
     margin: 0 !important;
     width: 100% !important;
     overflow-x: hidden !important;
+    min-height: 100vh !important;
   }
   
   .employee-profile-card {
-    margin-bottom: 16px !important;
-    padding: 16px !important;
+    margin-bottom: var(--mobile-padding-md) !important;
+    padding: var(--mobile-padding-md) !important;
+    border-radius: 12px !important;
   }
   
   .employee-avatar {
-    width: 60px !important;
-    height: 60px !important;
-    margin-bottom: 12px !important;
+    width: clamp(50px, 12vw, 70px) !important;
+    height: clamp(50px, 12vw, 70px) !important;
+    margin-bottom: var(--mobile-padding-sm) !important;
   }
   
   .leave-balance-card {
-    padding: 12px !important;
-    margin-bottom: 12px !important;
+    padding: var(--mobile-padding-sm) !important;
+    margin-bottom: var(--mobile-padding-sm) !important;
+    border-radius: 8px !important;
   }
   
   .leave-balance-item {
-    padding: 8px !important;
+    padding: var(--mobile-padding-xs) !important;
     text-align: center !important;
   }
   
   .leave-balance-number {
-    font-size: 1.5rem !important;
+    font-size: clamp(1.2rem, 4vw, 1.6rem) !important;
     font-weight: bold !important;
   }
   
   .leave-balance-label {
-    font-size: 0.75rem !important;
+    font-size: clamp(0.65rem, 2vw, 0.8rem) !important;
     margin-top: 4px !important;
-  }
-}
-
-/* Larger touch targets for mobile */
-@media (max-width: 768px) {
-  .MuiButton-root {
-    min-height: 48px !important;
-    padding: 12px 24px !important;
-    font-size: 16px !important;
+    line-height: 1.2 !important;
   }
   
-  .MuiIconButton-root {
-    width: 48px !important;
-    height: 48px !important;
+  .quick-actions-grid {
+    gap: var(--mobile-padding-sm) !important;
+    margin-top: var(--mobile-padding-md) !important;
   }
   
-  .MuiTextField-root input {
-    font-size: 16px !important;
-    padding: 16px !important;
+  .quick-action-card {
+    padding: var(--mobile-padding-md) !important;
+    min-height: clamp(80px, 20vw, 120px) !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
   }
   
-  .MuiSelect-select {
-    font-size: 16px !important;
-    padding: 16px !important;
+  .quick-action-icon {
+    font-size: clamp(24px, 6vw, 36px) !important;
+    margin-bottom: var(--mobile-padding-xs) !important;
   }
   
-  /* Enhanced Tab Navigation for Mobile */
-  .MuiTabs-root {
-    min-height: 48px !important;
-  }
-  
-  .MuiTab-root {
-    min-height: 48px !important;
-    min-width: 80px !important;
-    padding: 8px 12px !important;
-    font-size: 0.75rem !important;
-  }
-  
-  .MuiTab-iconWrapper {
-    margin-bottom: 4px !important;
-  }
-}
-
-/* Mobile-friendly sidebar */
-@media (max-width: 768px) {
-  .mobile-sidebar {
-    width: 100% !important;
-    height: 100vh !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    z-index: 1300 !important;
-  }
-  
-  .mobile-sidebar .MuiListItem-root {
-    padding: 16px 24px !important;
-    min-height: 56px !important;
-  }
-  
-  .mobile-sidebar .MuiListItemText-primary {
-    font-size: 18px !important;
-    font-weight: 500 !important;
-  }
-}
-
-/* Mobile dashboard cards */
-@media (max-width: 768px) {
-  .mobile-dashboard-card {
-    margin: 8px !important;
-    padding: 16px !important;
-  }
-  
-  .mobile-dashboard-card .MuiCardContent-root {
-    padding: 16px !important;
-  }
-  
-  .mobile-dashboard-card .MuiTypography-h6 {
-    font-size: 18px !important;
-    margin-bottom: 12px !important;
-  }
-}
-
-/* Mobile-friendly tables */
-@media (max-width: 768px) {
-  .mobile-table {
-    overflow-x: auto !important;
-  }
-  
-  .mobile-table .MuiTableCell-root {
-    padding: 12px 8px !important;
-    font-size: 14px !important;
-  }
-  
-  .mobile-table .MuiTableCell-head {
+  .quick-action-title {
+    font-size: clamp(0.8rem, 3vw, 1rem) !important;
     font-weight: 600 !important;
-    background-color: #f5f5f5 !important;
-  }
-}
-
-/* Mobile dialogs */
-@media (max-width: 768px) {
-  .mobile-dialog .MuiDialog-paper {
-    margin: 16px !important;
-    width: calc(100% - 32px) !important;
-    max-width: none !important;
+    line-height: 1.2 !important;
   }
   
-  .mobile-dialog .MuiDialogTitle-root {
-    padding: 24px 24px 16px !important;
-    font-size: 20px !important;
+  .quick-action-subtitle {
+    font-size: clamp(0.65rem, 2vw, 0.8rem) !important;
+    margin-top: 4px !important;
+    line-height: 1.2 !important;
+    opacity: 0.8 !important;
   }
   
-  .mobile-dialog .MuiDialogContent-root {
-    padding: 16px 24px !important;
+  /* Recent activity - Scrollable */
+  .recent-activity-card {
+    margin-top: var(--mobile-padding-md) !important;
+    padding: var(--mobile-padding-md) !important;
+    border-radius: 12px !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
   
-  .mobile-dialog .MuiDialogActions-root {
-    padding: 16px 24px 24px !important;
-    gap: 12px !important;
-  }
-}
-
-/* Mobile-friendly forms */
-@media (max-width: 768px) {
-  .mobile-form .MuiFormControl-root {
-    margin-bottom: 20px !important;
+  .activity-item {
+    padding: var(--mobile-padding-sm) 0 !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+    display: flex !important;
+    align-items: flex-start !important;
   }
   
-  .mobile-form .MuiInputLabel-root {
-    font-size: 16px !important;
+  .activity-item:last-child {
+    border-bottom: none !important;
   }
   
-  .mobile-form .MuiFormHelperText-root {
-    font-size: 14px !important;
-    margin-top: 8px !important;
-  }
-}
-
-/* Mobile navigation tabs */
-@media (max-width: 768px) {
-  .mobile-tabs .MuiTabs-root {
-    min-height: 56px !important;
+  .activity-icon {
+    font-size: clamp(18px, 4vw, 22px) !important;
+    margin-right: var(--mobile-padding-sm) !important;
+    margin-top: 2px !important;
+    flex-shrink: 0 !important;
   }
   
-  .mobile-tabs .MuiTab-root {
-    min-height: 56px !important;
-    font-size: 14px !important;
-    padding: 12px 16px !important;
+  .activity-content {
+    flex: 1 !important;
+    min-width: 0 !important;
   }
   
-  .mobile-tabs .MuiTabs-scrollButtons {
-    width: 48px !important;
-  }
-}
-
-/* Mobile-friendly charts */
-@media (max-width: 768px) {
-  .mobile-chart {
-    height: 250px !important;
-    margin: 16px 0 !important;
+  .activity-text {
+    font-size: clamp(0.8rem, 3vw, 0.9rem) !important;
+    line-height: 1.4 !important;
+    margin-bottom: 2px !important;
   }
   
-  .mobile-chart canvas {
-    max-width: 100% !important;
-    height: auto !important;
+  .activity-time {
+    font-size: clamp(0.65rem, 2vw, 0.75rem) !important;
+    color: rgba(0, 0, 0, 0.6) !important;
+    line-height: 1.2 !important;
   }
 }
 
-/* Mobile status indicators */
-.mobile-status-indicator {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.mobile-status-success {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-}
-
-.mobile-status-warning {
-  background-color: #fff3e0;
-  color: #f57c00;
-}
-
-.mobile-status-error {
-  background-color: #ffebee;
-  color: #d32f2f;
-}
-
-.mobile-status-info {
-  background-color: #e3f2fd;
-  color: #1976d2;
-}
-
-/* Mobile pull-to-refresh */
-.mobile-pull-refresh {
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Mobile loading states */
-.mobile-loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 40px;
-  min-height: 200px;
-}
-
-/* Mobile error states */
-.mobile-error {
-  text-align: center;
-  padding: 40px 20px;
-  color: #666;
-}
-
-.mobile-error .MuiButton-root {
-  margin-top: 16px;
-}
-
-/* Mobile-friendly floating action button */
-@media (max-width: 768px) {
-  .mobile-fab {
-    position: fixed !important;
-    bottom: 24px !important;
-    right: 24px !important;
-    z-index: 1000 !important;
-    width: 64px !important;
-    height: 64px !important;
-  }
-}
-
-/* Mobile-specific animations */
-@media (max-width: 768px) {
-  .mobile-slide-in {
-    animation: slideInFromRight 0.3s ease-out;
+/* Touch interactions - Enhanced for all devices */
+@media (hover: none) and (pointer: coarse) {
+  .demo-chip:hover {
+    transform: none !important;
   }
   
-  @keyframes slideInFromRight {
-    from {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
+  .demo-chip:active {
+    transform: scale(0.95) !important;
+    background-color: rgba(0, 0, 0, 0.1) !important;
   }
   
-  .mobile-fade-in {
-    animation: fadeIn 0.3s ease-out;
+  .login-button:hover {
+    transform: none !important;
   }
   
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+  .login-button:active {
+    transform: scale(0.98) !important;
+  }
+  
+  .feature-icon-item:hover {
+    transform: none !important;
+  }
+  
+  .feature-icon-item:active {
+    opacity: 1 !important;
+    transform: scale(0.95) !important;
+  }
+  
+  .quick-action-card:hover {
+    transform: none !important;
+  }
+  
+  .quick-action-card:active {
+    transform: scale(0.98) !important;
   }
 }
 
-/* Mobile-friendly scrollbars */
-@media (max-width: 768px) {
-  .mobile-scroll::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+/* High DPI displays - Crisp rendering */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .login-logo {
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
   }
   
-  .mobile-scroll::-webkit-scrollbar-track {
-    background: transparent;
+  .login-title {
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
   }
   
-  .mobile-scroll::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 2px;
+  .form-welcome-title {
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
   }
 }
 
-/* Safe area handling for mobile devices */
+/* Dark mode support - System preference */
+@media (prefers-color-scheme: dark) {
+  .login-page-container {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
+  }
+  
+  .login-form-section {
+    background: #1e1e1e !important;
+    color: white !important;
+  }
+  
+  .form-welcome-title {
+    color: #42a5f5 !important;
+  }
+  
+  .form-welcome-subtitle {
+    color: rgba(255, 255, 255, 0.6) !important;
+  }
+  
+  .demo-credentials-title {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+  
+  .login-footer-text {
+    color: rgba(255, 255, 255, 0.5) !important;
+  }
+  
+  .login-input .MuiOutlinedInput-root {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: white !important;
+  }
+  
+  .login-input .MuiInputLabel-root {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+}
+
+/* Accessibility enhancements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus management for keyboard navigation */
+.login-input:focus-within,
+.login-button:focus,
+.demo-chip:focus,
+.forgot-password-link:focus {
+  outline: 2px solid #1976d2 !important;
+  outline-offset: 2px !important;
+}
+
+/* Safe area handling for devices with notches */
 @supports (padding: max(0px)) {
-  .mobile-safe-area {
-    padding-top: max(16px, env(safe-area-inset-top));
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
+  .login-page-container {
+    padding-left: max(0px, env(safe-area-inset-left)) !important;
+    padding-right: max(0px, env(safe-area-inset-right)) !important;
+  }
+  
+  .login-branding-section {
+    padding-top: max(var(--mobile-padding-lg), env(safe-area-inset-top)) !important;
+  }
+  
+  .login-form-section {
+    padding-bottom: max(var(--mobile-padding-lg), env(safe-area-inset-bottom)) !important;
   }
 }

@@ -243,6 +243,7 @@ function WarehouseDashboard() {
   const [stockTransferDialog, setStockTransferDialog] = useState(false);
   const [newLocationDialog, setNewLocationDialog] = useState(false);
   const [analyticsDialog, setAnalyticsDialog] = useState(false);
+  const [addWarehouseDialog, setAddWarehouseDialog] = useState(false);
   
   // Form states
   const [transferForm, setTransferForm] = useState({
@@ -251,6 +252,10 @@ function WarehouseDashboard() {
   
   const [locationForm, setLocationForm] = useState({
     name: '', code: '', aisle: '', shelf: '', bin: ''
+  });
+
+  const [warehouseForm, setWarehouseForm] = useState({
+    name: '', code: '', address: '', capacity: '', manager: ''
   });
 
   // Enhanced data fetching with comprehensive analytics
@@ -563,6 +568,27 @@ function WarehouseDashboard() {
     }
   };
 
+  const handleAddWarehouse = async () => {
+    try {
+      await api.post('/warehouse/', {
+        name: warehouseForm.name,
+        code: warehouseForm.code,
+        address: warehouseForm.address,
+        capacity: parseInt(warehouseForm.capacity),
+        manager: warehouseForm.manager || null
+      });
+      
+      setSnackbar({ open: true, message: 'Warehouse added successfully!', severity: 'success' });
+      setAddWarehouseDialog(false);
+      setWarehouseForm({ name: '', code: '', address: '', capacity: '', manager: '' });
+      
+      // Refresh warehouse data
+      await fetchWarehouseData();
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to add warehouse', severity: 'error' });
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -688,6 +714,18 @@ function WarehouseDashboard() {
           </Box>
         </CardContent>
       </HeaderCard>
+
+      {/* Quick Actions */}
+      <Paper sx={{ p: 3, mb: 4, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', background: 'rgba(255, 255, 255, 0.98)', backdropFilter: 'blur(20px)' }}>
+        <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#2c3e50' }}>Quick Actions</Typography>
+        <Grid container spacing={2} justifyContent="center">
+          <Grid item xs={12} sm={6} md={4} lg={3}>
+            <QuickActionButton fullWidth startIcon={<AddIcon />} onClick={() => setAddWarehouseDialog(true)}>
+              Add Warehouse
+            </QuickActionButton>
+          </Grid>
+        </Grid>
+      </Paper>
 
       {/* Smart Warehouse Selector */}
       {userRole === 'sales_manager' && warehouses.length > 1 && (
@@ -894,33 +932,6 @@ function WarehouseDashboard() {
             </Grid>
           </Fade>
 
-          {/* Quick Actions */}
-          <Paper sx={{ p: 3, mb: 4, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#2c3e50' }}>Quick Actions</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <QuickActionButton fullWidth startIcon={<SwapHorizIcon />} onClick={() => setStockTransferDialog(true)}>
-                  Transfer Stock
-                </QuickActionButton>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <QuickActionButton fullWidth startIcon={<AddIcon />} onClick={() => setNewLocationDialog(true)}>
-                  Add Location
-                </QuickActionButton>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <QuickActionButton fullWidth startIcon={<InventoryIcon />} onClick={() => setTabValue(1)}>
-                  View Inventory
-                </QuickActionButton>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <QuickActionButton fullWidth startIcon={<AssessmentIcon />} onClick={() => setTabValue(3)}>
-                  View Analytics
-                </QuickActionButton>
-              </Grid>
-            </Grid>
-          </Paper>
-
           {/* Tabs */}
           <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
             <StyledTabs value={tabValue} onChange={(e, v) => setTabValue(v)} variant="fullWidth">
@@ -1062,6 +1073,59 @@ function WarehouseDashboard() {
         <DialogActions>
           <Button onClick={() => setNewLocationDialog(false)}>Cancel</Button>
           <Button onClick={handleAddLocation} variant="contained">Add Location</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={addWarehouseDialog} onClose={() => setAddWarehouseDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New Warehouse</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Warehouse Name"
+                value={warehouseForm.name}
+                onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Warehouse Code"
+                value={warehouseForm.code}
+                onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Address"
+                value={warehouseForm.address}
+                onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Capacity"
+                type="number"
+                value={warehouseForm.capacity}
+                onChange={(e) => setWarehouseForm({ ...warehouseForm, capacity: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Manager"
+                value={warehouseForm.manager}
+                onChange={(e) => setWarehouseForm({ ...warehouseForm, manager: e.target.value })}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddWarehouseDialog(false)}>Cancel</Button>
+          <Button onClick={handleAddWarehouse} variant="contained">Add Warehouse</Button>
         </DialogActions>
       </Dialog>
 

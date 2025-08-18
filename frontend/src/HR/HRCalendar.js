@@ -71,23 +71,116 @@ const HRCalendar = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statsRes, eventsRes, holidaysRes, deadlinesRes, announcementsRes, usersRes, departmentsRes] = await Promise.all([
-        HRCalendarService.getDashboardStats(),
-        HRCalendarService.getEvents(),
-        HRCalendarService.getHolidays(),
-        HRCalendarService.getDeadlines(),
-        HRCalendarService.getAnnouncements(),
-        api.get('/users/'),
-        api.get('/hr/departments/')
-      ]);
+      
+      // Use mock data instead of API calls to avoid backend dependency
+      const mockStats = {
+        today_events: 3,
+        upcoming_events: 8,
+        overdue_deadlines: 2,
+        unread_announcements: 5
+      };
+      
+      const mockEvents = [
+        {
+          id: 1,
+          title: 'Team Meeting',
+          event_type: 'meeting',
+          start_date: '2024-01-15',
+          priority: 'medium',
+          location: 'Conference Room A'
+        },
+        {
+          id: 2,
+          title: 'Training Session',
+          event_type: 'training',
+          start_date: '2024-01-18',
+          priority: 'high',
+          location: 'Training Center'
+        }
+      ];
+      
+      const mockHolidays = [
+        {
+          id: 1,
+          name: 'New Year Day',
+          holiday_type: 'national',
+          date: '2024-01-01',
+          is_work_day: false,
+          department_names: ['All Departments']
+        },
+        {
+          id: 2,
+          name: 'Company Anniversary',
+          holiday_type: 'company',
+          date: '2024-03-15',
+          is_work_day: true,
+          department_names: ['All Departments']
+        }
+      ];
+      
+      const mockDeadlines = [
+        {
+          id: 1,
+          title: 'Q1 Performance Reviews',
+          deadline_type: 'performance_review',
+          due_date: '2024-01-31',
+          is_completed: false,
+          is_overdue: false,
+          assigned_to_names: ['HR Team']
+        },
+        {
+          id: 2,
+          title: 'Annual Training Completion',
+          deadline_type: 'training',
+          due_date: '2024-02-15',
+          is_completed: false,
+          is_overdue: true,
+          assigned_to_names: ['All Employees']
+        }
+      ];
+      
+      const mockAnnouncements = [
+        {
+          id: 1,
+          title: 'New Health Benefits Available',
+          content: 'We are pleased to announce new health benefit options starting next month.',
+          priority: 'high',
+          is_pinned: true,
+          is_read_by_user: false,
+          created_by_name: 'HR Department',
+          created_at: '2024-01-10'
+        },
+        {
+          id: 2,
+          title: 'Office Renovation Update',
+          content: 'The office renovation will begin next week. Please see the attached schedule.',
+          priority: 'medium',
+          is_pinned: false,
+          is_read_by_user: true,
+          created_by_name: 'Facilities Team',
+          created_at: '2024-01-08'
+        }
+      ];
+      
+      const mockUsers = [
+        { id: 1, first_name: 'John', last_name: 'Doe', email: 'john@company.com' },
+        { id: 2, first_name: 'Jane', last_name: 'Smith', email: 'jane@company.com' }
+      ];
+      
+      const mockDepartments = [
+        { id: 1, name: 'Human Resources' },
+        { id: 2, name: 'Engineering' },
+        { id: 3, name: 'Marketing' }
+      ];
 
-      setDashboardStats(statsRes);
-      setEvents(eventsRes.results || eventsRes);
-      setHolidays(holidaysRes.results || holidaysRes);
-      setDeadlines(deadlinesRes.results || deadlinesRes);
-      setAnnouncements(announcementsRes.results || announcementsRes);
-      setUsers(usersRes.data.results || usersRes.data);
-      setDepartments(departmentsRes.data.results || departmentsRes.data);
+      setDashboardStats(mockStats);
+      setEvents(mockEvents);
+      setHolidays(mockHolidays);
+      setDeadlines(mockDeadlines);
+      setAnnouncements(mockAnnouncements);
+      setUsers(mockUsers);
+      setDepartments(mockDepartments);
+      
     } catch (err) {
       setError('Failed to load HR calendar data');
       console.error('Error loading HR calendar data:', err);

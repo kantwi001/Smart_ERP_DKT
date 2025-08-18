@@ -47,7 +47,8 @@ import {
   Close as CloseIcon,
   CheckCircle as CheckIcon,
   Schedule as PendingIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  MonetizationOn as MonetizationOnIcon
 } from '@mui/icons-material';
 import { AuthContext } from './AuthContext';
 import api from './api';
@@ -167,6 +168,14 @@ const MobileEmployeeApp = () => {
       icon: <ProcurementIcon />,
       color: '#795548',
       badge: null
+    },
+    {
+      id: 'sales',
+      title: 'Sales & POS',
+      description: 'Access sales dashboard and POS system',
+      icon: <MonetizationOnIcon />,
+      color: '#E91E63',
+      badge: null
     }
   ];
 
@@ -220,6 +229,9 @@ const MobileEmployeeApp = () => {
         break;
       case 'procurement':
         setProcurementDialogOpen(true);
+        break;
+      case 'sales':
+        // Handle sales module click
         break;
       default:
         setSnackbarMessage(`Opening ${moduleId} module...`);

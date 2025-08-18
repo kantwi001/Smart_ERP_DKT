@@ -1,0 +1,26 @@
+{
+  "name": "erp-system",
+  "version": "1.0.0",
+  "description": "Complete ERP System with Web and Mobile Apps",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && python manage.py runserver 0.0.0.0:2025",
+    "start:frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "rebuild-mobile": "chmod +x rebuild_mobile_app.sh && ./rebuild_mobile_app.sh",
+    "setup": "cd backend && pip install -r requirements.txt && cd ../frontend && npm install"
+  },
+  "keywords": [
+    "erp",
+    "business",
+    "management",
+    "react",
+    "django",
+    "mobile"
+  ],
+  "author": "Kwadwo Antwi",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

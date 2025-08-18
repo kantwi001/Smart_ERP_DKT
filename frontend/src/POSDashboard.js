@@ -179,10 +179,6 @@ const POSDashboard = () => {
     }
   };
   
-  const handleAddProduct = () => {
-    window.open('/pos/products/add', '_blank');
-  };
-  
   const handleProcessReturn = () => {
     setReturnDialogOpen(true);
   };
@@ -470,29 +466,6 @@ const POSDashboard = () => {
               }}
             >
               New Transaction
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<ShoppingCartIcon />}
-              onClick={handleAddProduct}
-              sx={{ 
-                background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)',
-                color: 'white',
-                borderRadius: 2,
-                py: 1.5,
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
-                }
-              }}
-            >
-              Add Product
             </Button>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>

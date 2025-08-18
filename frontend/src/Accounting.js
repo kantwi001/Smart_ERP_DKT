@@ -7,7 +7,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SavingsIcon from '@mui/icons-material/Savings';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-const Accounting = () => {
+const Finance = () => {
   const { token } = useContext(AuthContext);
   const [entries, setEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -84,7 +84,7 @@ const Accounting = () => {
   return (
     <Box>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h5">Accounting</Typography>
+        <Typography variant="h5">Finance</Typography>
         <Button variant="contained" onClick={handleOpen}>Add Entry</Button>
       </Box>
       {/* Dashboard widgets */}
@@ -200,7 +200,7 @@ const Accounting = () => {
         </TableContainer>
       )}
       <Dialog open={open} onClose={handleClose}>
-        <DialogTitle>Add Accounting Entry</DialogTitle>
+        <DialogTitle>Add Finance Entry</DialogTitle>
         <DialogContent>
           <form id="entry-form" onSubmit={handleSubmit}>
             <TextField label="Description" name="description" value={form.description} onChange={handleChange} fullWidth margin="normal" required />
@@ -220,4 +220,4 @@ const Accounting = () => {
   );
 };
 
-export default Accounting;
+export default Finance;

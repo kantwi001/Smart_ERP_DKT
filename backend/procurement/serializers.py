@@ -73,7 +73,7 @@ class ProcurementRequestSerializer(serializers.ModelSerializer):
         model = ProcurementRequest
         fields = [
             'id', 'title', 'description', 'item', 'quantity', 'estimated_cost', 'urgency', 'reason',
-            'status', 'current_stage', 'current_approver', 'current_approver_name',
+            'status', 'current_stage', 'approval_stage', 'current_approver', 'current_approver_name',
             'assigned_procurement_officer', 'assigned_procurement_officer_name',
             'assigned_finance_officer', 'assigned_finance_officer_name',
             'selected_vendor', 'selected_vendor_name', 'bid_analysis_report',

@@ -189,3 +189,89 @@ class Sale(models.Model):
     status = models.CharField(max_length=50, default='pending')
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='SLL')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')
+
+class Promotion(models.Model):
+    """Model for sales promotions with product binding and price reduction"""
+    DISCOUNT_TYPE_CHOICES = [
+        ('percentage', 'Percentage'),
+        ('fixed', 'Fixed Amount'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('expired', 'Expired'),
+        ('scheduled', 'Scheduled'),
+    ]
+    
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    discount_type = models.CharField(max_length=20, choices=DISCOUNT_TYPE_CHOICES, default='percentage')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    minimum_order = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    apply_to_all = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    
+    # Workflow fields
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_promotions')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Many-to-many relationship with products (for general promotions)
+    applicable_products = models.ManyToManyField('inventory.Product', blank=True, related_name='promotions')
+    
+    def __str__(self):
+        return f"Promotion: {self.name} ({self.discount_value}{'' if self.discount_type == 'fixed' else '%'})"
+    
+    def is_active(self):
+        """Check if promotion is currently active"""
+        from django.utils import timezone
+        now = timezone.now().date()
+        
+        if self.status != 'active':
+            return False
+            
+        if self.start_date and now < self.start_date:
+            return False
+            
+        if self.end_date and now > self.end_date:
+            return False
+            
+        return True
+    
+    def calculate_discount(self, amount):
+        """Calculate discount amount for a given order amount"""
+        if not self.is_active() or amount < self.minimum_order:
+            return 0
+            
+        if self.discount_type == 'percentage':
+            return amount * (self.discount_value / 100)
+        else:
+            return min(self.discount_value, amount)  # Don't exceed order amount
+    
+    class Meta:
+        ordering = ['-created_at']
+
+class PromotionProduct(models.Model):
+    """Model for specific product pricing in promotions"""
+    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name='product_pricing')
+    product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE)
+    original_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discounted_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate discount amount
+        self.discount_amount = self.original_price - self.discounted_price
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.promotion.name} - {self.product.name}: {self.original_price} → {self.discounted_price}"
+    
+    class Meta:
+        unique_together = ['promotion', 'product']
+        ordering = ['product__name']

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import Reports from './Reports';
 import { 
   Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
   Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText
@@ -399,37 +400,7 @@ const HRDashboard = () => {
 
         {/* Reports Tab */}
         <TabPanel value={tabValue} index={3}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <AssessmentIcon sx={{ mr: 1, color: '#FF6B6B' }} />
-                    HR Reports & Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <Box p={2} bgcolor="#f8f9fa" borderRadius={2}>
-                        <Typography variant="h6" color="primary" mb={1}>Monthly Reports</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Employee performance, attendance, and payroll summaries for the current month.
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <Box p={2} bgcolor="#f8f9fa" borderRadius={2}>
-                        <Typography variant="h6" color="secondary" mb={1}>Compliance Reports</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Regulatory compliance, training completion, and certification tracking.
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
+          <Reports />
         </TabPanel>
       </Paper>
     </Box>

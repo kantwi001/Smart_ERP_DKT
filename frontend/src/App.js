@@ -55,6 +55,7 @@ import { AuthProvider, AuthContext } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
 import Login from './Login';
 import Register from './Register';
+import ResetPassword from './ResetPassword';
 import Inventory from './Inventory';
 import WarehouseTransfers from './WarehouseTransfers';
 import Dashboard from './Dashboard';
@@ -63,7 +64,9 @@ import InventoryDashboard from './InventoryDashboard';
 import SalesDashboard from './SalesDashboard';
 import ManufacturingDashboard from './ManufacturingDashboard';
 import ProcurementDashboard from './ProcurementDashboard';
+import ProcurementDashboardManagement from './Procurement/ProcurementDashboardManagement';
 import AccountingDashboard from './AccountingDashboard';
+import Accounting from './Accounting';
 import CustomersDashboard from './CustomersDashboard';
 import POSDashboard from './POSDashboard';
 import ReportingDashboard from './ReportingDashboard';
@@ -83,7 +86,6 @@ import VisitLogs from './HR/VisitLogs';
 import Meetings from './HR/Meetings';
 import EmployeeDashboard from './EmployeeDashboard';
 import Sales from './Sales';
-import Accounting from './Accounting';
 import Purchasing from './Purchasing';
 import Manufacturing from './Manufacturing';
 import POS from './POS';
@@ -93,6 +95,7 @@ import Customers from './Customers';
 import Products from './Products';
 import Categories from './Categories';
 import Procurement from './Procurement';
+import ProcurementModule from './Procurement/ProcurementModule';
 import Notifications from './HR/Notifications';
 import DepartmentManagement from './HR/DepartmentManagement';
 import Survey from './Survey';
@@ -109,6 +112,8 @@ import UsersDashboard from './UsersDashboard';
 import NotificationCenter from './components/NotificationCenter';
 import SystemSettingsDashboard from './SystemSettingsDashboard';
 import MobileEmployeeApp from './MobileEmployeeApp';
+import PayrollManagement from './Finance/PayrollManagement';
+import PurchaseOrderManagement from './Procurement/PurchaseOrderManagement';
 import { createTheme } from '@mui/material/styles';
 
 const drawerWidth = 260;
@@ -176,7 +181,7 @@ function AppShell() {
   const hasModuleAccess = (moduleName) => {
     if (!user) return false;
     
-    console.log('� Checking module access for:', moduleName, 'User:', user?.username);
+    console.log('🔍 Checking module access for:', moduleName, 'User:', user?.username);
     
     // Superusers and admins have access to everything
     if (user?.is_superuser || user?.role === 'superadmin' || user?.role === 'admin') {
@@ -197,8 +202,8 @@ function AppShell() {
     // Check if user is in Sales department - case insensitive matching with proper type checks
     const isSalesUser = (user?.department_name && typeof user.department_name === 'string' && user.department_name.toLowerCase() === 'sales') || 
                        (user?.department && typeof user.department === 'string' && user.department.toLowerCase() === 'sales') ||
-                       user?.role === 'sales_rep' ||
                        user?.role === 'sales_manager' ||
+                       user?.role === 'sales_rep' ||
                        (user?.role === 'employee' && ((user?.department_name && typeof user.department_name === 'string' && user.department_name.toLowerCase() === 'sales') || (user?.department && typeof user.department === 'string' && user.department.toLowerCase() === 'sales')));
 
     console.log('🏢 Sales user check:', {
@@ -325,12 +330,13 @@ function AppShell() {
             { text: 'Customers', icon: <PeopleIcon />, path: '/customers' }
           ]
         },
-        { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/accounting' },
+        { text: 'Finance', icon: <AccountBalanceIcon />, path: '/finance' },
         { text: 'Manufacturing', icon: <FactoryIcon />, path: '/manufacturing' },
         { text: 'Reporting', icon: <AssessmentIcon />, path: '/reporting' },
         { text: 'Products', icon: <InventoryIcon />, path: '/products', role: 'sales' },
         { text: 'Categories', icon: <CategoryIcon />, path: '/categories', role: 'sales' },
-        { text: 'Procurement', icon: <ShoppingCartIcon />, path: '/procurement' },
+        { text: 'Procurement & Logistics Report', icon: <ShoppingCartIcon />, path: '/procurement' },
+        { text: 'Procurement Management', icon: <ShoppingCartIcon />, path: '/procurement/management' },
         { text: 'Users', icon: <SupervisorAccountIcon />, path: '/users' },
         { text: 'Sync', icon: <SyncIcon />, path: '/sync' },
         { text: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' },
@@ -416,12 +422,13 @@ function AppShell() {
         'HR': 'hr',                           // Full HR admin (HR staff only)
         'Sales': 'sales',                     // Full sales admin (managers only)
         'Sales Dashboard': 'sales',
-        'Accounting': 'accounting',           // Full admin access (managers only)
+        'Finance': 'finance',           // Full admin access (managers only)
         'Manufacturing': 'manufacturing',     // Full admin access (managers only)
         'Reporting': 'reporting',             // Full admin access (managers only)
         'Products': 'inventory',              // Full admin access (managers only)
         'Categories': 'inventory',            // Full admin access (managers only)
-        'Procurement': 'procurement',         // Full admin access (managers only)
+        'Procurement & Logistics Report': 'procurement',         // Full admin access (managers only)
+        'Procurement Management': 'procurement',         // Full admin access (managers only)
         'Users': 'users',                     // Full admin access (managers only)
         'System Settings': 'system_settings', // Full admin access (admins only)
         'Leave Management': 'hr',             // Full HR admin (HR staff only)
@@ -601,19 +608,72 @@ function AppShell() {
               <MenuIcon />
             </IconButton>
             
-            <Typography 
-              variant="h6" 
-              noWrap 
-              component="div" 
-              sx={{ 
-                flexGrow: 1,
-                fontSize: { xs: '1rem', sm: '1.25rem' },
-                fontWeight: 600
-              }}
-            >
-              ERP System
-            </Typography>
-
+            {/* Smart ERP Software Logo and Title */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              flexGrow: 1,
+              gap: { xs: 1, sm: 2 }
+            }}>
+              {/* Logo Icon */}
+              <Box
+                sx={{
+                  width: { xs: 28, sm: 36, md: 40 },
+                  height: { xs: 28, sm: 36, md: 40 },
+                  background: 'white',
+                  borderRadius: { xs: '6px', sm: '8px' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: { xs: '2px', sm: '4px' },
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  flexShrink: 0,
+                }}
+              >
+                <img
+                  src="/smart-erp-logo.png"
+                  alt="Smart ERP Software"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                  }}
+                />
+              </Box>
+              
+              {/* Title */}
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Typography 
+                  variant="h6" 
+                  noWrap 
+                  component="div" 
+                  sx={{ 
+                    fontSize: { xs: '0.9rem', sm: '1.1rem' },
+                    fontWeight: 700,
+                    lineHeight: 1.1,
+                    color: 'white'
+                  }}
+                >
+                  Smart ERP
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  noWrap 
+                  sx={{ 
+                    fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                    fontWeight: 500,
+                    lineHeight: 1,
+                    color: 'rgba(255,255,255,0.9)',
+                    display: { xs: 'none', sm: 'block' }
+                  }}
+                >
+                  SOFTWARE
+                </Typography>
+              </Box>
+            </Box>
+            
             {/* User Profile Section */}
             <Box sx={{ 
               display: 'flex', 
@@ -744,6 +804,7 @@ function AppShell() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
               <Route path="/" element={
                 <ProtectedRoute>
                   {user?.role === 'admin' || user?.role === 'manager' || user?.role === 'superadmin' ? <Dashboard /> : <MobileEmployeeApp />}
@@ -764,7 +825,7 @@ function AppShell() {
               } />
               <Route path="/hr/calendar-management" element={<ProtectedRoute><HRCalendar /></ProtectedRoute>} />
               <Route path="/hr/leave" element={<ProtectedRoute><Leave /></ProtectedRoute>} />
-              <Route path="/hr/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
+              <Route path="/hr/payroll" element={<ProtectedRoute><PayrollManagement /></ProtectedRoute>} />
               <Route path="/hr/payslips" element={<ProtectedRoute><Payslips /></ProtectedRoute>} />
               <Route path="/hr/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
               <Route path="/hr/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
@@ -776,8 +837,9 @@ function AppShell() {
               <Route path="/hr/departments" element={<ProtectedRoute><DepartmentManagement /></ProtectedRoute>} />
               <Route path="/sales" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
               <Route path="/sales/management" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-              <Route path="/accounting" element={<ProtectedRoute><AccountingDashboard /></ProtectedRoute>} />
-              <Route path="/accounting/management" element={<ProtectedRoute><Accounting /></ProtectedRoute>} />
+              <Route path="/finance" element={<ProtectedRoute><AccountingDashboard /></ProtectedRoute>} />
+              <Route path="/finance/management" element={<ProtectedRoute><Accounting /></ProtectedRoute>} />
+              <Route path="/finance/payroll" element={<ProtectedRoute><PayrollManagement /></ProtectedRoute>} />
               <Route path="/purchasing" element={<ProtectedRoute><Purchasing /></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><ManufacturingDashboard /></ProtectedRoute>} />
               <Route path="/manufacturing/management" element={<ProtectedRoute><Manufacturing /></ProtectedRoute>} />
@@ -789,8 +851,8 @@ function AppShell() {
               <Route path="/customers/management" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
               <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
               <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-              <Route path="/procurement" element={<ProtectedRoute><ProcurementDashboard /></ProtectedRoute>} />
-              <Route path="/procurement/management" element={<ProtectedRoute><Procurement /></ProtectedRoute>} />
+              <Route path="/procurement" element={<ProtectedRoute><ProcurementModule /></ProtectedRoute>} />
+              <Route path="/procurement/management" element={<ProtectedRoute><ProcurementDashboardManagement /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><UsersDashboard /></ProtectedRoute>} />
               <Route path="/users/management" element={<ProtectedRoute><Users /></ProtectedRoute>} />
               <Route path="/sync" element={<ProtectedRoute><OfflineSync /></ProtectedRoute>} />

@@ -1,5 +1,5 @@
-from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.contrib.auth import get_user_model
@@ -26,13 +26,12 @@ from .serializers import (
     TrainingSessionSerializer, TrainingMaterialSerializer, TrainingVideoSerializer, 
     TrainingProgressSerializer, HRTaskSerializer, ExitInterviewSerializer, 
     VisitLogSerializer, MeetingSerializer, NotificationSerializer, 
-    PerformanceReviewSerializer, OnboardingTemplateSerializer, 
-    OnboardingStepSerializer, OnboardingProcessSerializer, 
-    OnboardingStepInstanceSerializer, OnboardingDocumentSerializer, 
-    OnboardingFeedbackSerializer, CreateOnboardingProcessSerializer,
-    HRCalendarEventSerializer, HRHolidaySerializer, HRDeadlineSerializer,
-    EnhancedAnnouncementSerializer, HRCalendarNotificationSerializer,
-    AnnouncementReadSerializer
+    PerformanceReviewSerializer, OnboardingTemplateSerializer, OnboardingStepSerializer, 
+    OnboardingProcessSerializer, OnboardingStepInstanceSerializer, 
+    OnboardingDocumentSerializer, OnboardingFeedbackSerializer, 
+    CreateOnboardingProcessSerializer, HRCalendarEventSerializer, 
+    HRCalendarNotificationSerializer, HRHolidaySerializer, HRDeadlineSerializer, 
+    EnhancedAnnouncementSerializer, AnnouncementReadSerializer
 )
 
 User = get_user_model()
@@ -40,51 +39,53 @@ logger = logging.getLogger(__name__)
 
 def ensure_employee_record(user):
     """
-    Ensure that a User has a corresponding Employee record.
-    Creates one if it doesn't exist.
+    Ensure that an Employee record exists for the given user.
+    Create one if it doesn't exist.
     """
     try:
         employee = Employee.objects.get(user=user)
-        logger.info(f"Found existing Employee record for user {user.id} ({user.username})")
         return employee
     except Employee.DoesNotExist:
-        logger.info(f"Creating Employee record for user {user.id} ({user.username})")
-        # Create Employee record with default values
-        try:
-            # Try to get user's department from User model if it exists
-            department = getattr(user, 'department', None)
-            
-            # Handle department reference properly
-            department_obj = None
-            if department:
-                if hasattr(department, 'id'):
-                    department_obj = department
-                elif isinstance(department, int):
-                    try:
-                        department_obj = Department.objects.get(id=department)
-                        logger.info(f"Found department {department_obj} for user {user.id}")
-                    except Department.DoesNotExist:
-                        logger.warning(f"Department with ID {department} not found for user {user.id}")
-                        department_obj = None
-                else:
-                    logger.warning(f"Invalid department reference for user {user.id}: {department}")
-            
-            employee = Employee.objects.create(
-                user=user,
-                position=getattr(user, 'position', 'Employee'),
-                department=department_obj,
-                hire_date=getattr(user, 'date_joined', timezone.now().date()),
-                salary=0.00,  # Default salary
-                is_active=True
+        # Create a basic employee record
+        from datetime import date
+        employee = Employee.objects.create(
+            user=user,
+            position=getattr(user, 'position', 'Employee'),
+            department_id=getattr(user, 'department', None),
+            hire_date=date.today(),
+            salary=0.00,
+            is_active=True
+        )
+        
+        # Initialize leave balances for the current year
+        from datetime import datetime
+        current_year = datetime.now().year
+        
+        # Default leave allocations
+        leave_allocations = {
+            'annual': 21,
+            'sick': 10,
+            'maternity': 90,
+            'paternity': 14,
+            'compassionate': 5,
+            'study': 5,
+            'unpaid': 0,
+            'other': 0
+        }
+        
+        for leave_type, total_days in leave_allocations.items():
+            LeaveBalance.objects.get_or_create(
+                employee=employee,
+                leave_type=leave_type,
+                year=current_year,
+                defaults={
+                    'total_days': total_days,
+                    'used_days': 0,
+                    'pending_days': 0
+                }
             )
-            
-            logger.info(f"Successfully created Employee record for user {user.id} ({user.username})")
-            return employee
-            
-        except Exception as e:
-            logger.error(f"Failed to create Employee record for user {user.id}: {str(e)}")
-            # Return None instead of raising exception to prevent endpoint failures
-            return None
+        
+        return employee
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
@@ -480,3 +481,89 @@ class AnnouncementReadViewSet(viewsets.ModelViewSet):
     queryset = AnnouncementRead.objects.all()
     serializer_class = AnnouncementReadSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_notifications(request):
+    """Get notifications for the current user (leave and procurement)"""
+    from notifications.models import Notification
+    
+    # Get notifications for leave requests and procurement requests
+    notifications = Notification.objects.filter(
+        recipient=request.user,
+        notification_type__in=['leave_request', 'leave_approval', 'leave_decline', 'procurement_request', 'procurement_approval', 'procurement_decline']
+    ).order_by('-created_at')[:20]  # Latest 20 notifications
+    
+    notification_data = []
+    for notif in notifications:
+        notification_data.append({
+            'id': notif.id,
+            'title': notif.subject,
+            'message': notif.message,
+            'type': notif.notification_type,
+            'status': notif.status,
+            'created_at': notif.created_at,
+            'read_at': notif.read_at,
+            'reference_id': notif.reference_id,
+            'reference_type': notif.reference_type
+        })
+    
+    return Response(notification_data)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def mark_notification_read(request, notification_id):
+    """Mark a specific notification as read"""
+    from notifications.models import Notification
+    
+    try:
+        notification = Notification.objects.get(
+            id=notification_id,
+            recipient=request.user
+        )
+        notification.mark_as_read()
+        return Response({'message': 'Notification marked as read'})
+    except Notification.DoesNotExist:
+        return Response({'error': 'Notification not found'}, status=404)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def notification_summary(request):
+    """Get notification summary for dashboard"""
+    from notifications.models import Notification
+    
+    user = request.user
+    
+    # Count unread notifications
+    unread_leave = Notification.objects.filter(
+        recipient=user,
+        notification_type__in=['leave_request', 'leave_approval', 'leave_decline'],
+        status__in=['pending', 'sent', 'delivered']
+    ).count()
+    
+    unread_procurement = Notification.objects.filter(
+        recipient=user,
+        notification_type__in=['procurement_request', 'procurement_approval', 'procurement_decline'],
+        status__in=['pending', 'sent', 'delivered']
+    ).count()
+    
+    # Count pending approvals (where user is the approver)
+    pending_leave_approvals = LeaveRequest.objects.filter(
+        approver=user,
+        status='pending'
+    ).count()
+    
+    from procurement.models import ProcurementRequest
+    pending_procurement_approvals = ProcurementRequest.objects.filter(
+        current_approver=user,
+        status='pending'
+    ).count()
+    
+    return Response({
+        'unread_leave_notifications': unread_leave,
+        'unread_procurement_notifications': unread_procurement,
+        'pending_leave_approvals': pending_leave_approvals,
+        'pending_procurement_approvals': pending_procurement_approvals,
+        'total_unread': unread_leave + unread_procurement,
+        'total_pending_approvals': pending_leave_approvals + pending_procurement_approvals
+    })

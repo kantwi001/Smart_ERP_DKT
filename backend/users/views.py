@@ -9,9 +9,16 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.template.loader import render_to_string
+from django.urls import reverse
 from .models import SystemSettings
 from .serializers import UserSerializer, RegisterSerializer, SystemSettingsSerializer, ProfileUpdateSerializer
 from utils.email_service import email_service
+import secrets
+import string
 
 User = get_user_model()
 
@@ -370,6 +377,96 @@ def delete_user(request, user_id):
             {'error': f'Failed to delete user: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+class ForgotPasswordView(APIView):
+    """Handle forgot password requests"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not for security
+            return Response({'message': 'If an account with this email exists, password reset instructions have been sent.'}, status=status.HTTP_200_OK)
+        
+        # Generate reset token
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        
+        # Create reset URL (for production, use your domain)
+        reset_url = f"https://erp.tarinnovation.com/reset-password/{uid}/{token}/"
+        
+        # Send email
+        subject = 'ERP System - Password Reset Request'
+        message = f"""
+        Hello {user.first_name or user.username},
+        
+        You have requested a password reset for your ERP System account.
+        
+        Click the link below to reset your password:
+        {reset_url}
+        
+        This link will expire in 24 hours.
+        
+        If you didn't request this reset, please ignore this email.
+        
+        Best regards,
+        ERP System Team
+        """
+        
+        try:
+            # Use the email service if available, otherwise use Django's send_mail
+            if hasattr(email_service, 'send_email'):
+                email_service.send_email(
+                    to_email=email,
+                    subject=subject,
+                    message=message
+                )
+            else:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+            
+            return Response({'message': 'Password reset instructions have been sent to your email.'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': 'Failed to send reset email. Please try again later.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ResetPasswordView(APIView):
+    """Handle password reset with token"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        uid = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+        
+        if not all([uid, token, new_password]):
+            return Response({'error': 'UID, token, and new password are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Decode user ID
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({'error': 'Invalid reset link'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verify token
+        if not default_token_generator.check_token(user, token):
+            return Response({'error': 'Invalid or expired reset link'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update password
+        user.password = make_password(new_password)
+        user.save()
+        
+        return Response({'message': 'Password has been reset successfully'}, status=status.HTTP_200_OK)
 
 # System Settings Views
 class SystemSettingsView(APIView):

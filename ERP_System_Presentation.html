@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP System - Complete Business Management Solution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            page-break-after: always;
+            background: white;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .slide h1 {
+            font-size: 3.5rem;
+            color: #1976d2;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: 700;
+        }
+        
+        .slide h2 {
+            font-size: 2.5rem;
+            color: #1976d2;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .slide h3 {
+            font-size: 1.8rem;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .slide p {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-align: center;
+            max-width: 800px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 40px;
+        }
+        
+        .feature-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+        
+        .feature-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .feature-description {
+            font-size: 1rem;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .module-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 30px;
+        }
+        
+        .module-functions {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+            border-left: 5px solid #1976d2;
+        }
+        
+        .module-functions h4 {
+            color: #1976d2;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+        }
+        
+        .module-functions ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .module-functions li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 1rem;
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .module-functions li:before {
+            content: "✓";
+            color: #4caf50;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        
+        .screenshot-placeholder {
+            width: 100%;
+            height: 300px;
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            border: 2px dashed #1976d2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            color: #1976d2;
+            font-weight: 500;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 30px;
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 40px;
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 25px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .tech-item {
+            background: #1976d2;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        
+        .contact-info {
+            background: #f8f9fa;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 30px;
+            max-width: 600px;
+        }
+        
+        .logo {
+            font-size: 4rem;
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+        
+        @media print {
+            .slide {
+                page-break-after: always;
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title Slide -->
+    <div class="slide">
+        <div class="logo">🏢</div>
+        <h1>ERP System</h1>
+        <p style="font-size: 1.5rem; color: #666; margin-bottom: 40px;">Complete Business Management Solution</p>
+        <p style="font-size: 1.2rem; color: #888;">Web & Mobile Application</p>
+        <p style="font-size: 1rem; color: #aaa; margin-top: 40px;">Comprehensive Enterprise Resource Planning Platform</p>
+    </div>
+
+    <!-- Slide 2: Overview -->
+    <div class="slide">
+        <h2>System Overview</h2>
+        <p>A comprehensive ERP solution designed to streamline business operations across all departments with modern web and mobile interfaces.</p>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">12+</div>
+                <div class="stat-label">Core Modules</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">50+</div>
+                <div class="stat-label">Features</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">100%</div>
+                <div class="stat-label">Mobile Responsive</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">Availability</div>
+            </div>
+        </div>
+        
+        <div class="tech-stack">
+            <div class="tech-item">React.js</div>
+            <div class="tech-item">Django</div>
+            <div class="tech-item">PostgreSQL</div>
+            <div class="tech-item">Material-UI</div>
+            <div class="tech-item">Capacitor</div>
+            <div class="tech-item">JWT Auth</div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Core Features -->
+    <div class="slide">
+        <h2>Core Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <div class="feature-title">Secure Authentication</div>
+                <div class="feature-description">JWT-based authentication with role-based access control and password reset functionality</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">Mobile Ready</div>
+                <div class="feature-description">Fully responsive design with native mobile app support for iOS and Android</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Real-time Analytics</div>
+                <div class="feature-description">Live dashboards with interactive charts and comprehensive reporting</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-title">Workflow Management</div>
+                <div class="feature-description">Automated approval workflows with email and SMS notifications</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Dashboard Module -->
+    <div class="slide">
+        <h2>Main Dashboard</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Key Features</h4>
+                <ul>
+                    <li>Executive summary cards</li>
+                    <li>Real-time KPI monitoring</li>
+                    <li>Interactive charts and graphs</li>
+                    <li>Quick action buttons</li>
+                    <li>Recent activity feed</li>
+                    <li>Module navigation</li>
+                    <li>Role-based dashboard views</li>
+                    <li>Customizable widgets</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                📊 Dashboard Screenshot
+                <br>Main dashboard with summary cards, charts, and navigation
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: HR Management -->
+    <div class="slide">
+        <h2>HR Management Module</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>HR Functions</h4>
+                <ul>
+                    <li>Employee management</li>
+                    <li>Leave request system</li>
+                    <li>Payroll processing</li>
+                    <li>Recruitment & onboarding</li>
+                    <li>Training management</li>
+                    <li>HR calendar & events</li>
+                    <li>Department management</li>
+                    <li>Performance tracking</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                👥 HR Module Screenshot
+                <br>Employee dashboard with leave management and HR functions
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Inventory Management -->
+    <div class="slide">
+        <h2>Inventory Management</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Inventory Features</h4>
+                <ul>
+                    <li>Product catalog management</li>
+                    <li>Stock level monitoring</li>
+                    <li>Warehouse management</li>
+                    <li>Stock transfers</li>
+                    <li>Inventory valuation</li>
+                    <li>Reorder point alerts</li>
+                    <li>Barcode scanning</li>
+                    <li>Stock movement tracking</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                📦 Inventory Screenshot
+                <br>Inventory dashboard with stock levels and warehouse management
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Sales Management -->
+    <div class="slide">
+        <h2>Sales Management</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Sales Features</h4>
+                <ul>
+                    <li>Sales order management</li>
+                    <li>Customer relationship management</li>
+                    <li>Quote generation</li>
+                    <li>Sales analytics</li>
+                    <li>Commission tracking</li>
+                    <li>Territory management</li>
+                    <li>Sales pipeline</li>
+                    <li>Revenue forecasting</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                💰 Sales Screenshot
+                <br>Sales dashboard with orders, customers, and analytics
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Point of Sale (POS) -->
+    <div class="slide">
+        <h2>Point of Sale (POS)</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>POS Features</h4>
+                <ul>
+                    <li>Touch-friendly interface</li>
+                    <li>Product scanning</li>
+                    <li>Multiple payment methods</li>
+                    <li>Receipt printing</li>
+                    <li>Daily sales reports</li>
+                    <li>Cash drawer management</li>
+                    <li>Customer lookup</li>
+                    <li>Discount management</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                🛒 POS Screenshot
+                <br>Point of sale interface with product selection and checkout
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 9: Accounting & Finance -->
+    <div class="slide">
+        <h2>Accounting & Finance</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Accounting Features</h4>
+                <ul>
+                    <li>General ledger</li>
+                    <li>Accounts payable/receivable</li>
+                    <li>Financial reporting</li>
+                    <li>Budget management</li>
+                    <li>Tax calculations</li>
+                    <li>Bank reconciliation</li>
+                    <li>Cash flow analysis</li>
+                    <li>Audit trails</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                💳 Accounting Screenshot
+                <br>Financial dashboard with accounts and reporting
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 10: Procurement -->
+    <div class="slide">
+        <h2>Procurement Management</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Procurement Features</h4>
+                <ul>
+                    <li>Purchase requisitions</li>
+                    <li>Purchase orders</li>
+                    <li>Vendor management</li>
+                    <li>Approval workflows</li>
+                    <li>Bid analysis</li>
+                    <li>Contract management</li>
+                    <li>Supplier evaluation</li>
+                    <li>Cost analysis</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                📋 Procurement Screenshot
+                <br>Procurement dashboard with requests and approvals
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 11: Manufacturing -->
+    <div class="slide">
+        <h2>Manufacturing Module</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Manufacturing Features</h4>
+                <ul>
+                    <li>Production planning</li>
+                    <li>Work order management</li>
+                    <li>Bill of materials (BOM)</li>
+                    <li>Quality control</li>
+                    <li>Resource scheduling</li>
+                    <li>Production tracking</li>
+                    <li>Capacity planning</li>
+                    <li>Cost accounting</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                🏭 Manufacturing Screenshot
+                <br>Manufacturing dashboard with production planning
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 12: Customer Management -->
+    <div class="slide">
+        <h2>Customer Management</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Customer Features</h4>
+                <ul>
+                    <li>Customer database</li>
+                    <li>Contact management</li>
+                    <li>Customer segmentation</li>
+                    <li>Communication history</li>
+                    <li>Credit management</li>
+                    <li>Customer analytics</li>
+                    <li>Loyalty programs</li>
+                    <li>Support tickets</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                👥 Customer Screenshot
+                <br>Customer management with profiles and analytics
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 13: Reporting & Analytics -->
+    <div class="slide">
+        <h2>Reporting & Analytics</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Reporting Features</h4>
+                <ul>
+                    <li>Custom report builder</li>
+                    <li>Interactive dashboards</li>
+                    <li>Data visualization</li>
+                    <li>Scheduled reports</li>
+                    <li>Export capabilities</li>
+                    <li>KPI monitoring</li>
+                    <li>Trend analysis</li>
+                    <li>PowerBI integration</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                📈 Reports Screenshot
+                <br>Analytics dashboard with charts and reports
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 14: Mobile Application -->
+    <div class="slide">
+        <h2>Mobile Application</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Mobile Features</h4>
+                <ul>
+                    <li>Native iOS & Android apps</li>
+                    <li>Offline synchronization</li>
+                    <li>Push notifications</li>
+                    <li>Touch-optimized interface</li>
+                    <li>Camera integration</li>
+                    <li>GPS location services</li>
+                    <li>Biometric authentication</li>
+                    <li>Real-time data sync</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                📱 Mobile App Screenshot
+                <br>Mobile interface showing responsive design and touch optimization
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 15: User Management -->
+    <div class="slide">
+        <h2>User Management & Security</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Security Features</h4>
+                <ul>
+                    <li>Role-based access control</li>
+                    <li>User permissions</li>
+                    <li>Department assignments</li>
+                    <li>Password policies</li>
+                    <li>Session management</li>
+                    <li>Audit logging</li>
+                    <li>Two-factor authentication</li>
+                    <li>Data encryption</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                🔐 Security Screenshot
+                <br>User management interface with roles and permissions
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 16: Workflow Management -->
+    <div class="slide">
+        <h2>Workflow & Notifications</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Workflow Features</h4>
+                <ul>
+                    <li>Approval workflows</li>
+                    <li>Email notifications</li>
+                    <li>SMS alerts</li>
+                    <li>Push notifications</li>
+                    <li>Task assignments</li>
+                    <li>Deadline tracking</li>
+                    <li>Status monitoring</li>
+                    <li>Escalation rules</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                🔄 Workflow Screenshot
+                <br>Workflow management with approval chains and notifications
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 17: System Architecture -->
+    <div class="slide">
+        <h2>Technical Architecture</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚛️</div>
+                <div class="feature-title">Frontend</div>
+                <div class="feature-description">React.js with Material-UI for modern, responsive user interfaces</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🐍</div>
+                <div class="feature-title">Backend</div>
+                <div class="feature-description">Django REST Framework for robust API development</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🗄️</div>
+                <div class="feature-title">Database</div>
+                <div class="feature-description">PostgreSQL for reliable data storage and management</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">Mobile</div>
+                <div class="feature-description">Capacitor for cross-platform mobile app development</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 18: Benefits -->
+    <div class="slide">
+        <h2>Key Benefits</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-title">Increased Efficiency</div>
+                <div class="feature-description">Streamline operations and reduce manual processes by up to 70%</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <div class="feature-title">Cost Reduction</div>
+                <div class="feature-description">Lower operational costs through automation and optimization</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Better Insights</div>
+                <div class="feature-description">Real-time analytics for informed decision making</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-title">Scalability</div>
+                <div class="feature-description">Grows with your business needs and requirements</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 19: Implementation -->
+    <div class="slide">
+        <h2>Implementation & Support</h2>
+        <div class="module-details">
+            <div class="module-functions">
+                <h4>Implementation Process</h4>
+                <ul>
+                    <li>Requirements analysis</li>
+                    <li>System configuration</li>
+                    <li>Data migration</li>
+                    <li>User training</li>
+                    <li>Go-live support</li>
+                    <li>Post-implementation review</li>
+                    <li>Ongoing maintenance</li>
+                    <li>24/7 technical support</li>
+                </ul>
+            </div>
+            <div class="module-functions">
+                <h4>Training & Support</h4>
+                <ul>
+                    <li>Comprehensive user manuals</li>
+                    <li>Video tutorials</li>
+                    <li>Live training sessions</li>
+                    <li>Help desk support</li>
+                    <li>System updates</li>
+                    <li>Performance monitoring</li>
+                    <li>Backup & recovery</li>
+                    <li>Security updates</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 20: Contact & Demo -->
+    <div class="slide">
+        <h2>Get Started Today</h2>
+        <div class="contact-info">
+            <h3>Ready to Transform Your Business?</h3>
+            <p style="font-size: 1.1rem; margin: 20px 0;">Experience the power of our comprehensive ERP solution</p>
+            
+            <div style="margin: 30px 0;">
+                <div style="font-size: 1.2rem; font-weight: 600; color: #1976d2; margin-bottom: 10px;">Demo Credentials</div>
+                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                    <div style="background: #e3f2fd; padding: 10px 15px; border-radius: 5px;">Admin: admin@erp.com</div>
+                    <div style="background: #e8f5e8; padding: 10px 15px; border-radius: 5px;">Manager: manager@erp.com</div>
+                    <div style="background: #fff3e0; padding: 10px 15px; border-radius: 5px;">Employee: employee@erp.com</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px;">
+                <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px;">Contact Information</div>
+                <p>📧 Email: info@erpsystem.com</p>
+                <p>📞 Phone: +1 (555) 123-4567</p>
+                <p>🌐 Website: www.erpsystem.com</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -3,7 +3,7 @@ import {
   Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
   Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Checkbox
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -166,9 +166,7 @@ const SalesDashboard = () => {
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [salesOrderDialogOpen, setSalesOrderDialogOpen] = useState(false);
-  const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
-  const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
-  const [priceManagementDialogOpen, setPriceManagementDialogOpen] = useState(false);
+  const [promotionsDialogOpen, setPromotionsDialogOpen] = useState(false);
   const [transferStockDialogOpen, setTransferStockDialogOpen] = useState(false);
   const [viewTransfersDialogOpen, setViewTransfersDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -197,19 +195,6 @@ const SalesDashboard = () => {
     discount: 0
   });
 
-  const [customerForm, setCustomerForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    customer_type: 'retailer',
-    warehouse: '',
-    contact_person: '',
-    tax_number: '',
-    credit_limit: '',
-    payment_terms: 'cash'
-  });
-
   const [transferForm, setTransferForm] = useState({
     product: '',
     quantity: '',
@@ -218,16 +203,17 @@ const SalesDashboard = () => {
     notes: ''
   });
 
-  const [productForm, setProductForm] = useState({
+  const [promotionsForm, setPromotionsForm] = useState({
     name: '',
-    sku: '',
-    price: '',
-    description: ''
-  });
-
-  const [priceForm, setPriceForm] = useState({
-    product: '',
-    price: ''
+    description: '',
+    discount_type: 'percentage',
+    discount_value: '',
+    start_date: '',
+    end_date: '',
+    applicable_products: [],
+    minimum_order: '',
+    selected_products: [], // Array of {product_id, original_price, discounted_price}
+    apply_to_all: false
   });
 
   const [customers, setCustomers] = useState([]);
@@ -412,59 +398,6 @@ const SalesDashboard = () => {
     }
   };
   
-  const handleAddCustomer = async () => {
-    try {
-      if (!customerForm.name || !customerForm.email) {
-        setSnackbarMessage('Please fill in name and email fields');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Create customer via backend API
-      const customerData = {
-        name: customerForm.name,
-        email: customerForm.email,
-        phone: customerForm.phone,
-        address: customerForm.address,
-        customer_type: customerForm.customer_type,
-        warehouse: customerForm.warehouse,
-        contact_person: customerForm.contact_person,
-        tax_number: customerForm.tax_number,
-        credit_limit: customerForm.credit_limit,
-        payment_terms: customerForm.payment_terms,
-        status: 'active'
-      };
-
-      const response = await api.post('/sales/customers/', customerData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Customer created:', response.data);
-      setSnackbarMessage('Customer added successfully!');
-      setSnackbarOpen(true);
-      setAddCustomerDialogOpen(false);
-      setCustomerForm({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        customer_type: 'retailer',
-        warehouse: '',
-        contact_person: '',
-        tax_number: '',
-        credit_limit: '',
-        payment_terms: 'cash'
-      });
-      
-      // Refresh customers data to show new customer
-      loadCustomers();
-    } catch (error) {
-      console.error('Failed to add customer:', error);
-      setSnackbarMessage('Failed to add customer');
-      setSnackbarOpen(true);
-    }
-  };
-  
   const handleGenerateQuote = async () => {
     try {
       if (!quoteForm.customer || !quoteForm.product || !quoteForm.quantity) {
@@ -538,82 +471,6 @@ const SalesDashboard = () => {
     }
   };
   
-  const handleAddProduct = async () => {
-    try {
-      if (!productForm.name || !productForm.sku || !productForm.price) {
-        setSnackbarMessage('Please fill in all required fields');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Create product via backend API
-      const productData = {
-        name: productForm.name,
-        sku: productForm.sku,
-        price: parseFloat(productForm.price),
-        description: productForm.description
-      };
-
-      const response = await api.post('/inventory/products/', productData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Product created:', response.data);
-      setSnackbarMessage('Product added successfully!');
-      setSnackbarOpen(true);
-      setAddProductDialogOpen(false);
-      setProductForm({
-        name: '',
-        sku: '',
-        price: '',
-        description: ''
-      });
-      
-      // Refresh products data to show new product
-      loadProducts();
-    } catch (error) {
-      console.error('Failed to add product:', error);
-      setSnackbarMessage('Failed to add product');
-      setSnackbarOpen(true);
-    }
-  };
-  
-  const handlePriceManagement = async () => {
-    try {
-      if (!priceForm.product || !priceForm.price) {
-        setSnackbarMessage('Please select a product and enter a price');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Update price via backend API
-      const priceData = {
-        product: priceForm.product,
-        price: parseFloat(priceForm.price)
-      };
-
-      const response = await api.put('/inventory/products/price/', priceData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Price updated:', response.data);
-      setSnackbarMessage('Price updated successfully!');
-      setSnackbarOpen(true);
-      setPriceManagementDialogOpen(false);
-      setPriceForm({
-        product: '',
-        price: ''
-      });
-      
-      // Refresh products data to show updated price
-      loadProducts();
-    } catch (error) {
-      console.error('Failed to update price:', error);
-      setSnackbarMessage('Failed to update price');
-      setSnackbarOpen(true);
-    }
-  };
-
   const handleTransferStock = async () => {
     try {
       // Validate transfer form
@@ -772,6 +629,84 @@ const SalesDashboard = () => {
     }
   }, [token]);
 
+  const handlePromotions = async () => {
+    try {
+      if (!promotionsForm.name || !promotionsForm.discount_value) {
+        setSnackbarMessage('Please fill in promotion name and discount value');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Validate selected products if not applying to all
+      if (!promotionsForm.apply_to_all && promotionsForm.selected_products.length === 0 && promotionsForm.applicable_products.length === 0) {
+        setSnackbarMessage('Please select products or enable "Apply to all products"');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Validate selected products pricing
+      if (promotionsForm.selected_products.length > 0) {
+        const invalidProducts = promotionsForm.selected_products.filter(p => 
+          !p.original_price || !p.discounted_price || 
+          parseFloat(p.discounted_price) >= parseFloat(p.original_price)
+        );
+        if (invalidProducts.length > 0) {
+          setSnackbarMessage('Please ensure all selected products have valid pricing with discounted price less than original price');
+          setSnackbarOpen(true);
+          return;
+        }
+      }
+
+      // Create promotion via backend API
+      const promotionData = {
+        name: promotionsForm.name,
+        description: promotionsForm.description,
+        discount_type: promotionsForm.discount_type,
+        discount_value: parseFloat(promotionsForm.discount_value),
+        start_date: promotionsForm.start_date,
+        end_date: promotionsForm.end_date,
+        applicable_products: promotionsForm.apply_to_all ? [] : promotionsForm.applicable_products,
+        minimum_order: parseFloat(promotionsForm.minimum_order) || 0,
+        status: 'active',
+        apply_to_all: promotionsForm.apply_to_all,
+        product_pricing: promotionsForm.selected_products.map(p => ({
+          product_id: p.product_id,
+          original_price: parseFloat(p.original_price),
+          discounted_price: parseFloat(p.discounted_price),
+          discount_amount: parseFloat(p.original_price) - parseFloat(p.discounted_price)
+        }))
+      };
+
+      const response = await api.post('/sales/promotions/', promotionData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('Promotion created:', response.data);
+      setSnackbarMessage('Promotion created successfully with product bindings!');
+      setSnackbarOpen(true);
+      setPromotionsDialogOpen(false);
+      setPromotionsForm({
+        name: '',
+        description: '',
+        discount_type: 'percentage',
+        discount_value: '',
+        start_date: '',
+        end_date: '',
+        applicable_products: [],
+        minimum_order: '',
+        selected_products: [], // Array of {product_id, original_price, discounted_price}
+        apply_to_all: false
+      });
+      
+      // Refresh dashboard data
+      loadDashboardData();
+    } catch (error) {
+      console.error('Failed to create promotion:', error);
+      setSnackbarMessage('Failed to create promotion');
+      setSnackbarOpen(true);
+    }
+  };
+
   return (
     <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', p: 0 }}>
       {/* Header */}
@@ -869,48 +804,16 @@ const SalesDashboard = () => {
             <QuickActionButton
               fullWidth
               variant="contained"
-              startIcon={<PersonAddIcon />}
-              onClick={() => setAddCustomerDialogOpen(true)}
+              startIcon={<AttachMoneyIcon />}
+              onClick={() => setPromotionsDialogOpen(true)}
               sx={{ 
                 background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)',
                 color: 'white'
               }}
             >
-              Add Customer
+              Promotions
             </QuickActionButton>
           </Grid>
-          {canAddProducts() && (
-            <>
-              <Grid item xs={12} sm={6} md={3}>
-                <QuickActionButton
-                  fullWidth
-                  variant="contained"
-                  startIcon={<AddBoxIcon />}
-                  onClick={() => setAddProductDialogOpen(true)}
-                  sx={{ 
-                    background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
-                    color: 'white'
-                  }}
-                >
-                  Add Product
-                </QuickActionButton>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <QuickActionButton
-                  fullWidth
-                  variant="contained"
-                  startIcon={<PriceChangeIcon />}
-                  onClick={() => setPriceManagementDialogOpen(true)}
-                  sx={{ 
-                    background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
-                    color: 'white'
-                  }}
-                >
-                  Price Management
-                </QuickActionButton>
-              </Grid>
-            </>
-          )}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
@@ -1151,6 +1054,7 @@ const SalesDashboard = () => {
         {/* Sales Tab */}
         <TabPanel value={tabValue} index={1}>
           <Grid container spacing={3}>
+            {/* Recent Sales */}
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
@@ -1185,6 +1089,7 @@ const SalesDashboard = () => {
         {/* Customers Tab */}
         <TabPanel value={tabValue} index={2}>
           <Grid container spacing={3}>
+            {/* Customer Overview */}
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
@@ -1301,7 +1206,7 @@ const SalesDashboard = () => {
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                         Monthly Sales Performance (Last 6 Months)
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2, alignItems: 'end', height: 100 }}>
                         {[85000, 92000, 78000, 105000, 118000, 145000].map((amount, i) => {
                           const height = (amount / 150000) * 80;
                           const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1381,9 +1286,9 @@ const SalesDashboard = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
                       {[
-                        { segment: 'High Value', count: 45, percentage: 35, color: '#4CAF50', value: 'GHS 5K+' },
-                        { segment: 'Medium Value', count: 78, percentage: 45, color: '#FF9800', value: 'GHS 1-5K' },
-                        { segment: 'Low Value', count: 87, percentage: 20, color: '#2196F3', value: 'GHS <1K' }
+                        { segment: 'High Value', count: 45, percentage: 35, color: '#4CAF50' },
+                        { segment: 'Medium Value', count: 78, percentage: 45, color: '#FF9800' },
+                        { segment: 'Low Value', count: 87, percentage: 20, color: '#2196F3' }
                       ].map((segment, idx) => (
                         <Box key={segment.segment}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -1416,11 +1321,11 @@ const SalesDashboard = () => {
 
                     {/* Customer Metrics */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, mr: 1 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, mr: 1 }}>
                         <Typography variant="h6">{customers.length}</Typography>
                         <Typography variant="caption">Total Customers</Typography>
                       </Paper>
-                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
                         <Typography variant="h6">28</Typography>
                         <Typography variant="caption">New This Month</Typography>
                       </Paper>
@@ -1836,197 +1741,6 @@ const SalesDashboard = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Add Customer Dialog */}
-      <Dialog open={addCustomerDialogOpen} onClose={() => setAddCustomerDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Add New Customer</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Name"
-            value={customerForm.name}
-            onChange={(e) => setCustomerForm({...customerForm, name: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            value={customerForm.email}
-            onChange={(e) => setCustomerForm({...customerForm, email: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Phone Number"
-            value={customerForm.phone}
-            onChange={(e) => setCustomerForm({...customerForm, phone: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Address"
-            value={customerForm.address}
-            onChange={(e) => setCustomerForm({...customerForm, address: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            select
-            label="Customer Type"
-            value={customerForm.customer_type}
-            onChange={(e) => setCustomerForm({...customerForm, customer_type: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="retailer">Retailer</MenuItem>
-            <MenuItem value="wholesaler">Wholesaler</MenuItem>
-            <MenuItem value="distributor">Distributor</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Warehouse"
-            value={customerForm.warehouse}
-            onChange={(e) => setCustomerForm({...customerForm, warehouse: e.target.value})}
-            margin="normal"
-          >
-            {warehouses.map((warehouse) => (
-              <MenuItem key={warehouse.id} value={warehouse.id}>
-                {warehouse.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Contact Person"
-            value={customerForm.contact_person}
-            onChange={(e) => setCustomerForm({...customerForm, contact_person: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Tax Number"
-            value={customerForm.tax_number}
-            onChange={(e) => setCustomerForm({...customerForm, tax_number: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            type="number"
-            label="Credit Limit"
-            value={customerForm.credit_limit}
-            onChange={(e) => setCustomerForm({...customerForm, credit_limit: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            select
-            label="Payment Terms"
-            value={customerForm.payment_terms}
-            onChange={(e) => setCustomerForm({...customerForm, payment_terms: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="cash">Cash</MenuItem>
-            <MenuItem value="credit">Credit</MenuItem>
-            <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddCustomerDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleAddCustomer} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)' }}
-          >
-            Add Customer
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Add Product Dialog */}
-      <Dialog open={addProductDialogOpen} onClose={() => setAddProductDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Add New Product</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Name"
-            value={productForm.name}
-            onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="SKU"
-            value={productForm.sku}
-            onChange={(e) => setProductForm({...productForm, sku: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            type="number"
-            label="Price"
-            value={productForm.price}
-            onChange={(e) => setProductForm({...productForm, price: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Description"
-            value={productForm.description}
-            onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-            margin="normal"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddProductDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleAddProduct} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)' }}
-          >
-            Add Product
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Price Management Dialog */}
-      <Dialog open={priceManagementDialogOpen} onClose={() => setPriceManagementDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Price Management</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Product"
-            value={priceForm.product}
-            onChange={(e) => setPriceForm({...priceForm, product: e.target.value})}
-            margin="normal"
-          >
-            {products.map((product) => (
-              <MenuItem key={product.id} value={product.id}>
-                {product.name} - {product.sku}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            type="number"
-            label="Price"
-            value={priceForm.price}
-            onChange={(e) => setPriceForm({...priceForm, price: e.target.value})}
-            margin="normal"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPriceManagementDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handlePriceManagement} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)' }}
-          >
-            Update Price
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
       {/* Transfer Stock Dialog */}
       <Dialog open={transferStockDialogOpen} onClose={() => setTransferStockDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Transfer Stock</DialogTitle>
@@ -2138,6 +1852,210 @@ const SalesDashboard = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setViewTransfersDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Promotions Dialog */}
+      <Dialog open={promotionsDialogOpen} onClose={() => setPromotionsDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Create Promotion</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Promotion Name"
+            value={promotionsForm.name}
+            onChange={(e) => setPromotionsForm({...promotionsForm, name: e.target.value})}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Description"
+            value={promotionsForm.description}
+            onChange={(e) => setPromotionsForm({...promotionsForm, description: e.target.value})}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+          <TextField
+            fullWidth
+            select
+            label="Discount Type"
+            value={promotionsForm.discount_type}
+            onChange={(e) => setPromotionsForm({...promotionsForm, discount_type: e.target.value})}
+            margin="normal"
+          >
+            <MenuItem value="percentage">Percentage</MenuItem>
+            <MenuItem value="fixed">Fixed Amount</MenuItem>
+          </TextField>
+          <TextField
+            fullWidth
+            label="Discount Value"
+            value={promotionsForm.discount_value}
+            onChange={(e) => setPromotionsForm({...promotionsForm, discount_value: e.target.value})}
+            margin="normal"
+            type="number"
+          />
+          <TextField
+            fullWidth
+            label="Start Date"
+            value={promotionsForm.start_date}
+            onChange={(e) => setPromotionsForm({...promotionsForm, start_date: e.target.value})}
+            margin="normal"
+            type="date"
+          />
+          <TextField
+            fullWidth
+            label="End Date"
+            value={promotionsForm.end_date}
+            onChange={(e) => setPromotionsForm({...promotionsForm, end_date: e.target.value})}
+            margin="normal"
+            type="date"
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Product Selection
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Apply to all products
+              </Typography>
+              <Checkbox
+                checked={promotionsForm.apply_to_all}
+                onChange={(e) => setPromotionsForm({...promotionsForm, apply_to_all: e.target.checked})}
+                color="primary"
+              />
+            </Box>
+          </Box>
+          
+          {!promotionsForm.apply_to_all && (
+            <>
+              <TextField
+                fullWidth
+                select
+                label="Select Products for Promotion"
+                value={promotionsForm.applicable_products}
+                onChange={(e) => setPromotionsForm({...promotionsForm, applicable_products: e.target.value})}
+                margin="normal"
+                SelectProps={{
+                  multiple: true,
+                }}
+                helperText="Select products to apply this promotion to"
+              >
+                {products.map((product) => (
+                  <MenuItem key={product.id} value={product.id}>
+                    {product.name} - {product.sku} (GHS {product.price || 0})
+                  </MenuItem>
+                ))}
+              </TextField>
+              
+              <Typography variant="h6" sx={{ mt: 3, mb: 2, fontWeight: 600 }}>
+                Custom Product Pricing
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Set specific prices for individual products (optional - overrides general discount)
+              </Typography>
+              
+              {promotionsForm.selected_products.map((product, index) => (
+                <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                  <TextField
+                    select
+                    label="Product"
+                    value={product.product_id}
+                    onChange={(e) => {
+                      const selectedProduct = products.find(p => p.id === e.target.value);
+                      const newProducts = [...promotionsForm.selected_products];
+                      newProducts[index] = {
+                        ...newProducts[index],
+                        product_id: e.target.value,
+                        product_name: selectedProduct?.name || '',
+                        original_price: selectedProduct?.price || ''
+                      };
+                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
+                    }}
+                    sx={{ flex: 2 }}
+                  >
+                    {products.map((prod) => (
+                      <MenuItem key={prod.id} value={prod.id}>
+                        {prod.name} - {prod.sku}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    type="number"
+                    label="Original Price"
+                    value={product.original_price}
+                    onChange={(e) => {
+                      const newProducts = [...promotionsForm.selected_products];
+                      newProducts[index].original_price = e.target.value;
+                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
+                    }}
+                    sx={{ flex: 1 }}
+                    inputProps={{ min: 0, step: 0.01 }}
+                  />
+                  <TextField
+                    type="number"
+                    label="Discounted Price"
+                    value={product.discounted_price}
+                    onChange={(e) => {
+                      const newProducts = [...promotionsForm.selected_products];
+                      newProducts[index].discounted_price = e.target.value;
+                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
+                    }}
+                    sx={{ flex: 1 }}
+                    inputProps={{ min: 0, step: 0.01 }}
+                  />
+                  <Button
+                    onClick={() => {
+                      const newProducts = promotionsForm.selected_products.filter((_, i) => i !== index);
+                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
+                    }}
+                    color="error"
+                    size="small"
+                  >
+                    Remove
+                  </Button>
+                </Box>
+              ))}
+              
+              <Button
+                onClick={() => {
+                  setPromotionsForm({
+                    ...promotionsForm,
+                    selected_products: [...promotionsForm.selected_products, { 
+                      product_id: '', 
+                      product_name: '', 
+                      original_price: '', 
+                      discounted_price: '' 
+                    }]
+                  });
+                }}
+                variant="outlined"
+                sx={{ mb: 2 }}
+                startIcon={<AddIcon />}
+              >
+                Add Product with Custom Pricing
+              </Button>
+            </>
+          )}
+          
+          <TextField
+            fullWidth
+            label="Minimum Order Amount (GHS)"
+            value={promotionsForm.minimum_order}
+            onChange={(e) => setPromotionsForm({...promotionsForm, minimum_order: e.target.value})}
+            margin="normal"
+            type="number"
+            helperText="Minimum order amount required to apply this promotion"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPromotionsDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handlePromotions} 
+            variant="contained"
+            sx={{ background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)' }}
+          >
+            Create Promotion
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -53,6 +53,37 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         if obj.start_date and obj.end_date:
             return (obj.end_date - obj.start_date).days + 1
         return 0
+    
+    def create(self, validated_data):
+        """Create leave request with proper employee record handling"""
+        from .views import ensure_employee_record
+        from django.core.exceptions import ValidationError
+        
+        # Get the current user from the request context
+        request = self.context.get('request')
+        if not request or not request.user:
+            raise serializers.ValidationError("Authentication required to create leave request")
+        
+        user = request.user
+        
+        try:
+            # Ensure employee record exists
+            employee = ensure_employee_record(user)
+            if not employee:
+                raise serializers.ValidationError("Could not create or find employee record")
+            
+            # Set the employee for the leave request
+            validated_data['employee'] = employee
+            
+            # Create the leave request
+            leave_request = super().create(validated_data)
+            
+            return leave_request
+            
+        except ValidationError as e:
+            raise serializers.ValidationError(f"Employee record error: {str(e)}")
+        except Exception as e:
+            raise serializers.ValidationError(f"Failed to create leave request: {str(e)}")
 
 class LeaveBalanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)

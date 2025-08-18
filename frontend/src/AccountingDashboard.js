@@ -28,6 +28,7 @@ import TimeBasedAnalytics from './components/TimeBasedAnalytics';
 import GanttChart from './components/GanttChart';
 import TransactionIntegration from './components/TransactionIntegration';
 import { useTransactionIntegration } from './hooks/useTransactionIntegration';
+import PayrollManagement from './Finance/PayrollManagement';
 
 // Styled components for modern design
 const StyledTabs = styled(Tabs)(({ theme }) => ({
@@ -79,8 +80,8 @@ function TabPanel({ children, value, index, ...other }) {
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`accounting-tabpanel-${index}`}
-      aria-labelledby={`accounting-tab-${index}`}
+      id={`finance-tabpanel-${index}`}
+      aria-labelledby={`finance-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -131,7 +132,7 @@ const mockPieData3 = [
   { name: 'Other', value: 8 },
 ];
 
-const AccountingDashboard = () => {
+const FinanceDashboard = () => {
   const { token } = useContext(AuthContext);
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -146,7 +147,7 @@ const AccountingDashboard = () => {
     analytics,
     recordAccountingTransaction,
     refreshData
-  } = useTransactionIntegration('accounting');
+  } = useTransactionIntegration('finance');
   
   // Quick Actions State
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -191,7 +192,7 @@ const AccountingDashboard = () => {
     setCustomerBalanceDialogOpen(true);
     setReceivablesLoading(true);
     try {
-      const response = await api.get('/accounting/receivables/customer-balances/', {
+      const response = await api.get('/finance/receivables/customer-balances/', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCustomerBalances(response.data || []);
@@ -214,7 +215,7 @@ const AccountingDashboard = () => {
     setReceivableSummaryDialogOpen(true);
     setReceivablesLoading(true);
     try {
-      const response = await api.get('/accounting/receivables/receivable-summary/', {
+      const response = await api.get('/finance/receivables/receivable-summary/', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReceivableSummary(response.data || []);
@@ -237,7 +238,7 @@ const AccountingDashboard = () => {
     setReceivableDetailsDialogOpen(true);
     setReceivablesLoading(true);
     try {
-      const response = await api.get('/accounting/receivables/receivable-details/', {
+      const response = await api.get('/finance/receivables/receivable-details/', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReceivableDetails(response.data || []);
@@ -257,11 +258,11 @@ const AccountingDashboard = () => {
   };
 
   const handleGenerateStatement = () => {
-    window.open('/accounting/statements', '_blank');
+    window.open('/finance/statements', '_blank');
   };
   
   const handleReconcileAccount = () => {
-    window.open('/accounting/reconcile', '_blank');
+    window.open('/finance/reconcile', '_blank');
   };
 
   // Filter functions for search
@@ -292,7 +293,7 @@ const AccountingDashboard = () => {
       try {
         // Fetch invoices with error handling
         try {
-          const invoicesRes = await api.get('/accounting/invoices/', {
+          const invoicesRes = await api.get('/finance/invoices/', {
             headers: { Authorization: `Bearer ${token}` }
           });
           setInvoices(invoicesRes.data || []);
@@ -302,7 +303,7 @@ const AccountingDashboard = () => {
 
         // Fetch payments with error handling
         try {
-          const paymentsRes = await api.get('/accounting/payments/', {
+          const paymentsRes = await api.get('/finance/payments/', {
             headers: { Authorization: `Bearer ${token}` }
           });
           setPayments(paymentsRes.data || []);
@@ -311,8 +312,8 @@ const AccountingDashboard = () => {
         }
 
       } catch (err) {
-        setError('Failed to load accounting dashboard data.');
-        console.error('Accounting dashboard error:', err);
+        setError('Failed to load finance dashboard data.');
+        console.error('Finance dashboard error:', err);
       } finally {
         setLoading(false);
       }
@@ -334,10 +335,10 @@ const AccountingDashboard = () => {
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>
             <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-              Accounting Dashboard
+              Finance Dashboard
             </Typography>
             <Typography variant="h6" sx={{ opacity: 0.9 }}>
-              Track financial performance and manage accounting processes.
+              Track financial performance and manage finance processes.
             </Typography>
           </Box>
           <IconButton 
@@ -483,6 +484,7 @@ const AccountingDashboard = () => {
           <StyledTab icon={<ReceiptIcon />} label="Invoices" />
           <StyledTab icon={<PaymentIcon />} label="Payments" />
           <StyledTab icon={<AssessmentIcon />} label="Analytics" />
+          <StyledTab icon={<PeopleIcon />} label="Payroll Management" />
         </StyledTabs>
 
         {/* Overview Tab */}
@@ -1023,6 +1025,11 @@ const AccountingDashboard = () => {
             </Grid>
           </Grid>
         </TabPanel>
+
+        {/* Payroll Management Tab */}
+        <TabPanel value={tabValue} index={4}>
+          <PayrollManagement />
+        </TabPanel>
       </Paper>
       
       {/* Customer Balance Dialog */}
@@ -1356,4 +1363,4 @@ const AccountingDashboard = () => {
   );
 };
 
-export default AccountingDashboard;
+export default FinanceDashboard;

@@ -9,7 +9,7 @@ from .views import (
     OnboardingStepInstanceViewSet, OnboardingDocumentViewSet, OnboardingFeedbackViewSet,
     HRCalendarEventViewSet, HRHolidayViewSet, HRDeadlineViewSet,
     EnhancedAnnouncementViewSet, HRCalendarNotificationViewSet, AnnouncementReadViewSet,
-    leave_dashboard_stats, leave_balance
+    leave_dashboard_stats, leave_balance, user_notifications, mark_notification_read, notification_summary
 )
 
 router = routers.DefaultRouter()

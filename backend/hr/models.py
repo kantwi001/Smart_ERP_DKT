@@ -51,7 +51,7 @@ class LeaveRequest(models.Model):
     calculated_days = models.PositiveIntegerField(default=0, help_text='Number of working days calculated for this request')
     status = models.CharField(max_length=20, choices=[('pending','Pending'),('approved','Approved'),('declined','Declined')], default='pending')
     approver = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='leave_approvals')
-    approval_stage = models.CharField(max_length=30, choices=[('hod','HOD'),('hr','HR'),('complete','Complete')], default='hod')
+    approval_stage = models.CharField(max_length=30, choices=[('hod','HOD'),('hr','HR'),('cd','CD'),('complete','Complete')], default='hod')
     requested_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
@@ -67,6 +67,7 @@ class LeaveRequest(models.Model):
             
         # Track status changes for leave balance updates
         old_status = None
+        is_new = not self.pk
         if self.pk:
             try:
                 old_instance = LeaveRequest.objects.get(pk=self.pk)
@@ -76,8 +77,8 @@ class LeaveRequest(models.Model):
         
         super().save(*args, **kwargs)
         
-        # Update leave balance when status changes
-        if old_status != self.status:
+        # Update leave balance when status changes or new request is created
+        if is_new or old_status != self.status:
             self.update_leave_balance(old_status, self.status)
 
     def calculate_working_days(self):
@@ -105,10 +106,10 @@ class LeaveRequest(models.Model):
         # Get or create leave balance for this employee, leave type, and year
         leave_balance, created = LeaveBalance.objects.get_or_create(
             employee=self.employee,
-            leave_type=self.leave_type,
+            leave_type=self.leave_type.lower() if hasattr(self, 'leave_type') else 'annual',
             year=current_year,
             defaults={
-                'total_days': 21 if self.leave_type == 'annual' else 10,  # Default allocations
+                'total_days': 21 if self.leave_type.lower() == 'annual' else 10,  # Default allocations
                 'used_days': 0,
                 'pending_days': 0
             }
@@ -118,20 +119,63 @@ class LeaveRequest(models.Model):
         if old_status is None and new_status == 'pending':
             # New request - add to pending
             leave_balance.pending_days += self.calculated_days
+            # Send notification to approver
+            self.send_notification('request_submitted')
         elif old_status == 'pending' and new_status == 'approved':
             # Approved - move from pending to used
             leave_balance.pending_days = max(0, leave_balance.pending_days - self.calculated_days)
             leave_balance.used_days += self.calculated_days
             self.reviewed_at = datetime.now()
+            # Send notification to requester
+            self.send_notification('request_approved')
         elif old_status == 'pending' and new_status == 'declined':
             # Declined - remove from pending
             leave_balance.pending_days = max(0, leave_balance.pending_days - self.calculated_days)
             self.reviewed_at = datetime.now()
+            # Send notification to requester
+            self.send_notification('request_declined')
         elif old_status == 'approved' and new_status == 'declined':
             # Reverting approval - move from used back to nothing
             leave_balance.used_days = max(0, leave_balance.used_days - self.calculated_days)
         
         leave_balance.save()
+
+    def send_notification(self, notification_type):
+        """Send notifications for leave request status changes"""
+        try:
+            if notification_type == 'request_submitted':
+                # Notify approver
+                if self.approver:
+                    Notification.objects.create(
+                        user=self.approver,
+                        title=f"New Leave Request - {self.employee.user.get_full_name()}",
+                        message=f"A new {self.leave_type} leave request has been submitted for {self.calculated_days} days from {self.start_date} to {self.end_date}.",
+                        notification_type='leave_request',
+                        related_object_id=self.id
+                    )
+            elif notification_type == 'request_approved':
+                # Notify requester
+                Notification.objects.create(
+                    user=self.employee.user,
+                    title="Leave Request Approved",
+                    message=f"Your {self.leave_type} leave request for {self.calculated_days} days has been approved at the {self.approval_stage.upper()} stage.",
+                    notification_type='leave_approval',
+                    related_object_id=self.id
+                )
+            elif notification_type == 'request_declined':
+                # Notify requester
+                Notification.objects.create(
+                    user=self.employee.user,
+                    title="Leave Request Declined",
+                    message=f"Your {self.leave_type} leave request for {self.calculated_days} days has been declined at the {self.approval_stage.upper()} stage.",
+                    notification_type='leave_decline',
+                    related_object_id=self.id
+                )
+        except Exception as e:
+            # Log error but don't fail the main operation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send notification: {str(e)}")
 
     def approve(self, user):
         if self.status != 'pending' or user != self.approver:
@@ -151,6 +195,20 @@ class LeaveRequest(models.Model):
                 self.approver = None
                 self.save()
         elif self.approval_stage == 'hr':
+            # Move to CD stage
+            from users.models import User
+            cd_users = User.objects.filter(role='cd')
+            if cd_users.exists():
+                self.approver = cd_users.first()
+                self.approval_stage = 'cd'
+                self.save()
+            else:
+                # No CD, auto-complete
+                self.status = 'approved'
+                self.approval_stage = 'complete'
+                self.approver = None
+                self.save()
+        elif self.approval_stage == 'cd':
             self.status = 'approved'
             self.approval_stage = 'complete'
             self.approver = None
@@ -233,7 +291,7 @@ class PerformanceReview(models.Model):
     comments = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    approval_stage = models.CharField(max_length=30, choices=[('hod','HOD'),('hr','HR'),('complete','Complete')], default='hod')
+    approval_stage = models.CharField(max_length=30, choices=[('hod','HOD'),('hr','HR'),('cd','CD'),('complete','Complete')], default='hod')
 
     def save(self, *args, **kwargs):
         # On creation, set reviewer to employee's department supervisor (HOD)
@@ -261,6 +319,21 @@ class PerformanceReview(models.Model):
                 self.reviewer = None
                 self.save()
         elif self.approval_stage == 'hr':
+            # Move to CD stage
+            from users.models import User
+            cd_users = User.objects.filter(role='cd')
+            if cd_users.exists():
+                self.reviewer = cd_users.first()
+                self.approval_stage = 'cd'
+                self.status = 'review'
+                self.save()
+            else:
+                # No CD, auto-complete
+                self.status = 'approved'
+                self.approval_stage = 'complete'
+                self.reviewer = None
+                self.save()
+        elif self.approval_stage == 'cd':
             self.status = 'approved'
             self.approval_stage = 'complete'
             self.reviewer = None

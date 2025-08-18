@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.kwadwo.erpsystem',
-  appName: 'ERP System',
+  appId: 'com.smarterp.software',
+  appName: 'Smart ERP Software',
   webDir: 'build',
   server: {
     androidScheme: 'https',
@@ -20,13 +20,13 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 3000,
       launchAutoHide: true,
-      backgroundColor: "#ffffffff",
+      backgroundColor: "#1976d2",
       androidSplashResourceName: "splash",
       androidScaleType: "CENTER_CROP",
       showSpinner: true,
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small",
-      spinnerColor: "#999999",
+      spinnerColor: "#ffffff",
       splashFullScreen: true,
       splashImmersive: true,
       layoutName: "launch_screen",

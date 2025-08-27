@@ -5,23 +5,48 @@ from .models import SystemSettings
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
-    department = serializers.PrimaryKeyRelatedField(queryset=User._meta.get_field('department').related_model.objects.all(), allow_null=True, required=False)
+    department_id = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
+    assigned_warehouse_id = serializers.SerializerMethodField()
+    assigned_warehouse_name = serializers.SerializerMethodField()
     profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'role', 'phone', 'first_name', 'last_name', 
-            'department', 'department_name', 'is_superuser', 'accessible_modules', 
+            'department_id', 'department_name', 'assigned_warehouse_id', 'assigned_warehouse_name',
+            'is_active', 'is_superuser', 'is_staff', 'accessible_modules', 
             'is_module_restricted', 'assigned_warehouse', 'profile_picture', 
             'profile_picture_url', 'bio', 'date_of_birth', 'address', 
-            'emergency_contact_name', 'emergency_contact_phone', 'hire_date', 'employee_id'
+            'emergency_contact_name', 'emergency_contact_phone', 'hire_date', 'employee_id',
+            'date_joined', 'last_login'
         ]
-        read_only_fields = ['id', 'role', 'department_name', 'is_superuser', 'profile_picture_url']
+        read_only_fields = ['id', 'role', 'department_id', 'department_name', 'assigned_warehouse_id', 'assigned_warehouse_name', 'is_superuser', 'profile_picture_url']
+
+    def get_department_id(self, obj):
+        try:
+            return obj.department.id if obj.department else None
+        except (AttributeError, Exception):
+            return None
 
     def get_department_name(self, obj):
-        return obj.department.name if obj.department else None
+        try:
+            return obj.department.name if obj.department else None
+        except (AttributeError, Exception):
+            return None
+
+    def get_assigned_warehouse_id(self, obj):
+        try:
+            return obj.assigned_warehouse.id if obj.assigned_warehouse else None
+        except (AttributeError, Exception):
+            return None
+
+    def get_assigned_warehouse_name(self, obj):
+        try:
+            return obj.assigned_warehouse.name if obj.assigned_warehouse else None
+        except (AttributeError, Exception):
+            return None
     
     def get_profile_picture_url(self, obj):
         if obj.profile_picture:

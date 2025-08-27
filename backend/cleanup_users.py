@@ -2,8 +2,6 @@
 """
 User Cleanup Script
 Deletes all sample users and keeps/creates only specified users:
-- antwi (superadmin)
-- Kwadwo (admin)
 - Sales manager
 - Finance manager
 - Procurement Manager
@@ -53,7 +51,7 @@ def cleanup_and_create_users():
         print(f"  - {user.username} ({user.email}) - {user.role}")
     
     # Delete all users except superusers we want to keep
-    users_to_keep = ['antwi', 'kwadwo']
+    users_to_keep = []
     users_to_delete = User.objects.exclude(username__in=users_to_keep)
     
     print(f"\n🗑️ Deleting {users_to_delete.count()} users...")
@@ -64,58 +62,35 @@ def cleanup_and_create_users():
     # Create/update the required users
     users_to_create = [
         {
-            'username': 'antwi',
-            'email': 'kwadwo_antwi@dktghana.org',
-            'first_name': 'Kwadwo',
-            'last_name': 'Antwi',
-            'role': 'superadmin',
-            'is_superuser': True,
-            'is_staff': True,
-            'department': management_dept
-        },
-        {
-            'username': 'kwadwo',
-            'email': 'kwadwo@dktghana.org',
-            'first_name': 'Kwadwo',
-            'last_name': 'Admin',
-            'role': 'admin',
-            'is_superuser': False,
-            'is_staff': True,
-            'department': management_dept
-        },
-        {
             'username': 'sales_manager',
-            'email': 'sales.manager@dktghana.org',
+            'email': 'sales@company.com',
             'first_name': 'Sales',
             'last_name': 'Manager',
-            'role': 'manager',
+            'role': 'sales_manager',
             'is_superuser': False,
             'is_staff': True,
-            'department': sales_dept
         },
         {
             'username': 'finance_manager',
-            'email': 'finance.manager@dktghana.org',
+            'email': 'finance@company.com',
             'first_name': 'Finance',
             'last_name': 'Manager',
-            'role': 'manager',
+            'role': 'finance_manager',
             'is_superuser': False,
             'is_staff': True,
-            'department': finance_dept
         },
         {
             'username': 'procurement_manager',
-            'email': 'procurement.manager@dktghana.org',
+            'email': 'procurement@company.com',
             'first_name': 'Procurement',
             'last_name': 'Manager',
-            'role': 'manager',
+            'role': 'procurement_manager',
             'is_superuser': False,
             'is_staff': True,
-            'department': procurement_dept
         },
         {
             'username': 'cd',
-            'email': 'country.director@dktghana.org',
+            'email': 'country.director@company.com',
             'first_name': 'Country',
             'last_name': 'Director',
             'role': 'executive',

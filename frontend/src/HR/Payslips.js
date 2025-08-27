@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { Download as DownloadIcon, Receipt as ReceiptIcon } from '@mui/icons-material';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable';
 
 const Payslips = () => {
   const [payslips, setPayslips] = useState([]);
@@ -177,20 +177,24 @@ const Payslips = () => {
       ['Payment Date', payslip.payment_date ? new Date(payslip.payment_date).toLocaleDateString() : 'Pending']
     ];
     
-    doc.autoTable({
-      startY: 75,
-      head: [['Field', 'Value']],
-      body: employeeData,
-      theme: 'grid',
-      headStyles: { fillColor: [66, 139, 202] },
-      margin: { left: 20, right: 20 }
+    // Create employee info table manually
+    let yPosition = 80;
+    doc.setFontSize(10);
+    
+    employeeData.forEach(([field, value]) => {
+      doc.setFont(undefined, 'bold');
+      doc.text(field + ':', 20, yPosition);
+      doc.setFont(undefined, 'normal');
+      doc.text(value, 80, yPosition);
+      yPosition += 8;
     });
     
     // Earnings and Deductions
-    const finalY = doc.lastAutoTable.finalY + 15;
-    
+    yPosition += 10;
     doc.setFontSize(12);
-    doc.text('Earnings & Deductions:', 20, finalY);
+    doc.setFont(undefined, 'bold');
+    doc.text('Earnings & Deductions:', 20, yPosition);
+    yPosition += 15;
     
     const payrollData = [
       ['Basic Salary', formatCurrency(payslip.gross_amount - (payslip.allowances?.transport || 0) - (payslip.allowances?.meal || 0))],
@@ -206,25 +210,30 @@ const Payslips = () => {
       ['Net Amount', formatCurrency(payslip.net_amount)]
     ];
     
-    doc.autoTable({
-      startY: finalY + 5,
-      head: [['Description', 'Amount']],
-      body: payrollData,
-      theme: 'grid',
-      headStyles: { fillColor: [66, 139, 202] },
-      margin: { left: 20, right: 20 },
-      didParseCell: function (data) {
-        if (data.row.index === payrollData.length - 1) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [240, 248, 255];
-        }
+    // Create payroll table manually
+    doc.setFontSize(10);
+    payrollData.forEach(([description, amount], index) => {
+      if (description === '' && amount === '') {
+        yPosition += 4;
+        return;
       }
+      
+      if (index === payrollData.length - 1) {
+        doc.setFont(undefined, 'bold');
+      } else {
+        doc.setFont(undefined, 'normal');
+      }
+      
+      doc.text(description, 20, yPosition);
+      doc.text(amount, 120, yPosition);
+      yPosition += 8;
     });
     
     // Footer
     const pageHeight = doc.internal.pageSize.height;
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
+    doc.setFont(undefined, 'normal');
     doc.text('This is a computer-generated payslip. No signature required.', 20, pageHeight - 20);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, pageHeight - 10);
     

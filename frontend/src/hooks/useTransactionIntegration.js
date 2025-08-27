@@ -109,7 +109,7 @@ export const useTransactionIntegration = (moduleId) => {
         transactionService.unregisterTransactionListener(moduleId, handleTransactionUpdate);
       };
     }
-  }, [moduleId, handleTransactionUpdate, loadTransactions, loadAnalytics]);
+  }, [moduleId]);
 
   // Helper functions for common transaction types
   const transactionHelpers = {

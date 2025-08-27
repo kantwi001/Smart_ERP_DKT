@@ -1,18 +1,20 @@
-# Django shell script to remove users antwi, rosemond, and kay from all users and transactions
+# Django shell script to remove sample users from all users and transactions
 # Run with: python manage.py shell < remove_users.py
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.db import transaction
+from sales.models import Sale
+from inventory.models import InventoryItem
 
 User = get_user_model()
 
 print("=" * 80)
-print("REMOVING USERS: antwi, rosemond, kay")
+print("REMOVING SAMPLE USERS")
 print("=" * 80)
 
 # Users to remove
-target_usernames = ['antwi', 'rosemond', 'kay']
+target_usernames = ['sample_user1', 'sample_user2', 'test_user']
 
 # Show all users first
 print("\n🔍 All users before deletion:")
@@ -55,7 +57,6 @@ with transaction.atomic():
             
             # Check Sales records
             try:
-                from sales.models import Sale
                 sales = Sale.objects.filter(user=user).count()
                 print(f"   - Sales records: {sales}")
             except Exception as e:

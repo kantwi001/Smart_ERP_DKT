@@ -20,7 +20,7 @@ const EditPayrollDialog = ({ open, onClose, record, onSaved, onDeleted }) => {
     setLoading(true);
     setError('');
     try {
-      await axios.patch(`/api/hr/payroll/${form.id}/`, form);
+      await axios.patch(`/hr/payroll/${form.id}/`, form);
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
@@ -33,7 +33,7 @@ const EditPayrollDialog = ({ open, onClose, record, onSaved, onDeleted }) => {
     setLoading(true);
     setError('');
     try {
-      await axios.delete(`/api/hr/payroll/${form.id}/`);
+      await axios.delete(`/hr/payroll/${form.id}/`);
       if (onDeleted) onDeleted();
       onClose();
     } catch (err) {

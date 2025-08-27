@@ -1,8 +1,8 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Category, Product, InventoryTransfer
-from .serializers import CategorySerializer, ProductSerializer, InventoryTransferSerializer
+from .models import Category, Product, InventoryTransfer, ProductPrice
+from .serializers import CategorySerializer, ProductSerializer, InventoryTransferSerializer, ProductPriceSerializer
 import io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -18,6 +18,18 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+class ProductPriceViewSet(viewsets.ModelViewSet):
+    queryset = ProductPrice.objects.all()
+    serializer_class = ProductPriceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = ProductPrice.objects.all()
+        product_id = self.request.query_params.get('product', None)
+        if product_id is not None:
+            queryset = queryset.filter(product=product_id)
+        return queryset
 
 class InventoryTransferViewSet(viewsets.ModelViewSet):
     queryset = InventoryTransfer.objects.all()

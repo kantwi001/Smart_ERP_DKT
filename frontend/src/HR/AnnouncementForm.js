@@ -21,7 +21,7 @@ const AnnouncementForm = ({ onSuccess }) => {
     setError('');
     setSuccess(false);
     try {
-      await axios.post('/api/hr/announcements/', form);
+      await axios.post('/hr/announcements/', form);
       setSuccess(true);
       setForm({ title: '', message: '' });
       if (onSuccess) onSuccess();

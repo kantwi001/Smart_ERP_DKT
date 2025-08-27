@@ -1,128 +1,72 @@
 #!/bin/bash
 
-echo "🚀 Pushing ERP System updates to GitHub..."
-echo "================================================================================"
+echo "🚀 Pushing ERP System Updates to GitHub..."
+echo "=========================================="
 
 # Navigate to project root
-cd /Users/kwadwoantwi/CascadeProjects/erp-system
+cd "$(dirname "$0")"
 
-# Check if we're in a git repository
-if [ ! -d ".git" ]; then
-    echo "❌ Not a git repository. Initializing..."
-    git init
-    echo "✅ Git repository initialized"
-fi
-
-# Check git status
-echo "📋 Current git status:"
+# Step 1: Check git status
+echo "📋 Checking current git status..."
 git status
 
-# Add all changes
-echo "📦 Adding all changes to staging..."
+# Step 2: Add all changes
+echo "📦 Adding all changes..."
 git add .
 
-# Show what will be committed
-echo "📋 Files to be committed:"
-git diff --cached --name-only
+# Step 3: Create comprehensive commit message
+echo "💬 Creating commit..."
+git commit -m "🚀 Mobile App Integration with Warehouse Management
 
-# Create comprehensive commit message
-COMMIT_MESSAGE="🎉 Major ERP System Updates - Mobile Employee UI, Transfer Stock & Compilation Fixes
+✨ Features Added:
+- Connected mobile apps to erp.tarinnovation.com backend
+- Full warehouse transfer functionality (create, approve, track)
+- iOS and Android build fixes with proper schemes
+- Offline sync capabilities with automatic data synchronization
+- Comprehensive build scripts for mobile deployment
 
-✨ NEW: Mobile Employee UI Development:
-- Created comprehensive MobileEmployeeForms.js with all employee form components
-- Developed MobileEmployeeApp.js - mobile-first employee interface with card-based layout
-- Integrated mobile employee interface into App.js routing system
-- Employee users now get mobile-optimized UI by default (no sidebar, card-based modules)
-- Added dedicated /mobile-employee route for mobile access
-- Mobile-first responsive design with touch-optimized interactions
-- Real-time data synchronization with backend APIs
-- Employee-focused modules: Leave, Tasks, Profile, Payslips, Training, Procurement
+🔧 Technical Updates:
+- Updated mobile_app_config.js with production backend URL
+- Fixed iOS Xcode scheme configuration (App.xcscheme)
+- Resolved Android Java Runtime and Gradle issues
+- Added warehouse transfer endpoints and storage keys
+- Updated Capacitor configuration for cross-platform builds
 
-🔧 FIXED: Compilation Errors:
-- Resolved MUI date picker dependency issues in MobileEmployeeForms.js
-- Replaced @mui/x-date-pickers with native HTML5 date inputs
-- Fixed DatePicker, LocalizationProvider, AdapterDateFns import errors
-- Updated date handling logic to work with string dates
-- Added proper InputLabelProps for date field display
+📱 Mobile Apps:
+- iOS: frontend/ios/App/App.xcworkspace ready for Xcode
+- Android: APK generation with smart-erp-backend-connected.apk
+- Both platforms include full ERP functionality with warehouse management
 
-🎯 NEW: Transfer Stock Quick Action:
-- Added Transfer Stock quick action button to Inventory Dashboard Overview tab
-- Implemented complete transfer stock dialog with product/warehouse selection
-- Added full API integration with /inventory/transfers/ endpoint
-- Proper form validation and error handling
-- Loading states and success feedback
-- Auto data refresh after successful transfer
+🛠️ Build Scripts:
+- build_mobile_with_backend.sh - Comprehensive mobile build
+- fix_ios_build.sh - iOS specific fixes
+- fix_android_build.sh - Android specific fixes
+- rebuild_mobile_apps.sh - Complete rebuild from scratch
 
-🎨 Mobile UI Features:
-- Card-based module layout optimized for mobile screens
-- Swipeable navigation drawer with touch-friendly interactions
-- Floating Action Button (FAB) for quick actions
-- Notification system with badges and real-time updates
-- Auto day calculation for leave requests
-- Profile picture upload and editing
-- Complete procurement workflow integration
-- Training materials with video playback
-- Task management and status tracking
+🗄️ Database:
+- PostgreSQL database: erp_system
+- Warehouse transfer models and migrations included
+- Backend API endpoints for mobile synchronization
 
-📱 Technical Improvements:
-- Material-UI mobile-first components with native date inputs
-- Touch-optimized interface design with proper spacing
-- Offline-ready architecture for mobile use
-- Role-based routing ensures employees see mobile UI
-- Cross-module synchronization improvements
-- Enhanced API connectivity and error handling
-- Resolved all compilation errors for smooth deployment
+Ready for production deployment with full warehouse management capabilities."
 
-🔐 Enhanced Functionality:
-- Quick Actions section in Inventory Dashboard
-- Complete stock transfer workflow with validation
-- Real-time inventory data updates
-- Improved user experience across all modules
-- Better error handling and user feedback
+# Step 4: Push to GitHub
+echo "⬆️ Pushing to GitHub..."
+git push origin main
 
-This update represents a major milestone in mobile ERP functionality and inventory management, 
-delivering a streamlined, mobile-first employee experience with comprehensive stock transfer 
-capabilities and resolved compilation issues for production-ready deployment."
-
-# Commit changes
-echo "💾 Committing changes..."
-git commit -m "$COMMIT_MESSAGE"
-
-# Check if remote origin exists
-if git remote get-url origin >/dev/null 2>&1; then
-    echo "✅ Remote origin found"
-    
-    # Push to GitHub
-    echo "🚀 Pushing to GitHub..."
-    git push origin main
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ Successfully pushed to GitHub!"
-    else
-        echo "⚠️  Push failed, trying to set upstream..."
-        git push --set-upstream origin main
-        
-        if [ $? -eq 0 ]; then
-            echo "✅ Successfully pushed to GitHub with upstream set!"
-        else
-            echo "❌ Push failed. You may need to:"
-            echo "   1. Check your GitHub credentials"
-            echo "   2. Verify repository permissions"
-            echo "   3. Pull latest changes first: git pull origin main"
-        fi
-    fi
+# Check if push was successful
+if [ $? -eq 0 ]; then
+    echo "✅ Successfully pushed to GitHub!"
+    echo ""
+    echo "📋 Summary of pushed updates:"
+    echo "   🏗️ Mobile app builds with backend connection"
+    echo "   📱 iOS and Android projects ready for deployment"
+    echo "   🏪 Complete warehouse transfer functionality"
+    echo "   🔧 Build fix scripts for development team"
+    echo "   📊 Database schema with PostgreSQL (erp_system)"
+    echo ""
+    echo "🌐 Repository updated with production-ready mobile apps!"
 else
-    echo "⚠️  No remote origin found. Please add your GitHub repository:"
-    echo "   git remote add origin https://github.com/yourusername/your-repo.git"
-    echo "   git push --set-upstream origin main"
+    echo "❌ Failed to push to GitHub. Please check your git configuration."
+    echo "🔧 Try running: git remote -v to check your remote repository"
 fi
-
-# Show final status
-echo "📋 Final git status:"
-git status
-
-echo "================================================================================"
-echo "🎉 GitHub update process complete!"
-echo "📋 Recent changes have been committed and pushed to GitHub"
-echo "✅ ERP System is now synchronized with remote repository"
-echo "================================================================================"

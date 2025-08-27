@@ -20,6 +20,8 @@ import {
   Grid,
   Stack,
   Divider,
+  FormControlLabel,
+  Checkbox,
   useTheme,
   useMediaQuery
 } from '@mui/material';
@@ -52,6 +54,7 @@ const Login = () => {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -83,7 +86,9 @@ const Login = () => {
     setError('');
 
     try {
-      await login(email, password);
+      // Extract username from email if it contains @
+      const username = email.includes('@') ? email.split('@')[0] : email;
+      await login(username, password, rememberMe);
       navigate('/');
     } catch (error) {
       setError(error.response?.data?.error || 'Invalid credentials');
@@ -536,6 +541,26 @@ const Login = () => {
                           }
                         }
                       }
+                    }}
+                  />
+
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        sx={{
+                          color: '#1976d2',
+                          '&.Mui-checked': {
+                            color: '#1976d2',
+                          },
+                        }}
+                      />
+                    }
+                    label="Remember Me"
+                    sx={{
+                      fontSize: isMobile ? (isSmallPhone ? '0.8rem' : '0.875rem') : '1rem',
+                      mb: isMobile ? 2 : 2.5,
                     }}
                   />
 

@@ -13,7 +13,7 @@ lsof -ti:2026 | xargs kill -9 2>/dev/null
 sleep 2
 
 # Start Backend Server
-echo "Starting Django backend server..."
+echo "Starting Django backend server on port 2025..."
 cd backend
 
 # Check if virtual environment exists
@@ -48,5 +48,5 @@ else:
 "
 
 # Start the Django server
-echo "Starting Django server on port 2025..."
+echo "============================================"
 python manage.py runserver 0.0.0.0:2025

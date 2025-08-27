@@ -1,22 +1,366 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
-from datetime import timedelta
-from .models import Account, Transaction
-from .serializers import AccountSerializer, TransactionSerializer
+from datetime import timedelta, datetime
+from decimal import Decimal
+from .models import (
+    Currency, ChartOfAccounts, JournalEntry, JournalBatch, Budget, BudgetLine,
+    FixedAsset, ExpenseCategory, ExpenseReport, ExpenseItem, RecurringTransaction,
+    LegacyAccount, LegacyTransaction
+)
+from .serializers import (
+    CurrencySerializer, ChartOfAccountsSerializer, JournalEntrySerializer, 
+    JournalBatchSerializer, BudgetSerializer, BudgetLineSerializer,
+    FixedAssetSerializer, ExpenseCategorySerializer, ExpenseReportSerializer, 
+    ExpenseItemSerializer, RecurringTransactionSerializer,
+    LegacyAccountSerializer, LegacyTransactionSerializer
+)
 from sales.models import Customer
 from pos.models import Sale
 
-class AccountViewSet(viewsets.ModelViewSet):
-    queryset = Account.objects.all()
-    serializer_class = AccountSerializer
+class CurrencyViewSet(viewsets.ModelViewSet):
+    queryset = Currency.objects.all()
+    serializer_class = CurrencySerializer
     permission_classes = [permissions.IsAuthenticated]
 
-class TransactionViewSet(viewsets.ModelViewSet):
-    queryset = Transaction.objects.all()
-    serializer_class = TransactionSerializer
+    @action(detail=False, methods=['get'], url_path='active')
+    def active_currencies(self, request):
+        """Get all active currencies"""
+        currencies = Currency.objects.filter(is_active=True)
+        serializer = self.get_serializer(currencies, many=True)
+        return Response(serializer.data)
+
+class ChartOfAccountsViewSet(viewsets.ModelViewSet):
+    queryset = ChartOfAccounts.objects.all()
+    serializer_class = ChartOfAccountsSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='by-type/(?P<account_type>[^/.]+)')
+    def by_type(self, request, account_type=None):
+        """Get accounts by type"""
+        accounts = self.queryset.filter(account_type=account_type, is_active=True)
+        serializer = self.get_serializer(accounts, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='trial-balance')
+    def trial_balance(self, request):
+        """Generate trial balance report"""
+        accounts = ChartOfAccounts.objects.filter(is_active=True).order_by('account_code')
+        trial_balance_data = []
+        total_debits = Decimal('0.00')
+        total_credits = Decimal('0.00')
+
+        for account in accounts:
+            balance = account.current_balance
+            if balance > 0:
+                if account.account_type in ['ASSET', 'EXPENSE', 'COST_OF_GOODS_SOLD']:
+                    debit_balance = balance
+                    credit_balance = Decimal('0.00')
+                    total_debits += debit_balance
+                else:
+                    debit_balance = Decimal('0.00')
+                    credit_balance = balance
+                    total_credits += credit_balance
+            elif balance < 0:
+                if account.account_type in ['ASSET', 'EXPENSE', 'COST_OF_GOODS_SOLD']:
+                    debit_balance = Decimal('0.00')
+                    credit_balance = abs(balance)
+                    total_credits += credit_balance
+                else:
+                    debit_balance = abs(balance)
+                    credit_balance = Decimal('0.00')
+                    total_debits += debit_balance
+            else:
+                debit_balance = credit_balance = Decimal('0.00')
+
+            if debit_balance != 0 or credit_balance != 0:
+                trial_balance_data.append({
+                    'account_code': account.account_code,
+                    'account_name': account.account_name,
+                    'account_type': account.account_type,
+                    'debit_balance': float(debit_balance),
+                    'credit_balance': float(credit_balance)
+                })
+
+        return Response({
+            'trial_balance': trial_balance_data,
+            'total_debits': float(total_debits),
+            'total_credits': float(total_credits),
+            'is_balanced': abs(total_debits - total_credits) < 0.01
+        })
+
+class JournalEntryViewSet(viewsets.ModelViewSet):
+    queryset = JournalEntry.objects.all()
+    serializer_class = JournalEntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        account_id = self.request.query_params.get('account_id')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        
+        if account_id:
+            queryset = queryset.filter(account_id=account_id)
+        if date_from:
+            queryset = queryset.filter(transaction_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(transaction_date__lte=date_to)
+            
+        return queryset
+
+class JournalBatchViewSet(viewsets.ModelViewSet):
+    queryset = JournalBatch.objects.all()
+    serializer_class = JournalBatchSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['post'], url_path='post')
+    def post_batch(self, request, pk=None):
+        """Post a journal batch"""
+        batch = self.get_object()
+        if batch.status != 'DRAFT':
+            return Response({'error': 'Only draft batches can be posted'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        if not batch.is_balanced:
+            return Response({'error': 'Batch must be balanced before posting'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        batch.status = 'POSTED'
+        batch.posted_at = timezone.now()
+        batch.posted_by = request.user
+        batch.save()
+        
+        serializer = self.get_serializer(batch)
+        return Response(serializer.data)
+
+class BudgetViewSet(viewsets.ModelViewSet):
+    queryset = Budget.objects.all()
+    serializer_class = BudgetSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['get'], url_path='variance-report')
+    def variance_report(self, request, pk=None):
+        """Generate budget variance report"""
+        budget = self.get_object()
+        budget_lines = budget.budget_lines.all()
+        
+        variance_data = []
+        total_budgeted = Decimal('0.00')
+        total_actual = Decimal('0.00')
+        
+        for line in budget_lines:
+            # Calculate actual amount from journal entries
+            actual_amount = JournalEntry.objects.filter(
+                account=line.account,
+                transaction_date__gte=budget.start_date,
+                transaction_date__lte=budget.end_date
+            ).aggregate(
+                total=Sum('amount', filter=Q(entry_type='DEBIT')) - 
+                      Sum('amount', filter=Q(entry_type='CREDIT'))
+            )['total'] or Decimal('0.00')
+            
+            line.actual_amount = actual_amount
+            line.variance = actual_amount - line.budgeted_amount
+            line.save()
+            
+            variance_data.append({
+                'account_code': line.account.account_code,
+                'account_name': line.account.account_name,
+                'budgeted_amount': float(line.budgeted_amount),
+                'actual_amount': float(line.actual_amount),
+                'variance': float(line.variance),
+                'variance_percentage': line.variance_percentage
+            })
+            
+            total_budgeted += line.budgeted_amount
+            total_actual += line.actual_amount
+        
+        return Response({
+            'budget_name': budget.budget_name,
+            'period': f"{budget.start_date} to {budget.end_date}",
+            'variance_details': variance_data,
+            'total_budgeted': float(total_budgeted),
+            'total_actual': float(total_actual),
+            'total_variance': float(total_actual - total_budgeted)
+        })
+
+class FixedAssetViewSet(viewsets.ModelViewSet):
+    queryset = FixedAsset.objects.all()
+    serializer_class = FixedAssetSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='depreciation-schedule')
+    def depreciation_schedule(self, request):
+        """Generate depreciation schedule for all assets"""
+        assets = FixedAsset.objects.filter(status='ACTIVE')
+        schedule_data = []
+        
+        for asset in assets:
+            annual_depreciation = asset.annual_depreciation
+            remaining_years = max(0, asset.useful_life_years - 
+                                ((timezone.now().date() - asset.purchase_date).days // 365))
+            
+            schedule_data.append({
+                'asset_code': asset.asset_code,
+                'asset_name': asset.asset_name,
+                'purchase_cost': float(asset.purchase_cost),
+                'accumulated_depreciation': float(asset.accumulated_depreciation),
+                'net_book_value': float(asset.net_book_value),
+                'annual_depreciation': float(annual_depreciation),
+                'remaining_years': remaining_years
+            })
+        
+        return Response(schedule_data)
+
+class ExpenseReportViewSet(viewsets.ModelViewSet):
+    queryset = ExpenseReport.objects.all()
+    serializer_class = ExpenseReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(employee=self.request.user)
+        return queryset
+
+    @action(detail=True, methods=['post'], url_path='submit')
+    def submit_report(self, request, pk=None):
+        """Submit expense report for approval"""
+        report = self.get_object()
+        if report.status != 'DRAFT':
+            return Response({'error': 'Only draft reports can be submitted'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        report.status = 'SUBMITTED'
+        report.submitted_at = timezone.now()
+        report.save()
+        
+        serializer = self.get_serializer(report)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_report(self, request, pk=None):
+        """Approve expense report"""
+        report = self.get_object()
+        if report.status != 'SUBMITTED':
+            return Response({'error': 'Only submitted reports can be approved'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        report.status = 'APPROVED'
+        report.approved_by = request.user
+        report.approved_at = timezone.now()
+        report.save()
+        
+        serializer = self.get_serializer(report)
+        return Response(serializer.data)
+
+class FinanceDashboardViewSet(viewsets.ViewSet):
+    """Finance Dashboard with comprehensive analytics"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='overview')
+    def overview(self, request):
+        """Get finance dashboard overview"""
+        # Cash and bank balances
+        cash_accounts = ChartOfAccounts.objects.filter(
+            account_subtype='CASH', is_active=True
+        )
+        total_cash = sum(account.current_balance for account in cash_accounts)
+
+        # Accounts receivable
+        ar_accounts = ChartOfAccounts.objects.filter(
+            account_subtype='ACCOUNTS_RECEIVABLE', is_active=True
+        )
+        total_receivables = sum(account.current_balance for account in ar_accounts)
+
+        # Accounts payable
+        ap_accounts = ChartOfAccounts.objects.filter(
+            account_subtype='ACCOUNTS_PAYABLE', is_active=True
+        )
+        total_payables = sum(account.current_balance for account in ap_accounts)
+
+        # Revenue this month
+        current_month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        revenue_accounts = ChartOfAccounts.objects.filter(
+            account_type='REVENUE', is_active=True
+        )
+        monthly_revenue = Decimal('0.00')
+        for account in revenue_accounts:
+            revenue = JournalEntry.objects.filter(
+                account=account,
+                transaction_date__gte=current_month_start.date(),
+                entry_type='CREDIT'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            monthly_revenue += revenue
+
+        # Expenses this month
+        expense_accounts = ChartOfAccounts.objects.filter(
+            account_type='EXPENSE', is_active=True
+        )
+        monthly_expenses = Decimal('0.00')
+        for account in expense_accounts:
+            expenses = JournalEntry.objects.filter(
+                account=account,
+                transaction_date__gte=current_month_start.date(),
+                entry_type='DEBIT'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+            monthly_expenses += expenses
+
+        # Budget utilization
+        active_budgets = Budget.objects.filter(
+            status='ACTIVE',
+            start_date__lte=timezone.now().date(),
+            end_date__gte=timezone.now().date()
+        ).count()
+
+        return Response({
+            'cash_position': float(total_cash),
+            'accounts_receivable': float(total_receivables),
+            'accounts_payable': float(total_payables),
+            'monthly_revenue': float(monthly_revenue),
+            'monthly_expenses': float(monthly_expenses),
+            'net_income': float(monthly_revenue - monthly_expenses),
+            'active_budgets': active_budgets,
+            'currency': 'USD'  # Default currency
+        })
+
+    @action(detail=False, methods=['get'], url_path='financial-ratios')
+    def financial_ratios(self, request):
+        """Calculate key financial ratios"""
+        # Current assets and liabilities
+        current_assets = ChartOfAccounts.objects.filter(
+            account_subtype='CURRENT_ASSET', is_active=True
+        )
+        total_current_assets = sum(account.current_balance for account in current_assets)
+
+        current_liabilities = ChartOfAccounts.objects.filter(
+            account_subtype='CURRENT_LIABILITY', is_active=True
+        )
+        total_current_liabilities = sum(account.current_balance for account in current_liabilities)
+
+        # Calculate ratios
+        current_ratio = (total_current_assets / total_current_liabilities 
+                        if total_current_liabilities > 0 else 0)
+        
+        return Response({
+            'current_ratio': round(float(current_ratio), 2),
+            'total_current_assets': float(total_current_assets),
+            'total_current_liabilities': float(total_current_liabilities),
+            'working_capital': float(total_current_assets - total_current_liabilities)
+        })
+
+# Legacy ViewSets for backward compatibility
+class LegacyAccountViewSet(viewsets.ModelViewSet):
+    queryset = LegacyAccount.objects.all()
+    serializer_class = LegacyAccountSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class LegacyTransactionViewSet(viewsets.ModelViewSet):
+    queryset = LegacyTransaction.objects.all()
+    serializer_class = LegacyTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 class ReceivablesViewSet(viewsets.ViewSet):

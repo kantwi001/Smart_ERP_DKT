@@ -1,12 +1,13 @@
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from django.urls import path
-from .views import POSSessionViewSet, SaleViewSet, transactions_list
+from . import views
 
 router = DefaultRouter()
-router.register(r'sessions', POSSessionViewSet)
-router.register(r'sales', SaleViewSet)
+router.register(r'sessions', views.POSSessionViewSet)
+router.register(r'sales', views.SaleViewSet)
 
 urlpatterns = [
-    path('transactions/', transactions_list, name='transactions-list'),
+    path('', include(router.urls)),
+    path('products/', views.products_list, name='pos-products'),
+    path('transactions/', views.transactions_list, name='pos-transactions'),
 ]
-urlpatterns += router.urls

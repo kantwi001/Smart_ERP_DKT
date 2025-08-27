@@ -1,5 +1,5 @@
 // TransactionIntegration.js - Cross-module transaction integration widget
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -22,7 +22,16 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  TextField,
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper
 } from '@mui/material';
 import {
   TrendingUp,
@@ -38,9 +47,13 @@ import {
   Refresh,
   Visibility,
   Timeline,
-  Analytics
+  Analytics,
+  Payment,
+  PhotoCamera,
+  CheckCircle,
+  Cancel
 } from '@mui/icons-material';
-import { useTransactionIntegration } from '../hooks/useTransactionIntegration';
+import { getGlobalTransactionHistory, getGlobalPaymentHistory, addPayment, updatePaymentStatus, getTransactions } from '../sharedData';
 
 const moduleIcons = {
   sales: <TrendingUp />,
@@ -69,18 +82,65 @@ const moduleColors = {
 };
 
 const TransactionIntegration = ({ moduleId, title = "Transaction Integration" }) => {
-  const {
-    transactions,
-    analytics,
-    loading,
-    error,
-    refreshData,
-    clearError
-  } = useTransactionIntegration(moduleId);
-
+  const [transactions, setTransactions] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({
+    transaction_id: '',
+    amount: '',
+    payment_method: 'cash',
+    cheque_photo: null,
+    cheque_number: '',
+    notes: ''
+  });
+
+  useEffect(() => {
+    loadTransactionData();
+    
+    // Listen for transaction updates
+    const handleTransactionUpdate = () => {
+      loadTransactionData();
+    };
+    
+    const handlePaymentUpdate = () => {
+      loadTransactionData();
+    };
+    
+    const handleSalesTransactionUpdate = () => {
+      loadTransactionData();
+    };
+    
+    window.addEventListener('transactionHistoryUpdated', handleTransactionUpdate);
+    window.addEventListener('paymentHistoryUpdated', handlePaymentUpdate);
+    window.addEventListener('salesTransactionUpdated', handleSalesTransactionUpdate);
+    
+    return () => {
+      window.removeEventListener('transactionHistoryUpdated', handleTransactionUpdate);
+      window.removeEventListener('paymentHistoryUpdated', handlePaymentUpdate);
+      window.removeEventListener('salesTransactionUpdated', handleSalesTransactionUpdate);
+    };
+  }, []);
+
+  const loadTransactionData = () => {
+    try {
+      setLoading(true);
+      const transactionData = getTransactions();
+      const paymentData = getGlobalPaymentHistory();
+      
+      setTransactions(transactionData);
+      setPayments(paymentData);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load transaction data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -91,15 +151,55 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
     setDetailsOpen(true);
   };
 
-  const getTransactionIcon = (type) => {
-    if (type.includes('SALES')) return <TrendingUp color="success" />;
-    if (type.includes('PURCHASE')) return <ShoppingCart color="warning" />;
-    if (type.includes('PRODUCTION')) return <Factory color="secondary" />;
-    if (type.includes('INVENTORY')) return <Inventory color="primary" />;
-    if (type.includes('WAREHOUSE')) return <SwapHoriz color="info" />;
-    if (type.includes('PAYROLL')) return <People color="info" />;
-    if (type.includes('POS')) return <PointOfSale color="action" />;
-    return <Timeline color="action" />;
+  const handlePaymentSubmit = async () => {
+    try {
+      const paymentData = {
+        transaction_id: selectedTransaction.id,
+        invoice_reference: selectedTransaction.reference,
+        customer_id: selectedTransaction.customer_id,
+        customer_name: selectedTransaction.customer_name,
+        amount: parseFloat(paymentForm.amount),
+        payment_method: paymentForm.payment_method,
+        cheque_photo: paymentForm.cheque_photo,
+        cheque_number: paymentForm.cheque_number,
+        notes: paymentForm.notes
+      };
+
+      addPayment(paymentData);
+      
+      setPaymentDialogOpen(false);
+      setPaymentForm({
+        transaction_id: '',
+        amount: '',
+        payment_method: 'cash',
+        cheque_photo: null,
+        cheque_number: '',
+        notes: ''
+      });
+      
+      alert(`Payment submitted successfully! ${paymentForm.payment_method === 'cheque' ? 'Cheque is pending approval.' : 'Payment processed.'}`);
+    } catch (error) {
+      alert('Error submitting payment');
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPaymentForm({
+          ...paymentForm,
+          cheque_photo: e.target.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePaymentApproval = (paymentId, status) => {
+    updatePaymentStatus(paymentId, status, 'Collins Arku', `Payment ${status} by finance manager`);
+    alert(`Payment ${status} successfully!`);
   };
 
   const formatCurrency = (amount) => {
@@ -129,7 +229,7 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
           <Alert 
             severity="error" 
             action={
-              <Button color="inherit" size="small" onClick={clearError}>
+              <Button color="inherit" size="small" onClick={() => setError(null)}>
                 Dismiss
               </Button>
             }
@@ -149,7 +249,7 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
             {title}
           </Typography>
           <Tooltip title="Refresh transaction data">
-            <IconButton onClick={refreshData} disabled={loading}>
+            <IconButton onClick={loadTransactionData} disabled={loading}>
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -160,7 +260,6 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
         <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
           <Tab label="Recent Transactions" />
           <Tab label="Analytics" />
-          <Tab label="Module Connections" />
         </Tabs>
 
         {/* Recent Transactions Tab */}
@@ -188,16 +287,16 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
                     }}
                   >
                     <ListItemIcon>
-                      {getTransactionIcon(transaction.type)}
+                      <TrendingUp color={transaction.status === 'completed' ? 'success' : 'warning'} />
                     </ListItemIcon>
                     <ListItemText
                       primary={
                         <Box display="flex" alignItems="center" gap={1}>
                           <Typography variant="body2" fontWeight="medium">
-                            {transaction.type?.replace(/_/g, ' ') || 'Transaction'}
+                            {transaction.reference} - {transaction.customer_name}
                           </Typography>
                           <Chip
-                            label={transaction.status || 'pending'}
+                            label={transaction.status}
                             size="small"
                             color={getStatusColor(transaction.status)}
                             variant="outlined"
@@ -207,32 +306,33 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
                       secondary={
                         <Box>
                           <Typography variant="caption" color="textSecondary">
-                            {formatDateTime(transaction.timestamp)}
+                            {transaction.date} - {transaction.payment_method}
                           </Typography>
-                          {transaction.data?.amount && (
-                            <Typography variant="caption" display="block">
-                              Amount: {formatCurrency(transaction.data.amount)}
-                            </Typography>
-                          )}
+                          <Typography variant="caption" display="block">
+                            Amount: {formatCurrency(transaction.amount)}
+                          </Typography>
                         </Box>
                       }
                     />
-                    <Box display="flex" alignItems="center" gap={1}>
-                      {transaction.targets?.map((target, idx) => (
-                        <Tooltip key={idx} title={`Affects ${target}`}>
-                          <Chip
-                            icon={moduleIcons[target]}
-                            label={target}
-                            size="small"
-                            variant="outlined"
-                            sx={{
-                              borderColor: moduleColors[target],
-                              color: moduleColors[target]
-                            }}
-                          />
-                        </Tooltip>
-                      ))}
-                    </Box>
+                    {transaction.status === 'pending' && transaction.payment_method === 'credit' && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Payment />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTransaction(transaction);
+                          setPaymentForm({
+                            ...paymentForm,
+                            transaction_id: transaction.id,
+                            amount: transaction.amount
+                          });
+                          setPaymentDialogOpen(true);
+                        }}
+                      >
+                        Pay
+                      </Button>
+                    )}
                   </ListItem>
                 ))}
               </List>
@@ -246,12 +346,12 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
             <Grid item xs={6}>
               <Card variant="outlined">
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <TrendingDown color="primary" sx={{ fontSize: 40 }} />
-                  <Typography variant="h4" color="primary">
-                    {analytics.incoming_transactions}
+                  <TrendingUp color="success" sx={{ fontSize: 40 }} />
+                  <Typography variant="h4" color="success.main">
+                    {transactions.filter(t => t.status === 'completed').length}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    Incoming Transactions
+                    Completed Sales
                   </Typography>
                 </CardContent>
               </Card>
@@ -259,12 +359,12 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
             <Grid item xs={6}>
               <Card variant="outlined">
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <TrendingUp color="success.main" sx={{ fontSize: 40 }} />
-                  <Typography variant="h4" color="success.main">
-                    {analytics.outgoing_transactions}
+                  <TrendingDown color="warning" sx={{ fontSize: 40 }} />
+                  <Typography variant="h4" color="warning.main">
+                    {transactions.filter(t => t.status === 'pending').length}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    Outgoing Transactions
+                    Pending Receivables
                   </Typography>
                 </CardContent>
               </Card>
@@ -272,9 +372,9 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
             <Grid item xs={12}>
               <Card variant="outlined">
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <AccountBalance color="warning.main" sx={{ fontSize: 40 }} />
-                  <Typography variant="h4" color="warning.main">
-                    {formatCurrency(analytics.total_value)}
+                  <AccountBalance color="primary" sx={{ fontSize: 40 }} />
+                  <Typography variant="h4" color="primary">
+                    {formatCurrency(transactions.reduce((acc, t) => acc + t.amount, 0))}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
                     Total Transaction Value
@@ -285,60 +385,87 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
           </Grid>
         )}
 
-        {/* Module Connections Tab */}
-        {tabValue === 2 && (
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Top Source Modules
-            </Typography>
-            <Box mb={2}>
-              {analytics.top_sources?.length > 0 ? (
-                analytics.top_sources.map((source, index) => (
-                  <Chip
-                    key={index}
-                    icon={moduleIcons[source.module]}
-                    label={`${source.module} (${source.count})`}
-                    sx={{
-                      m: 0.5,
-                      backgroundColor: moduleColors[source.module] + '20',
-                      borderColor: moduleColors[source.module]
-                    }}
-                    variant="outlined"
-                  />
-                ))
-              ) : (
-                <Typography variant="body2" color="textSecondary">
-                  No source connections
-                </Typography>
+        {/* Payment Dialog */}
+        <Dialog open={paymentDialogOpen} onClose={() => setPaymentDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Submit Payment</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Amount"
+                  type="number"
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Payment Method"
+                  value={paymentForm.payment_method}
+                  onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
+                >
+                  <MenuItem value="cash">Cash</MenuItem>
+                  <MenuItem value="cheque">Cheque</MenuItem>
+                  <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+                </TextField>
+              </Grid>
+              {paymentForm.payment_method === 'cheque' && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Cheque Number"
+                      value={paymentForm.cheque_number}
+                      onChange={(e) => setPaymentForm({...paymentForm, cheque_number: e.target.value})}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<PhotoCamera />}
+                      fullWidth
+                    >
+                      Upload Cheque Photo
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                      />
+                    </Button>
+                    {paymentForm.cheque_photo && (
+                      <Box mt={2}>
+                        <img
+                          src={paymentForm.cheque_photo}
+                          alt="Cheque"
+                          style={{ width: '100%', maxHeight: '200px', objectFit: 'contain' }}
+                        />
+                      </Box>
+                    )}
+                  </Grid>
+                </>
               )}
-            </Box>
-
-            <Typography variant="subtitle2" gutterBottom>
-              Top Target Modules
-            </Typography>
-            <Box>
-              {analytics.top_targets?.length > 0 ? (
-                analytics.top_targets.map((target, index) => (
-                  <Chip
-                    key={index}
-                    icon={moduleIcons[target.module]}
-                    label={`${target.module} (${target.count})`}
-                    sx={{
-                      m: 0.5,
-                      backgroundColor: moduleColors[target.module] + '20',
-                      borderColor: moduleColors[target.module]
-                    }}
-                    variant="outlined"
-                  />
-                ))
-              ) : (
-                <Typography variant="body2" color="textSecondary">
-                  No target connections
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        )}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Notes"
+                  multiline
+                  rows={3}
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handlePaymentSubmit}>Submit Payment</Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Transaction Details Dialog */}
         <Dialog
@@ -355,28 +482,28 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
               <Box>
                 <Grid container spacing={2}>
                   <Grid item xs={6}>
-                    <Typography variant="subtitle2">Transaction ID</Typography>
+                    <Typography variant="subtitle2">Transaction Reference</Typography>
                     <Typography variant="body2" gutterBottom>
-                      {selectedTransaction.id}
+                      {selectedTransaction.reference}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
-                    <Typography variant="subtitle2">Type</Typography>
+                    <Typography variant="subtitle2">Customer</Typography>
                     <Typography variant="body2" gutterBottom>
-                      {selectedTransaction.type?.replace(/_/g, ' ')}
+                      {selectedTransaction.customer_name}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
-                    <Typography variant="subtitle2">Source Module</Typography>
-                    <Chip
-                      icon={moduleIcons[selectedTransaction.source]}
-                      label={selectedTransaction.source}
-                      sx={{
-                        backgroundColor: moduleColors[selectedTransaction.source] + '20',
-                        borderColor: moduleColors[selectedTransaction.source]
-                      }}
-                      variant="outlined"
-                    />
+                    <Typography variant="subtitle2">Amount</Typography>
+                    <Typography variant="body2" gutterBottom>
+                      {formatCurrency(selectedTransaction.amount)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="subtitle2">Payment Method</Typography>
+                    <Typography variant="body2" gutterBottom>
+                      {selectedTransaction.payment_method}
+                    </Typography>
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="subtitle2">Status</Typography>
@@ -385,38 +512,36 @@ const TransactionIntegration = ({ moduleId, title = "Transaction Integration" })
                       color={getStatusColor(selectedTransaction.status)}
                     />
                   </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2">Target Modules</Typography>
-                    <Box mt={1}>
-                      {selectedTransaction.targets?.map((target, idx) => (
-                        <Chip
-                          key={idx}
-                          icon={moduleIcons[target]}
-                          label={target}
-                          sx={{
-                            m: 0.5,
-                            backgroundColor: moduleColors[target] + '20',
-                            borderColor: moduleColors[target]
-                          }}
-                          variant="outlined"
-                        />
-                      ))}
-                    </Box>
+                  <Grid item xs={6}>
+                    <Typography variant="subtitle2">Date</Typography>
+                    <Typography variant="body2" gutterBottom>
+                      {selectedTransaction.date}
+                    </Typography>
                   </Grid>
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2">Transaction Data</Typography>
-                    <Box
-                      component="pre"
-                      sx={{
-                        backgroundColor: 'grey.100',
-                        p: 2,
-                        borderRadius: 1,
-                        overflow: 'auto',
-                        fontSize: '0.875rem'
-                      }}
-                    >
-                      {JSON.stringify(selectedTransaction.data, null, 2)}
-                    </Box>
+                    <Typography variant="subtitle2">Products</Typography>
+                    <TableContainer component={Paper} sx={{ mt: 1 }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Product</TableCell>
+                            <TableCell>Quantity</TableCell>
+                            <TableCell>Unit Price</TableCell>
+                            <TableCell>Total</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {selectedTransaction.products?.map((product, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{product.product_name}</TableCell>
+                              <TableCell>{product.quantity}</TableCell>
+                              <TableCell>{formatCurrency(product.unit_price)}</TableCell>
+                              <TableCell>{formatCurrency(product.total)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   </Grid>
                 </Grid>
               </Box>

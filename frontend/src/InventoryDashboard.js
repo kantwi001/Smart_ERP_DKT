@@ -8,7 +8,6 @@ import { styled } from '@mui/material/styles';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import PeopleIcon from '@mui/icons-material/People';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import WarningIcon from '@mui/icons-material/Warning';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
@@ -18,6 +17,39 @@ import StorageIcon from '@mui/icons-material/Storage';
 import AddIcon from '@mui/icons-material/Add';
 import api from './api';
 import { AuthContext } from './AuthContext';
+import { 
+  loadWarehousesWithFallback, 
+  loadProductsWithFallback, 
+  getGlobalProducts, 
+  getGlobalTransferHistory
+} from './sharedData';
+import offlineStorage from './utils/offlineStorage';
+
+// Sample product data - Starting with zero inventory for testing
+const sampleProducts = [
+  { id: 1, name: 'Samsung Galaxy S23', sku: 'SGS23-001', quantity: 0, unit_price: 2500.00, category: 'Smartphones', reorder_level: 10 },
+  { id: 2, name: 'iPhone 15 Pro', sku: 'IP15P-002', quantity: 0, unit_price: 3200.00, category: 'Smartphones', reorder_level: 8 },
+  { id: 3, name: 'MacBook Air M2', sku: 'MBA-M2-003', quantity: 0, unit_price: 4500.00, category: 'Laptops', reorder_level: 5 },
+  { id: 4, name: 'Dell XPS 13', sku: 'DXP13-004', quantity: 0, unit_price: 3800.00, category: 'Laptops', reorder_level: 6 },
+  { id: 5, name: 'HP Pavilion 15', sku: 'HPP15-005', quantity: 0, unit_price: 2200.00, category: 'Laptops', reorder_level: 8 },
+  { id: 6, name: 'iPad Pro 12.9', sku: 'IPP129-006', quantity: 0, unit_price: 3500.00, category: 'Tablets', reorder_level: 5 },
+  { id: 7, name: 'Surface Laptop 5', sku: 'SL5-007', quantity: 0, unit_price: 4200.00, category: 'Laptops', reorder_level: 4 },
+  { id: 8, name: 'AirPods Pro', sku: 'APP-008', quantity: 0, unit_price: 850.00, category: 'Accessories', reorder_level: 15 },
+  { id: 9, name: 'Samsung Watch 6', sku: 'SW6-009', quantity: 0, unit_price: 1200.00, category: 'Wearables', reorder_level: 8 },
+  { id: 10, name: 'Gaming Monitor 27"', sku: 'GM27-010', quantity: 0, unit_price: 1800.00, category: 'Monitors', reorder_level: 3 }
+];
+
+// Empty stock movements - Start with clean slate for testing
+const sampleStockMovements = [];
+
+// Sample warehouse data
+const sampleWarehouses = [
+  { id: 1, name: 'Main Warehouse', location: 'Accra Central', capacity: 10000 },
+  { id: 2, name: 'Branch A', location: 'Kumasi', capacity: 5000 },
+  { id: 3, name: 'Branch B', location: 'Tamale', capacity: 3000 },
+  { id: 4, name: 'Branch C', location: 'Cape Coast', capacity: 4000 },
+  { id: 5, name: 'Supplier Warehouse', location: 'Tema Port', capacity: 15000 }
+];
 
 // Styled components for modern design
 const StyledTabs = styled(Tabs)(({ theme }) => ({
@@ -85,16 +117,17 @@ function TabPanel({ children, value, index, ...other }) {
 const InventoryDashboard = () => {
   const { token } = useContext(AuthContext);
   const [tabValue, setTabValue] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Set to false to show data immediately
   const [error, setError] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [stockMovements, setStockMovements] = useState([]);
+  const [products, setProducts] = useState([]); // Initialize empty, will load from global state
+  const [stockMovements, setStockMovements] = useState(sampleStockMovements); // Initialize with sample movements
   const [lowStockItems, setLowStockItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [pendingTransfers, setPendingTransfers] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
+  const [warehouses, setWarehouses] = useState([]); // Initialize empty, will load from shared data
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   
   const [warehouseTransferOpen, setWarehouseTransferOpen] = useState(false);
   const [transferForm, setTransferForm] = useState({
@@ -104,51 +137,248 @@ const InventoryDashboard = () => {
     toWarehouse: ''
   });
 
-  // Fetch dashboard data
+  // Enhanced data fetching with shared data fallback
   const fetchDashboardData = React.useCallback(async () => {
     try {
       setLoading(true);
-      const [productsRes, movementsRes, categoriesRes, warehousesRes] = await Promise.all([
-        api.get('/inventory/products/', { headers: { Authorization: `Bearer ${token}` } }).catch(e => ({ data: [] })),
-        api.get('/inventory/stock-movements/', { headers: { Authorization: `Bearer ${token}` } }).catch(e => ({ data: [] })),
-        api.get('/inventory/categories/', { headers: { Authorization: `Bearer ${token}` } }).catch(e => ({ data: [] })),
-        api.get('/warehouse/', { headers: { Authorization: `Bearer ${token}` } }).catch(e => ({ data: [] }))
+      
+      // Load products and warehouses using global state
+      const [productsData, warehousesData] = await Promise.all([
+        loadProductsWithFallback(api),
+        loadWarehousesWithFallback(api)
       ]);
       
-      setProducts(productsRes.data || []);
-      setStockMovements(movementsRes.data || []);
-      setCategories(categoriesRes.data || []);
-      setWarehouses(warehousesRes.data || []);
-      setLowStockItems(productsRes.data?.filter(p => p.quantity < 10) || []);
-      setLowStockProducts(productsRes.data?.filter(p => p.quantity < (p.reorder_level || 10)) || []);
+      // Use global products to ensure sync across modules
+      setProducts(getGlobalProducts());
+      setWarehouses(warehousesData);
       
-      try {
-        const transfersRes = await api.get('/inventory/transfers/', { 
-          headers: { Authorization: `Bearer ${token}` },
-          params: { status: 'pending' }
-        });
-        setPendingTransfers(transfersRes.data || []);
-      } catch (err) {
-        setPendingTransfers([]);
-      }
+      // Load transfer history as stock movements
+      const transferHistory = getGlobalTransferHistory();
+      setStockMovements(transferHistory);
       
-      const recentMovements = movementsRes.data?.slice(0, 5).map(movement => ({
-        action: `${movement.movement_type || 'Stock movement'}: ${movement.product_name || 'Product'} - ${movement.quantity || 0} units`,
-        timestamp: movement.created_at ? new Date(movement.created_at).toLocaleString() : 'Unknown time',
-        type: movement.movement_type === 'IN' ? 'success' : movement.movement_type === 'OUT' ? 'warning' : 'info'
-      })) || [];
+      // Update derived state based on current products
+      const currentProducts = getGlobalProducts();
+      setLowStockItems(currentProducts.filter(p => (p.quantity || 0) < 10));
+      setLowStockProducts(currentProducts.filter(p => (p.quantity || 0) < (p.reorder_level || 10)));
+      setPendingTransfers(transferHistory.filter(m => m.status === 'pending'));
+      setCategories([]);
       
-      setRecentActivity(recentMovements);
-    } catch (err) {
-      setError('Failed to load inventory data');
+      console.log('[Inventory Dashboard] Loaded data:', {
+        products: getGlobalProducts().length,
+        warehouses: warehousesData.length,
+        transfers: transferHistory.length
+      });
+      
+    } catch (error) {
+      console.error('[Inventory Dashboard] Error loading data:', error);
+      // Fallback to global state
+      setProducts(getGlobalProducts());
+      setWarehouses([]);
+      setStockMovements(getGlobalTransferHistory());
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
+
+  // Listen for global product updates
+  useEffect(() => {
+    const handleProductsUpdate = (event) => {
+      const updatedProducts = event.detail;
+      setProducts(updatedProducts);
+      
+      // Update derived state when products change
+      setLowStockItems(updatedProducts.filter(p => (p.quantity || 0) < 10));
+      setLowStockProducts(updatedProducts.filter(p => (p.quantity || 0) < (p.reorder_level || 10)));
+      
+      console.log('[Inventory Dashboard] Products updated from global state:', updatedProducts.length);
+    };
+
+    window.addEventListener('productsUpdated', handleProductsUpdate);
+    return () => window.removeEventListener('productsUpdated', handleProductsUpdate);
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  const handleTransferAction = async (id, action) => {
+    try {
+      const response = await api.put(`/inventory/transfers/${id}/`, {
+        status: action === 'accept' ? 'accepted' : 'rejected'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log('Transfer updated:', response.data);
+      fetchDashboardData();
+    } catch (err) {
+      console.log('Error updating transfer:', err);
+    }
+  };
+
+  const handleAcceptTransfer = async (movement) => {
+    try {
+      const updatedMovement = { 
+        ...movement, 
+        status: 'accepted',
+        approved_by: 'Collins Arku',
+        approved_at: new Date().toISOString(),
+        notes: movement.notes + ' - Transfer approved'
+      };
+      const updatedMovements = stockMovements.map(m => m.id === movement.id ? updatedMovement : m);
+      setStockMovements(updatedMovements);
+
+      // Update product quantity
+      const productIndex = products.findIndex(p => p.sku === movement.product_sku);
+      if (productIndex !== -1) {
+        const updatedProduct = { ...products[productIndex] };
+        if (movement.movement_type === 'TRANSFER_IN') {
+          updatedProduct.quantity += movement.quantity;
+        } else if (movement.movement_type === 'TRANSFER_OUT') {
+          updatedProduct.quantity -= movement.quantity;
+        }
+        const updatedProducts = [...products];
+        updatedProducts[productIndex] = updatedProduct;
+        setProducts(updatedProducts);
+      }
+      
+      console.log('Transfer accepted:', updatedMovement);
+      console.log('Updated movements:', updatedMovements);
+    } catch (err) {
+      console.log('Error accepting transfer:', err);
+    }
+  };
+
+  const handleRejectTransfer = async (movement) => {
+    try {
+      const rejectionReason = prompt('Please provide a reason for rejection:') || 'No reason provided';
+      const updatedMovement = { 
+        ...movement, 
+        status: 'rejected',
+        rejected_by: 'Collins Arku',
+        rejected_at: new Date().toISOString(),
+        rejection_reason: rejectionReason,
+        notes: movement.notes + ' - Transfer rejected'
+      };
+      const updatedMovements = stockMovements.map(m => m.id === movement.id ? updatedMovement : m);
+      setStockMovements(updatedMovements);
+      
+      console.log('Transfer rejected:', updatedMovement);
+      console.log('Updated movements:', updatedMovements);
+    } catch (err) {
+      console.log('Error rejecting transfer:', err);
+    }
+  };
+
+  const handleTransferStock = async () => {
+    try {
+      if (!transferForm.product || !transferForm.quantity || !transferForm.fromWarehouse || !transferForm.toWarehouse) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      if (transferForm.fromWarehouse === transferForm.toWarehouse) {
+        alert('Source and destination warehouses must be different');
+        return;
+      }
+
+      const selectedProduct = products.find(p => p.id === parseInt(transferForm.product));
+      const transferQuantity = parseInt(transferForm.quantity);
+      
+      if (!selectedProduct) {
+        alert('Selected product not found');
+        return;
+      }
+
+      // Check if sufficient stock is available
+      if (selectedProduct.quantity < transferQuantity) {
+        alert(`Insufficient stock! Available: ${selectedProduct.quantity}, Requested: ${transferQuantity}`);
+        return;
+      }
+
+      if (transferQuantity <= 0) {
+        alert('Transfer quantity must be greater than 0');
+        return;
+      }
+
+      // Find warehouse names
+      const fromWarehouse = warehouses.find(w => w.id === parseInt(transferForm.fromWarehouse));
+      const toWarehouse = warehouses.find(w => w.id === parseInt(transferForm.toWarehouse));
+
+      // Create transfer record
+      const transferData = {
+        product: selectedProduct.name,
+        productSku: selectedProduct.sku,
+        quantity: transferQuantity,
+        from: fromWarehouse?.name || 'Unknown',
+        to: toWarehouse?.name || 'Unknown',
+        status: 'pending',
+        transferType: 'inter_warehouse',
+        requestedBy: 'Collins Arku',
+        approvedBy: null,
+        notes: transferForm.notes || `Transfer ${selectedProduct.name} from ${fromWarehouse?.name} to ${toWarehouse?.name}`
+      };
+
+      let newTransfer;
+
+      // Check if online or offline
+      if (navigator.onLine) {
+        try {
+          // Try to create online first
+          newTransfer = await api.post('/inventory/transfers/', transferData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          setSnackbar({
+            open: true,
+            message: `Transfer initiated successfully!`,
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Online creation failed, saving offline:', error);
+          // Fallback to offline storage
+          newTransfer = offlineStorage.addTransfer(transferData);
+          
+          setSnackbar({
+            open: true,
+            message: `Transfer saved offline - will sync when connection is restored`,
+            severity: 'warning'
+          });
+        }
+      } else {
+        // Save offline when no connection
+        newTransfer = offlineStorage.addTransfer(transferData);
+        
+        setSnackbar({
+          open: true,
+          message: `Transfer saved offline - will sync when connection is restored`,
+          severity: 'info'
+        });
+      }
+
+      // Add to transfer history
+      const updatedMovements = [...stockMovements, newTransfer];
+      setStockMovements(updatedMovements);
+
+      alert('Stock transfer initiated successfully! Awaiting approval.');
+      
+      setWarehouseTransferOpen(false);
+      
+      // Reset form
+      setTransferForm({
+        product: '',
+        quantity: '',
+        fromWarehouse: '',
+        toWarehouse: '',
+        notes: ''
+      });
+
+      // Refresh data
+      fetchDashboardData();
+    } catch (error) {
+      console.error('Transfer stock error:', error);
+      alert('Failed to initiate stock transfer. Please try again.');
+    }
+  };
 
   return (
     <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', p: 0 }}>
@@ -202,7 +432,7 @@ const InventoryDashboard = () => {
           variant="fullWidth"
         >
           <StyledTab icon={<TrendingUpIcon />} label="Overview" />
-          <StyledTab icon={<CategoryIcon />} label="Products" />
+          <StyledTab icon={<CategoryIcon />} label="Stock Levels" />
           <StyledTab icon={<SwapHorizIcon />} label="Movements" />
           <StyledTab icon={<AssessmentIcon />} label="Analytics" />
         </StyledTabs>
@@ -233,25 +463,6 @@ const InventoryDashboard = () => {
                       }}
                     >
                       Transfer Stock
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<AddIcon />}
-                      onClick={() => window.location.href = '/inventory/management'}
-                      sx={{
-                        borderColor: '#9C27B0',
-                        color: '#9C27B0',
-                        '&:hover': { 
-                          borderColor: '#7B1FA2',
-                          color: '#7B1FA2',
-                          bgcolor: 'rgba(156, 39, 176, 0.04)'
-                        },
-                        borderRadius: 2,
-                        px: 3,
-                        py: 1.5
-                      }}
-                    >
-                      Add Product
                     </Button>
                     <Button
                       variant="outlined"
@@ -294,20 +505,74 @@ const InventoryDashboard = () => {
                 </CardContent>
               </MetricCard>
             </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard>
+                <CardContent>
+                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                    <Box>
+                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Total Stock Units</Typography>
+                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
+                        {products.reduce((total, product) => total + (product.quantity || 0), 0)}
+                      </Typography>
+                    </Box>
+                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                      <StorageIcon sx={{ fontSize: 28 }} />
+                    </Avatar>
+                  </Box>
+                </CardContent>
+              </MetricCard>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard>
+                <CardContent>
+                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                    <Box>
+                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Pending Transfers</Typography>
+                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
+                        {stockMovements.filter(m => m.status === 'pending').length}
+                      </Typography>
+                    </Box>
+                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                      <SwapHorizIcon sx={{ fontSize: 28 }} />
+                    </Avatar>
+                  </Box>
+                </CardContent>
+              </MetricCard>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard>
+                <CardContent>
+                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                    <Box>
+                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Low Stock Items</Typography>
+                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
+                        {products.filter(p => (p.quantity || 0) <= (p.reorder_level || 10)).length}
+                      </Typography>
+                    </Box>
+                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                      <WarningIcon sx={{ fontSize: 28 }} />
+                    </Avatar>
+                  </Box>
+                </CardContent>
+              </MetricCard>
+            </Grid>
           </Grid>
         </TabPanel>
 
-        {/* Products Tab */}
+        {/* Stock Levels Tab */}
         <TabPanel value={tabValue} index={1}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Product Overview</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Stock Availability</Typography>
                   <Divider sx={{ mb: 2 }} />
                   {products.length > 0 ? (
                     <List sx={{ py: 0 }}>
-                      {products.slice(0, 10).map((product, idx) => (
+                      {products.map((product, idx) => (
                         <ListItem key={idx} sx={{ px: 0, py: 1 }}>
                           <ListItemText 
                             primary={product.name || `Product ${idx + 1}`}
@@ -337,11 +602,100 @@ const InventoryDashboard = () => {
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Stock Movements</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <SwapHorizIcon sx={{ mr: 1, color: '#9C27B0' }} />
+                    Stock Movements & Transfer Management
+                  </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  <Alert severity="info" sx={{ borderRadius: 2 }}>
-                    Stock movements will be displayed here.
-                  </Alert>
+                  
+                  {console.log('Current stockMovements state:', stockMovements)}
+                  {console.log('stockMovements length:', stockMovements?.length)}
+                  {console.log('sampleStockMovements:', sampleStockMovements)}
+                  {(stockMovements && stockMovements.length > 0) || sampleStockMovements.length > 0 ? (
+                    <Box>
+                      {/* Use stockMovements if available, otherwise use sampleStockMovements */}
+                      {(() => {
+                        const movements = stockMovements.length > 0 ? stockMovements : sampleStockMovements;
+                        return (
+                          <React.Fragment>
+                            {/* Pending Transfers Section */}
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#FF9800' }}>
+                              Pending Transfers ({movements.filter(m => m.status === 'pending').length})
+                            </Typography>
+                            
+                            {movements.filter(m => m.status === 'pending').map((movement) => (
+                              <Paper key={movement.id} sx={{ p: 2, mb: 2, border: '1px solid #FF9800', borderRadius: 2 }}>
+                                <Grid container spacing={2} alignItems="center">
+                                  <Grid item xs={12} md={6}>
+                                    <Box>
+                                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                        {movement.product_name}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        SKU: {movement.product_sku} | Quantity: {movement.quantity} units
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {movement.movement_type === 'TRANSFER_IN' ? 
+                                          `From: ${movement.from_warehouse} → To: ${movement.to_warehouse}` :
+                                          `From: ${movement.from_warehouse} → To: ${movement.to_warehouse}`
+                                        }
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                                        Requested by: {movement.requested_by} | {new Date(movement.created_at).toLocaleString()}
+                                      </Typography>
+                                      {movement.notes && (
+                                        <Typography variant="caption" color="text.secondary" display="block">
+                                          Notes: {movement.notes}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <Chip 
+                                      icon={movement.movement_type === 'TRANSFER_IN' ? <TrendingUpIcon /> : <SwapHorizIcon />}
+                                      label={movement.movement_type === 'TRANSFER_IN' ? 'Incoming' : 'Outgoing'}
+                                      color={movement.movement_type === 'TRANSFER_IN' ? 'success' : 'primary'}
+                                      variant="outlined"
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'row', md: 'column' } }}>
+                                      <Button
+                                        variant="contained"
+                                        color="success"
+                                        size="small"
+                                        startIcon={<TrendingUpIcon />}
+                                        onClick={() => handleAcceptTransfer(movement)}
+                                        sx={{ minWidth: 80 }}
+                                      >
+                                        Accept
+                                      </Button>
+                                      <Button
+                                        variant="contained"
+                                        color="error"
+                                        size="small"
+                                        startIcon={<WarningIcon />}
+                                        onClick={() => handleRejectTransfer(movement)}
+                                        sx={{ minWidth: 80 }}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </Box>
+                                  </Grid>
+                                </Grid>
+                              </Paper>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })()}
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Typography variant="h6" sx={{ opacity: 0.8 }}>
+                        No stock movement data available
+                      </Typography>
+                    </Box>
+                  )}
                 </CardContent>
               </AnalyticsCard>
             </Grid>
@@ -379,18 +733,38 @@ const InventoryDashboard = () => {
                     {/* Value Breakdown by Category */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       {[
-                        { category: 'Condoms', value: 45000, percentage: 35, color: '#4CAF50' },
-                        { category: 'Contraceptives', value: 38000, percentage: 30, color: '#2196F3' },
-                        { category: 'Medical Supplies', value: 25000, percentage: 20, color: '#FF9800' },
-                        { category: 'Other Products', value: 19000, percentage: 15, color: '#9C27B0' }
+                        { 
+                          status: 'Smartphones', 
+                          count: products.filter(p => p.category === 'Smartphones').length, 
+                          percentage: Math.round((products.filter(p => p.category === 'Smartphones').length / Math.max(products.length, 1)) * 100), 
+                          color: '#4CAF50' 
+                        },
+                        { 
+                          status: 'Laptops', 
+                          count: products.filter(p => p.category === 'Laptops').length, 
+                          percentage: Math.round((products.filter(p => p.category === 'Laptops').length / Math.max(products.length, 1)) * 100), 
+                          color: '#2196F3' 
+                       },
+                        { 
+                          status: 'Tablets', 
+                          count: products.filter(p => p.category === 'Tablets').length, 
+                          percentage: Math.round((products.filter(p => p.category === 'Tablets').length / Math.max(products.length, 1)) * 100), 
+                          color: '#FF9800' 
+                        },
+                        { 
+                          status: 'Other Products', 
+                          count: products.filter(p => p.category !== 'Smartphones' && p.category !== 'Laptops' && p.category !== 'Tablets').length, 
+                          percentage: Math.round((products.filter(p => p.category !== 'Smartphones' && p.category !== 'Laptops' && p.category !== 'Tablets').length / Math.max(products.length, 1)) * 100), 
+                          color: '#9C27B0' 
+                        }
                       ].map((item, idx) => (
-                        <Box key={item.category}>
+                        <Box key={item.status}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {item.category}
+                              {item.status}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              GHS {item.value.toLocaleString()}
+                              {item.count} products
                             </Typography>
                           </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -399,8 +773,8 @@ const InventoryDashboard = () => {
                                 variant="determinate" 
                                 value={item.percentage} 
                                 sx={{ 
-                                  height: 6, 
-                                  borderRadius: 3,
+                                  height: 8, 
+                                  borderRadius: 4,
                                   '& .MuiLinearProgress-bar': { bgcolor: item.color }
                                 }}
                               />
@@ -460,37 +834,30 @@ const InventoryDashboard = () => {
                     </Box>
                     
                     {/* Movement Summary */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
-                        <Typography variant="h5">330</Typography>
-                        <Typography variant="caption">Weekly Movements</Typography>
-                      </Paper>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
-                        <Typography variant="h5">47</Typography>
-                        <Typography variant="caption">Daily Average</Typography>
-                      </Paper>
-                    </Box>
-
-                    {/* Movement Types */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
-                          185 IN
-                        </Typography>
-                        <Typography variant="caption">Stock In</Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="error.main" sx={{ fontWeight: 600 }}>
-                          145 OUT
-                        </Typography>
-                        <Typography variant="caption">Stock Out</Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600 }}>
-                          12 ADJ
-                        </Typography>
-                        <Typography variant="caption">Adjustments</Typography>
-                      </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {[
+                        { metric: 'Days Sales Outstanding', value: '58 days', performance: 78 },
+                        { metric: 'Stock Accuracy', value: '96.5%', performance: 96 },
+                        { metric: 'Order Fulfillment Rate', value: '94.2%', performance: 94 },
+                        { metric: 'Carrying Cost Ratio', value: '12.3%', performance: 88 }
+                      ].map((item, idx) => (
+                        <Box key={item.metric}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.metric}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {item.value}
+                            </Typography>
+                          </Box>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={item.performance} 
+                            sx={{ height: 6, borderRadius: 3 }}
+                            color={item.performance >= 90 ? 'success' : item.performance >= 80 ? 'primary' : 'warning'}
+                          />
+                        </Box>
+                      ))}
                     </Box>
                   </Box>
                 </CardContent>
@@ -515,20 +882,20 @@ const InventoryDashboard = () => {
                       {[
                         { 
                           status: 'In Stock', 
-                          count: products.filter(p => p.quantity > 20).length, 
-                          percentage: Math.round((products.filter(p => p.quantity > 20).length / Math.max(products.length, 1)) * 100), 
+                          count: products.filter(p => (p.quantity || 0) > (p.reorder_level || 10)).length, 
+                          percentage: Math.round((products.filter(p => (p.quantity || 0) > (p.reorder_level || 10)).length / Math.max(products.length, 1)) * 100), 
                           color: '#4CAF50' 
                         },
                         { 
                           status: 'Low Stock', 
-                          count: lowStockProducts.length, 
-                          percentage: Math.round((lowStockProducts.length / Math.max(products.length, 1)) * 100), 
+                          count: products.filter(p => (p.quantity || 0) <= (p.reorder_level || 10) && (p.quantity || 0) > 0).length, 
+                          percentage: Math.round((products.filter(p => (p.quantity || 0) <= (p.reorder_level || 10) && (p.quantity || 0) > 0).length / Math.max(products.length, 1)) * 100), 
                           color: '#FF9800' 
                        },
                         { 
                           status: 'Out of Stock', 
-                          count: products.filter(p => p.quantity === 0).length, 
-                          percentage: Math.round((products.filter(p => p.quantity === 0).length / Math.max(products.length, 1)) * 100), 
+                          count: products.filter(p => (p.quantity || 0) === 0).length, 
+                          percentage: Math.round((products.filter(p => (p.quantity || 0) === 0).length / Math.max(products.length, 1)) * 100), 
                           color: '#F44336' 
                         }
                       ].map((stock, idx) => (
@@ -577,145 +944,130 @@ const InventoryDashboard = () => {
               </AnalyticsCard>
             </Grid>
 
-            {/* Turnover & Performance Analytics */}
+            {/* Transfer Analytics */}
             <Grid item xs={12} md={6}>
               <AnalyticsCard>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <AssessmentIcon sx={{ mr: 1, color: '#FF5722' }} />
-                    Turnover & Performance Analytics
+                    <SwapHorizIcon sx={{ mr: 1, color: '#2196F3' }} />
+                    Transfer Analytics
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Box sx={{ height: 300 }}>
-                    {/* Inventory Turnover Rate */}
-                    <Box sx={{ textAlign: 'center', mb: 3 }}>
-                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
-                        6.2x
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Inventory Turnover Rate
-                      </Typography>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={87} 
-                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
-                        color="success"
-                      />
-                    </Box>
-
-                    {/* Performance Metrics */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {/* Transfer Status Distribution */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Transfer Status Overview
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
                       {[
-                        { metric: 'Days Sales Outstanding', value: '58 days', performance: 78 },
-                        { metric: 'Stock Accuracy', value: '96.5%', performance: 96 },
-                        { metric: 'Order Fulfillment Rate', value: '94.2%', performance: 94 },
-                        { metric: 'Carrying Cost Ratio', value: '12.3%', performance: 88 }
-                      ].map((item, idx) => (
-                        <Box key={item.metric}>
+                        { 
+                          status: 'Pending', 
+                          count: stockMovements.filter(m => m.status === 'pending').length, 
+                          percentage: Math.round((stockMovements.filter(m => m.status === 'pending').length / Math.max(stockMovements.length, 1)) * 100), 
+                          color: '#FF9800' 
+                        },
+                        { 
+                          status: 'Accepted', 
+                          count: stockMovements.filter(m => m.status === 'accepted').length, 
+                          percentage: Math.round((stockMovements.filter(m => m.status === 'accepted').length / Math.max(stockMovements.length, 1)) * 100), 
+                          color: '#4CAF50' 
+                        },
+                        { 
+                          status: 'Rejected', 
+                          count: stockMovements.filter(m => m.status === 'rejected').length, 
+                          percentage: Math.round((stockMovements.filter(m => m.status === 'rejected').length / Math.max(stockMovements.length, 1)) * 100), 
+                          color: '#F44336' 
+                        }
+                      ].map((transfer, idx) => (
+                        <Box key={transfer.status}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {item.metric}
+                              {transfer.status}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              {item.value}
+                              {transfer.count} transfers
                             </Typography>
                           </Box>
-                          <LinearProgress 
-                            variant="determinate" 
-                            value={item.performance} 
-                            sx={{ height: 6, borderRadius: 3 }}
-                            color={item.performance >= 90 ? 'success' : item.performance >= 80 ? 'primary' : 'warning'}
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={transfer.percentage} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': { bgcolor: transfer.color }
+                                }} 
+                              />
+                            </Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 40 }}>
+                              {transfer.percentage}%
+                            </Typography>
+                          </Box>
                         </Box>
                       ))}
+                    </Box>
+                    
+                    {/* Total Units Transferred */}
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(33, 150, 243, 0.1)', borderRadius: 2 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Total Units in Transit
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: '#2196F3' }}>
+                        {stockMovements.filter(m => m.status === 'pending').reduce((total, m) => total + m.quantity, 0)}
+                      </Typography>
                     </Box>
                   </Box>
                 </CardContent>
               </AnalyticsCard>
             </Grid>
 
-            {/* Warehouse Performance Dashboard */}
-            <Grid item xs={12}>
+            {/* Inventory Value Analytics */}
+            <Grid item xs={12} md={6}>
               <AnalyticsCard>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <LocalShippingIcon sx={{ mr: 1, color: '#2196F3' }} />
-                    Warehouse Performance Dashboard
+                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                    Inventory Value Analytics
                   </Typography>
                   <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={3}>
-                    {/* Top Performing Products */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                        Top Moving Products
+                  <Box sx={{ height: 300 }}>
+                    {/* Total Inventory Value */}
+                    <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(76, 175, 80, 0.1)', borderRadius: 2 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Total Inventory Value
                       </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {products.slice(0, 4).map((product, idx) => (
-                          <Box key={product.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-                            <Avatar sx={{ bgcolor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'][idx] }}>
-                              {idx + 1}
-                            </Avatar>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: '#4CAF50' }}>
+                        GH₵{products.reduce((total, p) => total + ((p.quantity || 0) * (p.unit_price || 0)), 0).toLocaleString()}
+                      </Typography>
+                    </Box>
+                    
+                    {/* Top Value Products */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Top Value Products
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {products
+                        .map(p => ({ ...p, totalValue: (p.quantity || 0) * (p.unit_price || 0) }))
+                        .sort((a, b) => b.totalValue - a.totalValue)
+                        .slice(0, 5)
+                        .map((product, idx) => (
+                          <Box key={product.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                 {product.name}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {product.category} • {product.quantity} units in stock
+                                {product.quantity} units × GH₵{product.unit_price}
                               </Typography>
                             </Box>
-                            <Chip 
-                              label={`${Math.floor(Math.random() * 50 + 20)} moves`} 
-                              color="primary" 
-                              size="small"
-                              sx={{ fontWeight: 600 }}
-                            />
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#4CAF50' }}>
+                              GH₵{product.totalValue.toLocaleString()}
+                            </Typography>
                           </Box>
                         ))}
-                      </Box>
-                    </Grid>
-
-                    {/* Warehouse Efficiency Metrics */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                        Warehouse Efficiency Metrics
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {[
-                          { metric: 'Space Utilization', value: 78, color: '#4CAF50' },
-                          { metric: 'Pick Accuracy', value: 96, color: '#2196F3' },
-                          { metric: 'Order Processing Speed', value: 89, color: '#FF9800' },
-                          { metric: 'Inventory Accuracy', value: 94, color: '#9C27B0' }
-                        ].map((metric, idx) => (
-                          <Box key={metric.metric}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                {metric.metric}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {metric.value}%
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Box sx={{ flex: 1 }}>
-                                <LinearProgress 
-                                  variant="determinate" 
-                                  value={metric.value} 
-                                  sx={{ 
-                                    height: 8, 
-                                    borderRadius: 4,
-                                    '& .MuiLinearProgress-bar': { bgcolor: metric.color }
-                                  }}
-                                />
-                              </Box>
-                              <Typography variant="body2" color={metric.color} sx={{ minWidth: 40, fontWeight: 600 }}>
-                                {metric.value}%
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Grid>
-                  </Grid>
+                    </Box>
+                  </Box>
                 </CardContent>
               </AnalyticsCard>
             </Grid>
@@ -730,61 +1082,62 @@ const InventoryDashboard = () => {
       >
         <DialogTitle>Transfer Stock</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {console.log('Warehouses state in dialog:', warehouses)}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
             <FormControl variant="outlined" sx={{ width: '100%' }}>
               <InputLabel id="product-label">Product</InputLabel>
               <Select
                 labelId="product-label"
-                id="product"
-                label="Product"
+                id="product-select"
                 value={transferForm.product}
                 onChange={(e) => setTransferForm({ ...transferForm, product: e.target.value })}
+                label="Product"
               >
                 {products.map((product) => (
                   <MenuItem key={product.id} value={product.id}>
-                    {product.name}
+                    {product.name} - {product.sku} (Stock: {product.quantity || 0})
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            <FormControl variant="outlined" sx={{ width: '100%' }}>
-              <InputLabel id="quantity-label">Quantity</InputLabel>
-              <TextField
-                id="quantity"
-                label="Quantity"
-                type="number"
-                value={transferForm.quantity}
-                onChange={(e) => setTransferForm({ ...transferForm, quantity: e.target.value })}
-              />
-            </FormControl>
+            
+            <TextField
+              label="Quantity"
+              type="number"
+              value={transferForm.quantity}
+              onChange={(e) => setTransferForm({ ...transferForm, quantity: e.target.value })}
+              variant="outlined"
+              sx={{ width: '100%' }}
+            />
+            
             <FormControl variant="outlined" sx={{ width: '100%' }}>
               <InputLabel id="from-warehouse-label">From Warehouse</InputLabel>
               <Select
                 labelId="from-warehouse-label"
-                id="from-warehouse"
-                label="From Warehouse"
+                id="from-warehouse-select"
                 value={transferForm.fromWarehouse}
                 onChange={(e) => setTransferForm({ ...transferForm, fromWarehouse: e.target.value })}
               >
+                {console.log('Warehouses available:', warehouses)}
                 {warehouses.map((warehouse) => (
                   <MenuItem key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
+                    {warehouse.name} - {warehouse.location}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+            
             <FormControl variant="outlined" sx={{ width: '100%' }}>
               <InputLabel id="to-warehouse-label">To Warehouse</InputLabel>
               <Select
                 labelId="to-warehouse-label"
-                id="to-warehouse"
-                label="To Warehouse"
+                id="to-warehouse-select"
                 value={transferForm.toWarehouse}
                 onChange={(e) => setTransferForm({ ...transferForm, toWarehouse: e.target.value })}
               >
                 {warehouses.map((warehouse) => (
                   <MenuItem key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
+                    {warehouse.name} - {warehouse.location}
                   </MenuItem>
                 ))}
               </Select>
@@ -793,10 +1146,7 @@ const InventoryDashboard = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setWarehouseTransferOpen(false)}>Cancel</Button>
-          <Button onClick={() => {
-            // Add API call to transfer stock here
-            setWarehouseTransferOpen(false);
-          }}>Transfer</Button>
+          <Button onClick={handleTransferStock} variant="contained" color="primary">Transfer</Button>
         </DialogActions>
       </Dialog>
     </Box>

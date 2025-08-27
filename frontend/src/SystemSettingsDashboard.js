@@ -101,19 +101,20 @@ function TabPanel({ children, value, index, ...other }) {
 }
 
 const SystemSettingsDashboard = () => {
-  const { user, token } = useContext(AuthContext);
+  const { user, token, systemSettings, fetchSystemSettings, updateSystemSettings } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  // System Settings State
-  const [systemSettings, setSystemSettings] = useState({
-    siteName: 'ERP System',
+  // Local state for form modifications (before saving)
+  const [localSmtpSettings, setLocalSmtpSettings] = useState(systemSettings.smtp);
+  const [localSystemSettings, setLocalSystemSettings] = useState({
+    siteName: systemSettings.general.siteName,
     siteDescription: 'Enterprise Resource Planning System',
-    maintenanceMode: false,
-    registrationEnabled: true,
+    maintenanceMode: systemSettings.general.maintenanceMode,
+    registrationEnabled: systemSettings.general.registrationEnabled,
     defaultUserRole: 'employee',
     sessionTimeout: 30,
     maxLoginAttempts: 5,
@@ -124,28 +125,14 @@ const SystemSettingsDashboard = () => {
     logRetentionDays: 90,
   });
 
-  // SMTP Settings State
-  const [smtpSettings, setSmtpSettings] = useState({
-    enabled: false,
-    host: '',
-    port: 587,
-    username: '',
-    password: '',
-    useTLS: true,
-    useSSL: false,
-    fromEmail: '',
-    fromName: 'ERP System',
-    testEmail: '',
-  });
-
   // Notification Settings State
   const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
+    emailNotifications: systemSettings.notifications.emailNotifications,
     smsNotifications: false,
     pushNotifications: true,
     userRegistration: true,
     passwordReset: true,
-    systemAlerts: true,
+    systemAlerts: systemSettings.notifications.systemAlerts,
     maintenanceNotices: true,
     securityAlerts: true,
     dailyReports: false,
@@ -156,88 +143,36 @@ const SystemSettingsDashboard = () => {
   // Check if user is superuser
   const isSuperuser = user?.role === 'superadmin' || user?.is_superuser;
 
+  // Sync local state with global system settings when they change
+  useEffect(() => {
+    setLocalSmtpSettings(systemSettings.smtp);
+    setLocalSystemSettings(prev => ({
+      ...prev,
+      siteName: systemSettings.general.siteName,
+      maintenanceMode: systemSettings.general.maintenanceMode,
+      registrationEnabled: systemSettings.general.registrationEnabled,
+    }));
+    setNotificationSettings(prev => ({
+      ...prev,
+      emailNotifications: systemSettings.notifications.emailNotifications,
+      systemAlerts: systemSettings.notifications.systemAlerts,
+    }));
+  }, [systemSettings]);
+
   useEffect(() => {
     if (!isSuperuser) {
       setError('Access denied. Only superusers can access System Settings.');
       return;
     }
-    fetchSystemSettings();
+    // System settings are now loaded globally via AuthContext
   }, [isSuperuser]);
-
-  const fetchSystemSettings = async () => {
-    if (!token || !isSuperuser) return;
-    
-    setLoading(true);
-    try {
-      const settingsRes = await api.get('/users/system/settings/');
-      const data = settingsRes.data;
-      
-      // Update system settings state
-      setSystemSettings({
-        siteName: data.site_name || 'ERP System',
-        siteDescription: data.site_description || 'Enterprise Resource Planning System',
-        maintenanceMode: data.maintenance_mode || false,
-        registrationEnabled: data.registration_enabled || true,
-        defaultUserRole: data.default_user_role || 'employee',
-        sessionTimeout: data.session_timeout || 30,
-        maxLoginAttempts: data.max_login_attempts || 5,
-        passwordMinLength: data.password_min_length || 8,
-        requirePasswordComplexity: data.require_password_complexity || true,
-        enableTwoFactor: data.enable_two_factor || false,
-        backupFrequency: data.backup_frequency || 'daily',
-        logRetentionDays: data.log_retention_days || 90,
-      });
-      
-      // Update SMTP settings state
-      setSmtpSettings({
-        enabled: data.smtp_enabled || false,
-        host: data.smtp_host || '',
-        port: data.smtp_port || 587,
-        username: data.smtp_username || '',
-        password: data.smtp_password || '',
-        useTLS: data.smtp_use_tls || true,
-        useSSL: data.smtp_use_ssl || false,
-        fromEmail: data.smtp_from_email || '',
-        fromName: data.smtp_from_name || 'ERP System',
-        testEmail: '',
-      });
-      
-      // Update notification settings state
-      setNotificationSettings({
-        emailNotifications: data.email_notifications || true,
-        smsNotifications: data.sms_notifications || false,
-        pushNotifications: data.push_notifications || true,
-        userRegistration: data.user_registration_notifications || true,
-        passwordReset: data.password_reset_notifications || true,
-        systemAlerts: data.system_alerts || true,
-        maintenanceNotices: data.maintenance_notices || true,
-        securityAlerts: data.security_alerts || true,
-        dailyReports: data.daily_reports || false,
-        weeklyReports: data.weekly_reports || true,
-        monthlyReports: data.monthly_reports || true,
-      });
-      
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to load system settings.');
-      console.error('System settings error:', err);
-      setLoading(false);
-    }
-  };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
-  const handleSystemSettingChange = (key, value) => {
-    setSystemSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
   const handleSmtpSettingChange = (key, value) => {
-    setSmtpSettings(prev => ({
+    setLocalSmtpSettings(prev => ({
       ...prev,
       [key]: value
     }));
@@ -257,30 +192,30 @@ const SystemSettingsDashboard = () => {
       // Prepare data based on settings type
       if (settingsType === 'general') {
         settingsData = {
-          site_name: systemSettings.siteName,
-          site_description: systemSettings.siteDescription,
-          maintenance_mode: systemSettings.maintenanceMode,
-          registration_enabled: systemSettings.registrationEnabled,
-          default_user_role: systemSettings.defaultUserRole,
-          session_timeout: systemSettings.sessionTimeout,
-          max_login_attempts: systemSettings.maxLoginAttempts,
-          password_min_length: systemSettings.passwordMinLength,
-          require_password_complexity: systemSettings.requirePasswordComplexity,
-          enable_two_factor: systemSettings.enableTwoFactor,
-          backup_frequency: systemSettings.backupFrequency,
-          log_retention_days: systemSettings.logRetentionDays,
+          site_name: localSystemSettings.siteName,
+          site_description: localSystemSettings.siteDescription,
+          maintenance_mode: localSystemSettings.maintenanceMode,
+          registration_enabled: localSystemSettings.registrationEnabled,
+          default_user_role: localSystemSettings.defaultUserRole,
+          session_timeout: localSystemSettings.sessionTimeout,
+          max_login_attempts: localSystemSettings.maxLoginAttempts,
+          password_min_length: localSystemSettings.passwordMinLength,
+          require_password_complexity: localSystemSettings.requirePasswordComplexity,
+          enable_two_factor: localSystemSettings.enableTwoFactor,
+          backup_frequency: localSystemSettings.backupFrequency,
+          log_retention_days: localSystemSettings.logRetentionDays,
         };
       } else if (settingsType === 'smtp') {
         settingsData = {
-          smtp_enabled: smtpSettings.enabled,
-          smtp_host: smtpSettings.host,
-          smtp_port: smtpSettings.port,
-          smtp_username: smtpSettings.username,
-          smtp_password: smtpSettings.password,
-          smtp_use_tls: smtpSettings.useTLS,
-          smtp_use_ssl: smtpSettings.useSSL,
-          smtp_from_email: smtpSettings.fromEmail,
-          smtp_from_name: smtpSettings.fromName,
+          smtp_enabled: localSmtpSettings.enabled,
+          smtp_host: localSmtpSettings.host,
+          smtp_port: localSmtpSettings.port,
+          smtp_username: localSmtpSettings.username,
+          smtp_password: localSmtpSettings.password,
+          smtp_use_tls: localSmtpSettings.useTLS,
+          smtp_use_ssl: localSmtpSettings.useSSL,
+          smtp_from_email: localSmtpSettings.fromEmail,
+          smtp_from_name: localSmtpSettings.fromName,
         };
       } else if (settingsType === 'notifications') {
         settingsData = {
@@ -298,44 +233,56 @@ const SystemSettingsDashboard = () => {
         };
       }
       
-      // Save settings via API
-      const response = await api.put('/users/system/settings/', settingsData);
+      // Use global updateSystemSettings function
+      const success = await updateSystemSettings(settingsType, settingsData);
       
-      setSnackbarMessage(`${settingsType.charAt(0).toUpperCase() + settingsType.slice(1)} settings saved successfully!`);
-      setSnackbarOpen(true);
-      
-      // Refresh settings to get updated data
-      await fetchSystemSettings();
-      
-    } catch (error) {
-      console.error('Save settings error:', error);
-      setSnackbarMessage(`Failed to save ${settingsType} settings: ${error.response?.data?.error || error.message}`);
+      if (success) {
+        setSnackbarMessage(`${settingsType.charAt(0).toUpperCase() + settingsType.slice(1)} settings saved successfully!`);
+        setSnackbarOpen(true);
+        
+        console.log(`✅ ${settingsType} settings persisted globally across all modules`);
+      } else {
+        throw new Error(`Failed to save ${settingsType} settings`);
+      }
+    } catch (err) {
+      console.error(`Error saving ${settingsType} settings:`, err);
+      setSnackbarMessage(`Failed to save ${settingsType} settings. Please try again.`);
       setSnackbarOpen(true);
     }
   };
 
   const handleTestSMTP = async () => {
-    if (!smtpSettings.testEmail) {
+    if (!localSmtpSettings.testEmail) {
       setSnackbarMessage('Please enter a test email address');
       setSnackbarOpen(true);
       return;
     }
 
     try {
-      // First save current SMTP settings if they haven't been saved
-      await handleSaveSettings('smtp');
-      
-      // Test SMTP configuration
-      const response = await api.post('/users/system/smtp/test/', { 
-        test_email: smtpSettings.testEmail 
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:2025/api/users/system/smtp/test/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          test_email: localSmtpSettings.testEmail
+        })
       });
+
+      const data = await response.json();
       
-      setSnackbarMessage(`Test email sent successfully to ${smtpSettings.testEmail}!`);
-      setSnackbarOpen(true);
+      if (response.ok) {
+        setSnackbarMessage(data.message || 'Test email sent successfully!');
+        setSnackbarOpen(true);
+      } else {
+        setSnackbarMessage(data.error || 'Failed to send test email');
+        setSnackbarOpen(true);
+      }
     } catch (error) {
-      console.error('Test SMTP error:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to send test email';
-      setSnackbarMessage(`Failed to send test email: ${errorMessage}`);
+      console.error('SMTP test error:', error);
+      setSnackbarMessage('Error testing SMTP settings. Please check your configuration.');
       setSnackbarOpen(true);
     }
   };
@@ -417,8 +364,8 @@ const SystemSettingsDashboard = () => {
                     <TextField
                       fullWidth
                       label="Site Name"
-                      value={systemSettings.siteName}
-                      onChange={(e) => handleSystemSettingChange('siteName', e.target.value)}
+                      value={localSystemSettings.siteName}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, siteName: e.target.value }))}
                       variant="outlined"
                     />
                   </Grid>
@@ -427,8 +374,8 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="Default User Role"
                       select
-                      value={systemSettings.defaultUserRole}
-                      onChange={(e) => handleSystemSettingChange('defaultUserRole', e.target.value)}
+                      value={localSystemSettings.defaultUserRole}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, defaultUserRole: e.target.value }))}
                     >
                       <MenuItem value="employee">Employee</MenuItem>
                       <MenuItem value="manager">Manager</MenuItem>
@@ -441,8 +388,8 @@ const SystemSettingsDashboard = () => {
                       label="Site Description"
                       multiline
                       rows={2}
-                      value={systemSettings.siteDescription}
-                      onChange={(e) => handleSystemSettingChange('siteDescription', e.target.value)}
+                      value={localSystemSettings.siteDescription}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, siteDescription: e.target.value }))}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -450,8 +397,8 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="Session Timeout (minutes)"
                       type="number"
-                      value={systemSettings.sessionTimeout}
-                      onChange={(e) => handleSystemSettingChange('sessionTimeout', parseInt(e.target.value))}
+                      value={localSystemSettings.sessionTimeout}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -459,8 +406,8 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="Max Login Attempts"
                       type="number"
-                      value={systemSettings.maxLoginAttempts}
-                      onChange={(e) => handleSystemSettingChange('maxLoginAttempts', parseInt(e.target.value))}
+                      value={localSystemSettings.maxLoginAttempts}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, maxLoginAttempts: parseInt(e.target.value) }))}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -468,8 +415,8 @@ const SystemSettingsDashboard = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={systemSettings.maintenanceMode}
-                            onChange={(e) => handleSystemSettingChange('maintenanceMode', e.target.checked)}
+                            checked={localSystemSettings.maintenanceMode}
+                            onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, maintenanceMode: e.target.checked }))}
                             color="warning"
                           />
                         }
@@ -478,8 +425,8 @@ const SystemSettingsDashboard = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={systemSettings.registrationEnabled}
-                            onChange={(e) => handleSystemSettingChange('registrationEnabled', e.target.checked)}
+                            checked={localSystemSettings.registrationEnabled}
+                            onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, registrationEnabled: e.target.checked }))}
                             color="primary"
                           />
                         }
@@ -488,8 +435,8 @@ const SystemSettingsDashboard = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={systemSettings.requirePasswordComplexity}
-                            onChange={(e) => handleSystemSettingChange('requirePasswordComplexity', e.target.checked)}
+                            checked={localSystemSettings.requirePasswordComplexity}
+                            onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, requirePasswordComplexity: e.target.checked }))}
                             color="secondary"
                           />
                         }
@@ -530,7 +477,7 @@ const SystemSettingsDashboard = () => {
                   <FormControlLabel
                     control={
                       <Switch
-                        checked={smtpSettings.enabled}
+                        checked={localSmtpSettings.enabled}
                         onChange={(e) => handleSmtpSettingChange('enabled', e.target.checked)}
                         color="primary"
                       />
@@ -544,9 +491,9 @@ const SystemSettingsDashboard = () => {
                     <TextField
                       fullWidth
                       label="SMTP Host"
-                      value={smtpSettings.host}
+                      value={localSmtpSettings.host}
                       onChange={(e) => handleSmtpSettingChange('host', e.target.value)}
-                      disabled={!smtpSettings.enabled}
+                      disabled={!localSmtpSettings.enabled}
                       placeholder="smtp.gmail.com"
                     />
                   </Grid>
@@ -555,18 +502,18 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="SMTP Port"
                       type="number"
-                      value={smtpSettings.port}
+                      value={localSmtpSettings.port}
                       onChange={(e) => handleSmtpSettingChange('port', parseInt(e.target.value))}
-                      disabled={!smtpSettings.enabled}
+                      disabled={!localSmtpSettings.enabled}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
                       label="Username"
-                      value={smtpSettings.username}
+                      value={localSmtpSettings.username}
                       onChange={(e) => handleSmtpSettingChange('username', e.target.value)}
-                      disabled={!smtpSettings.enabled}
+                      disabled={!localSmtpSettings.enabled}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -574,18 +521,18 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="Password"
                       type="password"
-                      value={smtpSettings.password}
+                      value={localSmtpSettings.password}
                       onChange={(e) => handleSmtpSettingChange('password', e.target.value)}
-                      disabled={!smtpSettings.enabled}
+                      disabled={!localSmtpSettings.enabled}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
                       label="From Email"
-                      value={smtpSettings.fromEmail}
+                      value={localSmtpSettings.fromEmail}
                       onChange={(e) => handleSmtpSettingChange('fromEmail', e.target.value)}
-                      disabled={!smtpSettings.enabled}
+                      disabled={!localSmtpSettings.enabled}
                       placeholder="noreply@yourcompany.com"
                     />
                   </Grid>
@@ -593,9 +540,9 @@ const SystemSettingsDashboard = () => {
                     <TextField
                       fullWidth
                       label="From Name"
-                      value={smtpSettings.fromName}
+                      value={localSmtpSettings.fromName}
                       onChange={(e) => handleSmtpSettingChange('fromName', e.target.value)}
-                      disabled={!smtpSettings.enabled}
+                      disabled={!localSmtpSettings.enabled}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -603,9 +550,9 @@ const SystemSettingsDashboard = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={smtpSettings.useTLS}
+                            checked={localSmtpSettings.useTLS}
                             onChange={(e) => handleSmtpSettingChange('useTLS', e.target.checked)}
-                            disabled={!smtpSettings.enabled}
+                            disabled={!localSmtpSettings.enabled}
                             color="primary"
                           />
                         }
@@ -614,9 +561,9 @@ const SystemSettingsDashboard = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={smtpSettings.useSSL}
+                            checked={localSmtpSettings.useSSL}
                             onChange={(e) => handleSmtpSettingChange('useSSL', e.target.checked)}
-                            disabled={!smtpSettings.enabled}
+                            disabled={!localSmtpSettings.enabled}
                             color="secondary"
                           />
                         }
@@ -634,21 +581,21 @@ const SystemSettingsDashboard = () => {
                     <Box display="flex" gap={2} alignItems="center">
                       <TextField
                         label="Test Email Address"
-                        value={smtpSettings.testEmail}
+                        value={localSmtpSettings.testEmail}
                         onChange={(e) => handleSmtpSettingChange('testEmail', e.target.value)}
-                        disabled={!smtpSettings.enabled}
+                        disabled={!localSmtpSettings.enabled}
                         placeholder="test@example.com"
                         sx={{ flexGrow: 1 }}
                       />
-                      <QuickActionButton
+                      <Button
                         variant="outlined"
                         startIcon={<TestIcon />}
                         onClick={handleTestSMTP}
-                        disabled={!smtpSettings.enabled || !smtpSettings.testEmail}
+                        disabled={!localSmtpSettings.enabled || !localSmtpSettings.testEmail}
                         sx={{ borderColor: '#FF5722', color: '#FF5722' }}
                       >
                         Send Test Email
-                      </QuickActionButton>
+                      </Button>
                     </Box>
                   </Grid>
                 </Grid>
@@ -849,8 +796,8 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="Minimum Password Length"
                       type="number"
-                      value={systemSettings.passwordMinLength}
-                      onChange={(e) => handleSystemSettingChange('passwordMinLength', parseInt(e.target.value))}
+                      value={localSystemSettings.passwordMinLength}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, passwordMinLength: parseInt(e.target.value) }))}
                       InputProps={{
                         inputProps: { min: 6, max: 20 }
                       }}
@@ -861,8 +808,8 @@ const SystemSettingsDashboard = () => {
                       fullWidth
                       label="Log Retention (Days)"
                       type="number"
-                      value={systemSettings.logRetentionDays}
-                      onChange={(e) => handleSystemSettingChange('logRetentionDays', parseInt(e.target.value))}
+                      value={localSystemSettings.logRetentionDays}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, logRetentionDays: parseInt(e.target.value) }))}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -870,8 +817,8 @@ const SystemSettingsDashboard = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={systemSettings.enableTwoFactor}
-                            onChange={(e) => handleSystemSettingChange('enableTwoFactor', e.target.checked)}
+                            checked={localSystemSettings.enableTwoFactor}
+                            onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, enableTwoFactor: e.target.checked }))}
                             color="primary"
                           />
                         }

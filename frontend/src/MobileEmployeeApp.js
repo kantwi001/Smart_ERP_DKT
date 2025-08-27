@@ -51,6 +51,7 @@ import {
   MonetizationOn as MonetizationOnIcon
 } from '@mui/icons-material';
 import { AuthContext } from './AuthContext';
+import NetworkStatusIndicator from './components/NetworkStatusIndicator';
 import api from './api';
 import {
   LeaveRequestForm,
@@ -352,14 +353,13 @@ const MobileEmployeeApp = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            Employee Portal
+          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
+            ERP Mobile
           </Typography>
-          <IconButton>
-            <Badge badgeContent={notifications.length} color="error">
-              <NotificationIcon />
-            </Badge>
-          </IconButton>
+          
+          {/* Network Status Indicator */}
+          <NetworkStatusIndicator size="small" />
+          
           <Avatar sx={{ ml: 1, bgcolor: '#4CAF50' }}>
             {user?.first_name?.[0] || user?.username?.[0] || 'E'}
           </Avatar>

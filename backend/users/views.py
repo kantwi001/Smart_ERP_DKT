@@ -178,10 +178,12 @@ def create_user_with_email(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        # Check if user already exists
-        if User.objects.filter(email=data['email']).exists():
+        # Check if user already exists (case-insensitive and trimmed)
+        email_to_check = data['email'].strip().lower()
+        existing_user = User.objects.filter(email__iexact=email_to_check).first()
+        if existing_user:
             return Response(
-                {'error': 'User with this email already exists'}, 
+                {'error': f'User with this email already exists (ID: {existing_user.id}, Email: {existing_user.email})'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -573,3 +575,97 @@ def test_smtp_settings(request):
             {'error': f'Failed to send test email: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_user_department(request, user_id):
+    """Update user's department assignment"""
+    try:
+        print(f"🔄 Updating department for user ID: {user_id}")
+        print(f"📤 Request data: {request.data}")
+        
+        user = User.objects.get(id=user_id)
+        print(f"👤 Found user: {user.first_name} {user.last_name}")
+        
+        department_id = request.data.get('department_id')
+        print(f"🏢 Department ID to assign: {department_id}")
+        
+        if department_id:
+            from hr.models import Department
+            try:
+                department = Department.objects.get(id=department_id)
+                print(f"✅ Found department: {department.name}")
+                user.department = department
+            except Department.DoesNotExist:
+                print(f"❌ Department with ID {department_id} not found")
+                return Response({'error': f'Department with ID {department_id} not found'}, status=404)
+        else:
+            print("🔄 Removing department assignment")
+            user.department = None
+            
+        user.save()
+        print(f"💾 User saved successfully")
+        
+        response_data = {
+            'success': True,
+            'message': f'Department updated for {user.first_name} {user.last_name}',
+            'user': {
+                'id': user.id,
+                'department_id': user.department.id if user.department else None,
+                'department_name': user.department.name if user.department else None
+            }
+        }
+        print(f"📤 Sending response: {response_data}")
+        return Response(response_data)
+        
+    except User.DoesNotExist:
+        print(f"❌ User with ID {user_id} not found")
+        return Response({'error': 'User not found'}, status=404)
+    except Exception as e:
+        print(f"💥 Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_departments(request):
+    """Get all departments for dropdown selection"""
+    try:
+        from hr.models import Department
+        departments = Department.objects.all()
+        
+        department_data = []
+        for dept in departments:
+            department_data.append({
+                'id': dept.id,
+                'name': dept.name
+            })
+        
+        return Response(department_data)
+    except Exception as e:
+        print(f"💥 Error fetching departments: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_warehouses(request):
+    """Get all warehouses for dropdown selection"""
+    try:
+        from warehouse.models import Warehouse
+        warehouses = Warehouse.objects.all()
+        
+        warehouse_data = []
+        for warehouse in warehouses:
+            warehouse_data.append({
+                'id': warehouse.id,
+                'name': warehouse.name,
+                'code': getattr(warehouse, 'code', ''),
+                'location': getattr(warehouse, 'location', '')
+            })
+        
+        return Response(warehouse_data)
+    except Exception as e:
+        print(f"💥 Error fetching warehouses: {str(e)}")
+        # Return empty list if warehouse model doesn't exist
+        return Response([])

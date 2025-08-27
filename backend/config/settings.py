@@ -5,7 +5,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'changeme')
 DEBUG = int(os.environ.get('DEBUG', default=1))
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '192.168.2.185',
+    '192.168.2.126',
+    '10.0.2.2',
+    '*'  # Allow all hosts for mobile development
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -68,12 +76,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'USER': os.environ.get('DJANGO_DB_USER', 'erpuser'),
-        'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', 'erppassword'),
-        'HOST': os.environ.get('DJANGO_DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DJANGO_DB_PORT', '5432'),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'erp_system',
+        'USER': 'erpuser',
+        'PASSWORD': 'erppassword',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -97,7 +105,33 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS settings for mobile app connectivity
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:2026",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:2026",
+    "http://192.168.2.185:2026",
+    "http://192.168.2.126:2026",
+    "capacitor://localhost",
+    "ionic://localhost",
+    "http://localhost",
+    "https://localhost"
+]
+
+CORS_ALLOW_ALL_ORIGINS = True  # Enable for mobile development
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 AUTH_USER_MODEL = 'users.User'
 

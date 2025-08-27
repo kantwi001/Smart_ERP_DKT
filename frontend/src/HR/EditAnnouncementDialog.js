@@ -20,7 +20,7 @@ const EditAnnouncementDialog = ({ open, onClose, announcement, onSaved, onDelete
     setLoading(true);
     setError('');
     try {
-      await axios.patch(`/api/hr/announcements/${form.id}/`, form);
+      await axios.patch(`/hr/announcements/${form.id}/`, form);
       if (onSaved) onSaved();
       onClose();
     } catch (err) {
@@ -33,7 +33,7 @@ const EditAnnouncementDialog = ({ open, onClose, announcement, onSaved, onDelete
     setLoading(true);
     setError('');
     try {
-      await axios.delete(`/api/hr/announcements/${form.id}/`);
+      await axios.delete(`/hr/announcements/${form.id}/`);
       if (onDeleted) onDeleted();
       onClose();
     } catch (err) {

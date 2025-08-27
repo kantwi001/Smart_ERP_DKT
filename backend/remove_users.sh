@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🗑️  Removing users: antwi, rosemond, kay from ERP system..."
+echo "🗑️  Removing sample users from ERP system..."
 echo "⚠️  WARNING: This will permanently delete users and all their related data!"
 echo "================================================================================"
 
@@ -8,7 +8,7 @@ echo "==========================================================================
 cd /Users/kwadwoantwi/CascadeProjects/erp-system/backend
 
 # Confirmation prompt
-read -p "Are you sure you want to delete users antwi, rosemond, and kay? (y/yes/n/no): " confirm
+read -p "Are you sure you want to delete sample users? (y/yes/n/no): " confirm
 
 if [[ "$confirm" != "yes" && "$confirm" != "y" && "$confirm" != "Y" && "$confirm" != "YES" ]]; then
     echo "❌ User deletion cancelled."

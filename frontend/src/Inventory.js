@@ -4,13 +4,15 @@ import { AuthContext } from './AuthContext';
 import { 
   Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   CircularProgress, Alert, Box, Grid, Card, CardContent, Button, Dialog, DialogTitle, 
-  DialogContent, DialogActions, TextField, MenuItem, Snackbar
+  DialogContent, DialogActions, TextField, MenuItem, Snackbar, Tabs, Tab, Chip
 } from '@mui/material';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import WarningIcon from '@mui/icons-material/Warning';
 import RemoveShoppingCartIcon from '@mui/icons-material/RemoveShoppingCart';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Inventory = () => {
@@ -34,6 +36,8 @@ const Inventory = () => {
     toWarehouse: '',
     notes: ''
   });
+
+  const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -125,6 +129,36 @@ const Inventory = () => {
     }
   };
 
+  const handleAcceptTransfer = async (transferId) => {
+    try {
+      await api.post(`/inventory/transfers/${transferId}/accept/`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSnackbarMessage('Transfer accepted successfully!');
+      setSnackbarOpen(true);
+      // Refresh data in real implementation
+    } catch (error) {
+      console.error('Accept transfer error:', error);
+      setSnackbarMessage('Failed to accept transfer. Please try again.');
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleRejectTransfer = async (transferId) => {
+    try {
+      await api.post(`/inventory/transfers/${transferId}/reject/`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSnackbarMessage('Transfer rejected successfully!');
+      setSnackbarOpen(true);
+      // Refresh data in real implementation
+    } catch (error) {
+      console.error('Reject transfer error:', error);
+      setSnackbarMessage('Failed to reject transfer. Please try again.');
+      setSnackbarOpen(true);
+    }
+  };
+
   // Dashboard summary data
   const totalItems = items.length;
   const lowStock = items.filter(i => i.quantity !== undefined && i.quantity < 10 && i.quantity > 0).length;
@@ -135,152 +169,407 @@ const Inventory = () => {
   // Fallback UI if no items or loading/error
   const showFallback = !loading && (error || items.length === 0);
 
+  // Mock data
+  const mockMovements = [
+    { date: '2024-02-15', product: 'Laptop Dell XPS 13', type: 'IN', quantity: 25, location: 'Main Warehouse', status: 'Completed', reference: 'PO-2024-001' },
+    { date: '2024-02-14', product: 'iPhone 15 Pro', type: 'OUT', quantity: 10, location: 'Sales Floor', status: 'Completed', reference: 'SO-2024-045' },
+    { date: '2024-02-13', product: 'Samsung Galaxy S24', type: 'IN', quantity: 30, location: 'Main Warehouse', status: 'Completed', reference: 'PO-2024-002' },
+    { date: '2024-02-12', product: 'MacBook Air M3', type: 'OUT', quantity: 5, location: 'Customer Delivery', status: 'Completed', reference: 'SO-2024-046' },
+    { date: '2024-02-11', product: 'iPad Pro 12.9"', type: 'IN', quantity: 15, location: 'Main Warehouse', status: 'Completed', reference: 'PO-2024-003' },
+    { date: '2024-02-10', product: 'AirPods Pro 2', type: 'OUT', quantity: 20, location: 'Retail Store', status: 'Completed', reference: 'SO-2024-047' },
+    { date: '2024-02-09', product: 'Surface Pro 9', type: 'IN', quantity: 12, location: 'Tech Warehouse', status: 'Completed', reference: 'PO-2024-004' },
+    { date: '2024-02-08', product: 'Nintendo Switch OLED', type: 'OUT', quantity: 8, location: 'Gaming Section', status: 'Completed', reference: 'SO-2024-048' }
+  ];
+
+  const mockIncomingTransfers = [
+    { id: 1, product: 'HP Pavilion Laptop', quantity: 20, from: 'Central Warehouse' },
+    { id: 2, product: 'Wireless Mouse Logitech', quantity: 50, from: 'Tech Hub' },
+    { id: 3, product: 'USB-C Charger 65W', quantity: 35, from: 'Accessories Store' },
+    { id: 4, product: 'Bluetooth Headphones', quantity: 25, from: 'Audio Department' }
+  ];
+
+  const mockOutgoingTransfers = [
+    { id: 1, product: 'Gaming Keyboard RGB', quantity: 15, to: 'Gaming Store', status: 'Pending Approval' },
+    { id: 2, product: 'Webcam 4K Logitech', quantity: 10, to: 'Remote Work Hub', status: 'Pending Approval' },
+    { id: 3, product: 'Monitor 27" 4K', quantity: 8, to: 'Office Branch', status: 'Pending Approval' }
+  ];
+
   return (
     <Box>
       <Typography variant="h5" mb={2}>Inventory</Typography>
-      {showFallback ? (
-        <Alert severity={error ? "error" : "info"} sx={{ mb: 2 }}>
-          {error ? error : "No inventory found."}
-        </Alert>
-      ) : (
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={tabValue} onChange={(e, value) => setTabValue(value)}>
+          <Tab label="Inventory" />
+          <Tab label="Movements" />
+          <Tab label="Pending Transfers" />
+        </Tabs>
+      </Box>
+      
+      {tabValue === 0 && (
         <>
-          <Grid container spacing={2} mb={2}>
-            <Grid item xs={12} sm={4}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center">
-                    <InventoryIcon color="primary" sx={{ fontSize: 32, mr: 1 }} />
-                    <Box>
-                      <Typography variant="h6">Total Items</Typography>
-                      <Typography variant="h4">{totalItems}</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center">
-                    <WarningIcon color="warning" sx={{ fontSize: 32, mr: 1 }} />
-                    <Box>
-                      <Typography variant="h6">Low Stock</Typography>
-                      <Typography variant="h4">{lowStock}</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center">
-                    <RemoveShoppingCartIcon color="error" sx={{ fontSize: 32, mr: 1 }} />
-                    <Box>
-                      <Typography variant="h6">Out of Stock</Typography>
-                      <Typography variant="h4">{outOfStock}</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-          <Grid container spacing={2} mb={2}>
-            <Grid item xs={12}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" mb={1}>Transfer Quick Actions</Typography>
-                  <Button 
-                    startIcon={<SwapHorizIcon />} 
-                    variant="contained" 
-                    color="primary"
-                    onClick={() => setTransferDialogOpen(true)}
-                  >
-                    Transfer Stock
-                  </Button>
-                  <Button 
-                    startIcon={<VisibilityIcon />} 
-                    variant="contained" 
-                    color="secondary" 
-                    sx={{ ml: 1 }}
-                    onClick={() => setTransferHistoryOpen(true)}
-                  >
-                    View Transfer History
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-          <Grid container spacing={2} mb={2}>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>Stock Levels (Top 8)</Typography>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={stockChartData} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
-                      <XAxis dataKey="name" interval={0} angle={-15} textAnchor="end" height={60} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="quantity" fill="#1976d2" radius={[4,4,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>Recent Items</Typography>
-                  {recentItems.length === 0 ? (
-                    <Typography color="text.secondary">No recent items.</Typography>
-                  ) : (
-                    <ul style={{ margin: 0, paddingLeft: 16 }}>
-                      {recentItems.map((item, idx) => (
-                        <li key={item.id || idx}>
-                          <Typography variant="body2">{item.name} &mdash; SKU: {item.sku} &mdash; Qty: {item.quantity}</Typography>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          {showFallback ? (
+            <Alert severity={error ? "error" : "info"} sx={{ mb: 2 }}>
+              {error ? error : "No inventory found."}
+            </Alert>
+          ) : (
+            <>
+              <Grid container spacing={2} mb={2}>
+                <Grid item xs={12} sm={4}>
+                  <Card>
+                    <CardContent>
+                      <Box display="flex" alignItems="center">
+                        <InventoryIcon color="primary" sx={{ fontSize: 32, mr: 1 }} />
+                        <Box>
+                          <Typography variant="h6">Total Items</Typography>
+                          <Typography variant="h4">{totalItems}</Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Card>
+                    <CardContent>
+                      <Box display="flex" alignItems="center">
+                        <WarningIcon color="warning" sx={{ fontSize: 32, mr: 1 }} />
+                        <Box>
+                          <Typography variant="h6">Low Stock</Typography>
+                          <Typography variant="h4">{lowStock}</Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Card>
+                    <CardContent>
+                      <Box display="flex" alignItems="center">
+                        <RemoveShoppingCartIcon color="error" sx={{ fontSize: 32, mr: 1 }} />
+                        <Box>
+                          <Typography variant="h6">Out of Stock</Typography>
+                          <Typography variant="h4">{outOfStock}</Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+              <Grid container spacing={2} mb={2}>
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" mb={1}>Transfer Quick Actions</Typography>
+                      <Button 
+                        startIcon={<SwapHorizIcon />} 
+                        variant="contained" 
+                        color="primary"
+                        onClick={() => setTransferDialogOpen(true)}
+                      >
+                        Transfer Stock
+                      </Button>
+                      <Button 
+                        startIcon={<VisibilityIcon />} 
+                        variant="contained" 
+                        color="secondary" 
+                        sx={{ ml: 1 }}
+                        onClick={() => setTransferHistoryOpen(true)}
+                      >
+                        View Transfer History
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </>
+          )}
         </>
       )}
-      {loading ? (
-        <CircularProgress />
-      ) : !showFallback && (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>SKU</TableCell>
-                <TableCell>Quantity</TableCell>
-                <TableCell>Location</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {items.length === 0 ? (
+
+      {tabValue === 1 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="h6" mb={2}>Stock Movements</Typography>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={4} align="center">No inventory found.</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Quantity</TableCell>
+                  <TableCell>From/To</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Reference</TableCell>
                 </TableRow>
-              ) : (
-                items.map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.sku}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell>{item.location || '-'}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell>2024-02-15</TableCell>
+                  <TableCell>Laptop Dell XPS 13</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="IN" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>25</TableCell>
+                  <TableCell>Main Warehouse</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>PO-2024-001</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-14</TableCell>
+                  <TableCell>iPhone 15 Pro</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="OUT" 
+                      color="warning"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>10</TableCell>
+                  <TableCell>Sales Floor</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>SO-2024-045</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-13</TableCell>
+                  <TableCell>Samsung Galaxy S24</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="IN" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>30</TableCell>
+                  <TableCell>Main Warehouse</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>PO-2024-002</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-12</TableCell>
+                  <TableCell>MacBook Air M3</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="OUT" 
+                      color="warning"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>5</TableCell>
+                  <TableCell>Customer Delivery</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>SO-2024-046</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-11</TableCell>
+                  <TableCell>iPad Pro 12.9"</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="IN" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>15</TableCell>
+                  <TableCell>Main Warehouse</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>PO-2024-003</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-10</TableCell>
+                  <TableCell>AirPods Pro 2</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="OUT" 
+                      color="warning"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>20</TableCell>
+                  <TableCell>Retail Store</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>SO-2024-047</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-09</TableCell>
+                  <TableCell>Surface Pro 9</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="IN" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>12</TableCell>
+                  <TableCell>Tech Warehouse</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>PO-2024-004</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>2024-02-08</TableCell>
+                  <TableCell>Nintendo Switch OLED</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="OUT" 
+                      color="warning"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>8</TableCell>
+                  <TableCell>Gaming Section</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label="Completed" 
+                      color="success"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>SO-2024-048</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       )}
 
+      {tabValue === 2 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="h6" mb={2}>Pending Stock Transfers</Typography>
+          <Grid container spacing={2} mb={2}>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom color="primary">
+                    Incoming Transfers (Awaiting Your Approval)
+                  </Typography>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Product</TableCell>
+                          <TableCell>Qty</TableCell>
+                          <TableCell>From</TableCell>
+                          <TableCell>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {mockIncomingTransfers.map((transfer, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{transfer.product}</TableCell>
+                            <TableCell>{transfer.quantity}</TableCell>
+                            <TableCell>{transfer.from}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                startIcon={<CheckIcon />}
+                                color="success"
+                                onClick={() => handleAcceptTransfer(transfer.id)}
+                                sx={{ mr: 1 }}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="small"
+                                startIcon={<CloseIcon />}
+                                color="error"
+                                onClick={() => handleRejectTransfer(transfer.id)}
+                              >
+                                Reject
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom color="warning.main">
+                    Outgoing Transfers (Awaiting Approval)
+                  </Typography>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Product</TableCell>
+                          <TableCell>Qty</TableCell>
+                          <TableCell>To</TableCell>
+                          <TableCell>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {mockOutgoingTransfers.map((transfer, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{transfer.product}</TableCell>
+                            <TableCell>{transfer.quantity}</TableCell>
+                            <TableCell>{transfer.to}</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={transfer.status} 
+                                color="warning"
+                                size="small"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+      
       {/* Transfer Stock Dialog */}
       <Dialog open={transferDialogOpen} onClose={() => setTransferDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Transfer Stock</DialogTitle>

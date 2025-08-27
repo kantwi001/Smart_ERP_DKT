@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import api from './api';
 import { AuthContext } from './AuthContext';
+import offlineStorage from './utils/offlineStorage';
 import { 
   Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   CircularProgress, Alert, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, 
@@ -64,25 +65,43 @@ const POS = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
+    console.log('POS component mounted, fetching data...');
     fetchTransactions();
     fetchProducts();
     fetchCustomers();
     // eslint-disable-next-line
   }, [token]);
 
+  useEffect(() => {
+    console.log('Products state updated:', products);
+  }, [products]);
+
   const fetchProducts = async () => {
     try {
-      const res = await api.get('/sales/products/', { headers: { Authorization: `Bearer ${token}` } });
-      setProducts(res.data);
-    } catch {}
+      const res = await api.get('/api/inventory/products/', { headers: { Authorization: `Bearer ${token}` } });
+      console.log('Products API Response:', res.data);
+      console.log('Products count:', res.data.length);
+      if (res.data && Array.isArray(res.data)) {
+        setProducts(res.data);
+        console.log('Products set in state:', res.data);
+      } else {
+        console.error('Invalid products data format:', res.data);
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+      console.error('Error details:', error.response?.data);
+      setError('Failed to load products for POS transactions.');
+      setProducts([]);
+    }
   };
+
   const fetchCustomers = async () => {
     try {
       const res = await api.get('/sales/customers/', { headers: { Authorization: `Bearer ${token}` } });
       setCustomers(res.data);
     } catch {}
   };
-
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -106,7 +125,6 @@ const POS = () => {
     setCustomerWarning('');
     setSelectedCustomer(null);
   };
-
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
   const handleProductChange = (event, value) => {
@@ -172,7 +190,10 @@ const POS = () => {
       fetchTransactions();
       handleClose();
     } catch (err) {
-      setError('Failed to record transaction.');
+      console.error('Failed to record transaction.');
+      // Fallback to offline storage
+      offlineStorage.addTransaction({ ...form, currency });
+      setError('Failed to record transaction. Saved offline.');
     }
   };
 
@@ -330,7 +351,14 @@ const POS = () => {
               getOptionLabel={option => `${option.name} (SKU: ${option.sku}) [${option.quantity} in stock]`}
               value={products.find(p => p.id === form.product) || null}
               onChange={handleProductChange}
-              renderInput={params => <TextField {...params} label="Product" margin="normal" required fullWidth />}
+              renderInput={params => <TextField {...params} label="Product" margin="normal" required fullWidth placeholder="Select a Product" />}
+              noOptionsText={products.length === 0 ? "No products available - Check console for errors" : "No matching products"}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              loading={products.length === 0}
+              onOpen={() => {
+                console.log('Product dropdown opened, products available:', products.length);
+                console.log('Products data:', products);
+              }}
             />
             <Autocomplete
               options={customers}

@@ -39,10 +39,8 @@ import ApartmentIcon from '@mui/icons-material/Apartment';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PersonIcon from '@mui/icons-material/Person';
-import CampaignIcon from '@mui/icons-material/Campaign';
 import SchoolIcon from '@mui/icons-material/School';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -50,6 +48,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import SyncIcon from '@mui/icons-material/Sync';
 import CategoryIcon from '@mui/icons-material/Category';
 import LockIcon from '@mui/icons-material/Lock';
+import { createTheme } from '@mui/material/styles';
 import './mobile.css'; // Mobile-optimized styles
 import { AuthProvider, AuthContext } from './AuthContext';
 import ProtectedRoute from './ProtectedRoute';
@@ -68,7 +67,6 @@ import ProcurementDashboardManagement from './Procurement/ProcurementDashboardMa
 import AccountingDashboard from './AccountingDashboard';
 import Accounting from './Accounting';
 import CustomersDashboard from './CustomersDashboard';
-import POSDashboard from './POSDashboard';
 import ReportingDashboard from './ReportingDashboard';
 import Leave from './HR/Leave';
 import Payroll from './HR/Payroll';
@@ -86,9 +84,9 @@ import VisitLogs from './HR/VisitLogs';
 import Meetings from './HR/Meetings';
 import EmployeeDashboard from './EmployeeDashboard';
 import Sales from './Sales';
+import ProductsModule from './Sales/ProductsModule';
 import Purchasing from './Purchasing';
 import Manufacturing from './Manufacturing';
-import POS from './POS';
 import Reporting from './Reporting';
 import Users from './Users';
 import Customers from './Customers';
@@ -113,8 +111,11 @@ import NotificationCenter from './components/NotificationCenter';
 import SystemSettingsDashboard from './SystemSettingsDashboard';
 import MobileEmployeeApp from './MobileEmployeeApp';
 import PayrollManagement from './Finance/PayrollManagement';
+import FinanceDashboard from './Finance/FinanceDashboard';
 import PurchaseOrderManagement from './Procurement/PurchaseOrderManagement';
-import { createTheme } from '@mui/material/styles';
+import NetworkStatusIndicator from './components/NetworkStatusIndicator';
+import MobileApp from './MobileApp';
+import { Capacitor } from '@capacitor/core';
 
 const drawerWidth = 260;
 
@@ -130,7 +131,7 @@ const theme = createTheme({
 });
 
 function AppShell() {
-  const { user, logout, token } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
   const location = useLocation();
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -237,7 +238,6 @@ function AppShell() {
       return [
         'employee_dashboard',    // Personal dashboard
         'inventory_view',        // View inventory (limited operations)
-        'pos_operator',          // POS operations (not full admin)
         'customers_view',        // View/add customers (limited)
         'surveys_consumer',      // Answer surveys (not create/manage)
         'route_planning_view',   // View routes (not create/manage)
@@ -321,20 +321,19 @@ function AppShell() {
             { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
             { text: 'Warehouse', icon: <InventoryIcon />, path: '/warehouse' },
             { text: 'Warehouse Transfers', icon: <SwapHorizIcon />, path: '/warehouse-transfers' },
-            { text: 'POS', icon: <PointOfSaleIcon />, path: '/pos' },
+            { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
             { text: 'Surveys', icon: <AssessmentIcon />, path: '/surveys' },
             { text: 'Route Planning', icon: <LocationOnIcon />, path: '/route-planning' },
             { text: 'Survey Admin', icon: <LockIcon />, path: '/survey-admin' },
             { text: 'PowerBI', icon: <AssessmentIcon />, path: '/powerbi' },
             { text: 'Route Planning Admin', icon: <LockIcon />, path: '/route-planning-admin' },
-            { text: 'Customers', icon: <PeopleIcon />, path: '/customers' }
+            { text: 'Products', icon: <ShoppingCartIcon />, path: '/products' },
+            { text: 'Categories', icon: <CategoryIcon />, path: '/categories' }
           ]
         },
         { text: 'Finance', icon: <AccountBalanceIcon />, path: '/finance' },
         { text: 'Manufacturing', icon: <FactoryIcon />, path: '/manufacturing' },
         { text: 'Reporting', icon: <AssessmentIcon />, path: '/reporting' },
-        { text: 'Products', icon: <InventoryIcon />, path: '/products', role: 'sales' },
-        { text: 'Categories', icon: <CategoryIcon />, path: '/categories', role: 'sales' },
         { text: 'Procurement & Logistics Report', icon: <ShoppingCartIcon />, path: '/procurement' },
         { text: 'Procurement Management', icon: <ShoppingCartIcon />, path: '/procurement/management' },
         { text: 'Users', icon: <SupervisorAccountIcon />, path: '/users' },
@@ -358,7 +357,6 @@ function AppShell() {
             { text: 'Sales Dashboard', icon: <MonetizationOnIcon />, path: '/sales' },
             { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
             { text: 'Warehouse', icon: <InventoryIcon />, path: '/warehouse' },
-            { text: 'POS', icon: <PointOfSaleIcon />, path: '/pos' },
             { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
             { text: 'Surveys', icon: <AssessmentIcon />, path: '/surveys' },
             { text: 'Route Planning', icon: <LocationOnIcon />, path: '/route-planning' },
@@ -409,7 +407,6 @@ function AppShell() {
         'Task': 'tasks_assigned',              // Only assigned tasks, not task management
         'Notifications': 'notifications',
         'Inventory': 'inventory_view',         // View-only for sales
-        'POS': 'pos_operator',                 // Operator access, not admin
         'Customers': 'customers_view',         // Limited customer access
         'Surveys': 'surveys_consumer',         // Answer surveys, not create/manage
         'Route Planning': 'route_planning_view', // View routes, not create/manage
@@ -425,8 +422,8 @@ function AppShell() {
         'Finance': 'finance',           // Full admin access (managers only)
         'Manufacturing': 'manufacturing',     // Full admin access (managers only)
         'Reporting': 'reporting',             // Full admin access (managers only)
-        'Products': 'inventory',              // Full admin access (managers only)
-        'Categories': 'inventory',            // Full admin access (managers only)
+        'Products': 'sales',                  // Sales users can manage products
+        'Categories': 'sales',                // Sales users can manage categories
         'Procurement & Logistics Report': 'procurement',         // Full admin access (managers only)
         'Procurement Management': 'procurement',         // Full admin access (managers only)
         'Users': 'users',                     // Full admin access (managers only)
@@ -483,7 +480,7 @@ function AppShell() {
         const handleClick = () => openStates.setOpenHR(o => !o);
         return (
           <React.Fragment key={item.text}>
-            <ListItem button={true} onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#e3f2fd' : undefined, borderRadius: 2, mb: 0.5, '&:hover': { bgcolor: '#f5f5f5' } }}>
+            <ListItem onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#e3f2fd' : undefined, borderRadius: 2, mb: 0.5, '&:hover': { bgcolor: '#f5f5f5' } }}>
               <ListItemIcon sx={{ color: open ? '#1976d2' : '#424242' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} sx={{ color: open ? '#1976d2' : '#424242', fontWeight: 600 }} />
               {open ? <ExpandLess /> : <ExpandMore />}
@@ -501,7 +498,7 @@ function AppShell() {
         const handleClick = () => openStates.setOpenPeople(o => !o);
         return (
           <React.Fragment key={item.text}>
-            <ListItem button={true} onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#f5f5f5' : undefined, borderRadius: 2, mb: 0.5 }}>
+            <ListItem onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#f5f5f5' : undefined, borderRadius: 2, mb: 0.5 }}>
               <ListItemIcon sx={{ color: open ? '#f57c00' : '#424242' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} sx={{ color: open ? '#f57c00' : '#424242', fontWeight: 600 }} />
               {open ? <ExpandLess /> : <ExpandMore />}
@@ -519,7 +516,7 @@ function AppShell() {
         const handleClick = () => openStates.setOpenProcesses(o => !o);
         return (
           <React.Fragment key={item.text}>
-            <ListItem button={true} onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#f5f5f5' : undefined, borderRadius: 2, mb: 0.5 }}>
+            <ListItem onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#f5f5f5' : undefined, borderRadius: 2, mb: 0.5 }}>
               <ListItemIcon sx={{ color: open ? '#f57c00' : '#424242' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} sx={{ color: open ? '#f57c00' : '#424242', fontWeight: 600 }} />
               {open ? <ExpandLess /> : <ExpandMore />}
@@ -537,7 +534,7 @@ function AppShell() {
         const handleClick = () => openStates.setOpenSales(o => !o);
         return (
           <React.Fragment key={item.text}>
-            <ListItem button={true} onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#e8f5e8' : undefined, borderRadius: 2, mb: 0.5 }}>
+            <ListItem onClick={handleClick} sx={{ pl: 2 + 2 * level, bgcolor: open ? '#e8f5e8' : undefined, borderRadius: 2, mb: 0.5 }}>
               <ListItemIcon sx={{ color: open ? '#2e7d32' : '#4caf50' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} sx={{ color: open ? '#2e7d32' : '#4caf50', fontWeight: 600 }} />
               {open ? <ExpandLess /> : <ExpandMore />}
@@ -552,7 +549,7 @@ function AppShell() {
       }
       if (!item.subItems && (!item.role || (user && user.role === item.role))) {
         return (
-          <ListItem button={true} key={item.text} component={Link} to={item.path} selected={location.pathname === item.path}
+          <ListItem key={item.text} component={Link} to={item.path} selected={location.pathname === item.path}
             sx={{ pl: 2 + 2 * level, bgcolor: location.pathname === item.path ? '#e3f2fd' : undefined, borderRadius: 2, mb: 0.5, '&:hover': { bgcolor: '#f5f5f5' } }}>
             <ListItemIcon sx={{ color: location.pathname === item.path ? '#1976d2' : '#424242' }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.text} sx={{ color: location.pathname === item.path ? '#1976d2' : '#424242' }} />
@@ -565,7 +562,7 @@ function AppShell() {
   }
 
   // Add authentication status check
-  const isAuthenticated = user && token;
+  const isAuthenticated = user;
   
   // If not authenticated, show login screen instead of dashboards
   if (!isAuthenticated && location.pathname !== '/login') {
@@ -690,6 +687,9 @@ function AppShell() {
                   <NotificationsIcon />
                 </Badge>
               </IconButton>
+
+              {/* Network Status Indicator */}
+              <NetworkStatusIndicator />
 
               {/* User Menu */}
               <Box sx={{ 
@@ -836,20 +836,17 @@ function AppShell() {
               <Route path="/hr/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
               <Route path="/hr/departments" element={<ProtectedRoute><DepartmentManagement /></ProtectedRoute>} />
               <Route path="/sales" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
-              <Route path="/sales/management" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-              <Route path="/finance" element={<ProtectedRoute><AccountingDashboard /></ProtectedRoute>} />
+              <Route path="/finance" element={<ProtectedRoute><FinanceDashboard /></ProtectedRoute>} />
               <Route path="/finance/management" element={<ProtectedRoute><Accounting /></ProtectedRoute>} />
               <Route path="/finance/payroll" element={<ProtectedRoute><PayrollManagement /></ProtectedRoute>} />
               <Route path="/purchasing" element={<ProtectedRoute><Purchasing /></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><ManufacturingDashboard /></ProtectedRoute>} />
               <Route path="/manufacturing/management" element={<ProtectedRoute><Manufacturing /></ProtectedRoute>} />
-              <Route path="/pos" element={<ProtectedRoute><POSDashboard /></ProtectedRoute>} />
-              <Route path="/pos/management" element={<ProtectedRoute><POS /></ProtectedRoute>} />
               <Route path="/reporting" element={<ProtectedRoute><ReportingDashboard /></ProtectedRoute>} />
               <Route path="/reporting/management" element={<ProtectedRoute><Reporting /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><CustomersDashboard /></ProtectedRoute>} />
               <Route path="/customers/management" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-              <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+              <Route path="/products" element={<ProtectedRoute><ProductsModule /></ProtectedRoute>} />
               <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
               <Route path="/procurement" element={<ProtectedRoute><ProcurementModule /></ProtectedRoute>} />
               <Route path="/procurement/management" element={<ProtectedRoute><ProcurementDashboardManagement /></ProtectedRoute>} />
@@ -892,6 +889,11 @@ function AppShell() {
 }
 
 function App() {
+  // Check if running on mobile platform
+  if (Capacitor.isNativePlatform()) {
+    return <MobileApp />;
+  }
+
   return (
     <AuthProvider>
       <Router>

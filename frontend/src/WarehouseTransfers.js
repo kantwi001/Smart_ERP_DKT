@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useContext } from 'react';
 import api from './api';
 import { AuthContext } from './AuthContext';
-import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from '@mui/material';
+import { 
+  getGlobalTransferHistory,
+  addTransferToHistory,
+  updateTransferStatus,
+  getGlobalProducts,
+  loadWarehousesWithFallback
+} from './sharedData';
+import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Chip, FormControl, InputLabel, Select } from '@mui/material';
 
 const WarehouseTransfers = () => {
   const { token } = useContext(AuthContext);
@@ -9,10 +16,16 @@ const WarehouseTransfers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ sku: '', quantity: '', from_location: '', to_location: '' });
+  const [form, setForm] = useState({ product: '', quantity: '', fromWarehouse: '', toWarehouse: '', notes: '' });
+  const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [user, setUser] = useState({});
 
   useEffect(() => {
     fetchTransfers();
+    fetchProducts();
+    fetchWarehouses();
+    fetchUser();
     // eslint-disable-next-line
   }, [token]);
 
@@ -20,21 +33,51 @@ const WarehouseTransfers = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/inventory/transfers/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setTransfers(res.data);
+      // Use global transfer history instead of API
+      const transferHistory = getGlobalTransferHistory();
+      setTransfers(transferHistory);
+      console.log('[Warehouse Transfers] Loaded transfers:', transferHistory.length);
     } catch (err) {
+      console.error('[Warehouse Transfers] Error loading transfers:', err);
       setError('Failed to load transfers.');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const products = await getGlobalProducts();
+      setProducts(products);
+    } catch (err) {
+      console.error('Failed to load products:', err);
+    }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      const warehouses = await loadWarehousesWithFallback();
+      setWarehouses(warehouses);
+    } catch (err) {
+      console.error('Failed to load warehouses:', err);
+    }
+  };
+
+  const fetchUser = async () => {
+    try {
+      const user = await api.get('/users/me/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(user.data);
+    } catch (err) {
+      console.error('Failed to load user:', err);
+    }
+  };
+
   const handleOpen = () => setOpen(true);
   const handleClose = () => {
     setOpen(false);
-    setForm({ sku: '', quantity: '', from_location: '', to_location: '' });
+    setForm({ product: '', quantity: '', fromWarehouse: '', toWarehouse: '', notes: '' });
   };
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
@@ -42,54 +85,164 @@ const WarehouseTransfers = () => {
   const handleSubmit = async e => {
     e.preventDefault();
     try {
-      await api.post('/inventory/transfers/', form, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchTransfers();
+      if (!form.product || !form.quantity || !form.fromWarehouse || !form.toWarehouse) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      if (form.fromWarehouse === form.toWarehouse) {
+        setError('Source and destination warehouses must be different');
+        return;
+      }
+
+      // Find selected product and warehouses
+      const selectedProduct = products.find(p => p.name === form.product || p.id === parseInt(form.product));
+      const fromWarehouse = warehouses.find(w => w.name === form.fromWarehouse || w.id === parseInt(form.fromWarehouse));
+      const toWarehouse = warehouses.find(w => w.name === form.toWarehouse || w.id === parseInt(form.toWarehouse));
+
+      // Create transfer record
+      const transferData = {
+        product: selectedProduct?.name || form.product,
+        productSku: selectedProduct?.sku || 'MANUAL-TRANSFER',
+        quantity: parseInt(form.quantity),
+        from: fromWarehouse?.name || form.fromWarehouse,
+        to: toWarehouse?.name || form.toWarehouse,
+        status: 'pending',
+        transferType: 'inter_warehouse',
+        requestedBy: user?.first_name + ' ' + user?.last_name || 'Warehouse Manager',
+        approvedBy: null,
+        notes: form.notes || `Transfer ${selectedProduct?.name || form.product} from ${fromWarehouse?.name || form.fromWarehouse} to ${toWarehouse?.name || form.toWarehouse}`
+      };
+
+      // Add to transfer history
+      addTransferToHistory(transferData);
+      
+      setError(null);
+      setForm({ product: '', quantity: '', fromWarehouse: '', toWarehouse: '', notes: '' });
       handleClose();
     } catch (err) {
+      console.error('Failed to create transfer:', err);
       setError('Failed to create transfer.');
     }
   };
 
   // Print waybill for a warehouse transfer
-  const handlePrintWaybill = async (id) => {
+  const handlePrintWaybill = (transfer) => {
     try {
-      // First get transfer details to create a better filename
-      const transferRes = await api.get(`/inventory/transfers/${id}/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const transfer = transferRes.data;
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
       
-      // Generate PDF waybill
-      const res = await api.get(`/inventory/transfers/${id}/print_waybill/`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob',
-      });
+      // Generate waybill HTML content
+      const waybillHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Waybill - ${transfer.referenceNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .company-name { font-size: 24px; font-weight: bold; color: #1976d2; }
+            .waybill-title { font-size: 20px; margin: 10px 0; }
+            .reference { font-size: 14px; color: #666; }
+            .details-section { margin: 20px 0; }
+            .details-row { display: flex; justify-content: space-between; margin: 10px 0; }
+            .details-label { font-weight: bold; }
+            .transfer-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .transfer-table th, .transfer-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .transfer-table th { background-color: #f5f5f5; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
+            .signature-box { width: 200px; text-align: center; }
+            .signature-line { border-top: 1px solid #000; margin-top: 40px; padding-top: 5px; }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">Smart ERP Software</div>
+            <div class="waybill-title">WAREHOUSE TRANSFER WAYBILL</div>
+            <div class="reference">Reference: ${transfer.referenceNumber}</div>
+          </div>
+          
+          <div class="details-section">
+            <div class="details-row">
+              <span><span class="details-label">Date:</span> ${transfer.date}</span>
+              <span><span class="details-label">Status:</span> ${transfer.status.toUpperCase()}</span>
+            </div>
+            <div class="details-row">
+              <span><span class="details-label">Transfer Type:</span> ${transfer.transferType === 'inter_warehouse' ? 'Inter-Warehouse' : 'Supplier'}</span>
+              <span><span class="details-label">Requested By:</span> ${transfer.requestedBy}</span>
+            </div>
+          </div>
+          
+          <div class="details-section">
+            <h3>Transfer Details</h3>
+            <div class="details-row">
+              <span><span class="details-label">From Warehouse:</span> ${transfer.from}</span>
+              <span><span class="details-label">To Warehouse:</span> ${transfer.to}</span>
+            </div>
+          </div>
+          
+          <table class="transfer-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Quantity</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${transfer.product}</td>
+                <td>${transfer.productSku}</td>
+                <td>${transfer.quantity}</td>
+                <td>${transfer.notes || 'N/A'}</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div class="details-section">
+            <div class="details-row">
+              <span><span class="details-label">Approved By:</span> ${transfer.approvedBy || 'Pending Approval'}</span>
+              <span><span class="details-label">Print Date:</span> ${new Date().toLocaleString()}</span>
+            </div>
+          </div>
+          
+          <div class="signatures">
+            <div class="signature-box">
+              <div class="signature-line">Sender Signature</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line">Receiver Signature</div>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p>This is a computer-generated waybill. Please verify all details before processing.</p>
+            <p>Smart ERP Software - Warehouse Management System</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() {
+                window.close();
+              };
+            };
+          </script>
+        </body>
+        </html>
+      `;
       
-      // Create descriptive filename
-      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const transferDate = transfer.created_at ? new Date(transfer.created_at).toISOString().split('T')[0] : currentDate;
-      const fromWarehouse = transfer.from_warehouse_name || transfer.from_location || 'Unknown';
-      const toWarehouse = transfer.to_warehouse_name || transfer.to_location || 'Unknown';
-      const productSku = transfer.product_sku || transfer.sku || 'Multiple';
+      // Write content to print window and trigger print
+      printWindow.document.write(waybillHTML);
+      printWindow.document.close();
       
-      // Clean warehouse names for filename (remove special characters)
-      const cleanFromWarehouse = fromWarehouse.replace(/[^a-zA-Z0-9]/g, '');
-      const cleanToWarehouse = toWarehouse.replace(/[^a-zA-Z0-9]/g, '');
-      const cleanProductSku = productSku.replace(/[^a-zA-Z0-9]/g, '');
-      
-      // Create professional filename: Waybill_TransferID_FromWarehouse_ToWarehouse_ProductSKU_Date.pdf
-      const filename = `Waybill_T${id}_${cleanFromWarehouse}_to_${cleanToWarehouse}_${cleanProductSku}_${transferDate}.pdf`;
-      
-      const blob = new Blob([res.data], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      link.href = window.URL.createObjectURL(blob);
-      link.download = filename;
-      link.click();
-      window.URL.revokeObjectURL(link.href);
-      
-      console.log(`Waybill downloaded: ${filename}`);
+      console.log(`Waybill printed for transfer: ${transfer.referenceNumber}`);
     } catch (err) {
       console.error('Failed to print waybill:', err);
       alert('Failed to print waybill. Please try again.');
@@ -133,7 +286,7 @@ const WarehouseTransfers = () => {
                     <TableCell>{tr.to_location}</TableCell>
                     <TableCell>{tr.created_at ? new Date(tr.created_at).toLocaleString() : '-'}</TableCell>
                     <TableCell>
-                      <Button size="small" variant="outlined" color="primary" onClick={() => handlePrintWaybill(tr.id)}>
+                      <Button size="small" variant="outlined" color="primary" onClick={() => handlePrintWaybill(tr)}>
                         Print Waybill
                       </Button>
                     </TableCell>
@@ -148,10 +301,52 @@ const WarehouseTransfers = () => {
         <DialogTitle>New Warehouse Transfer</DialogTitle>
         <DialogContent>
           <form id="transfer-form" onSubmit={handleSubmit}>
-            <TextField label="SKU" name="sku" value={form.sku} onChange={handleChange} fullWidth margin="normal" required />
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="product-label">Product</InputLabel>
+              <Select
+                labelId="product-label"
+                id="product"
+                name="product"
+                value={form.product}
+                label="Product"
+                onChange={handleChange}
+              >
+                {products.map(p => (
+                  <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField label="Quantity" name="quantity" value={form.quantity} onChange={handleChange} fullWidth margin="normal" type="number" required />
-            <TextField label="From Location" name="from_location" value={form.from_location} onChange={handleChange} fullWidth margin="normal" required />
-            <TextField label="To Location" name="to_location" value={form.to_location} onChange={handleChange} fullWidth margin="normal" required />
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="from-warehouse-label">From Warehouse</InputLabel>
+              <Select
+                labelId="from-warehouse-label"
+                id="fromWarehouse"
+                name="fromWarehouse"
+                value={form.fromWarehouse}
+                label="From Warehouse"
+                onChange={handleChange}
+              >
+                {warehouses.map(w => (
+                  <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="to-warehouse-label">To Warehouse</InputLabel>
+              <Select
+                labelId="to-warehouse-label"
+                id="toWarehouse"
+                name="toWarehouse"
+                value={form.toWarehouse}
+                label="To Warehouse"
+                onChange={handleChange}
+              >
+                {warehouses.map(w => (
+                  <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </form>
         </DialogContent>
         <DialogActions>

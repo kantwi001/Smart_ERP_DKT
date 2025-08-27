@@ -3,7 +3,8 @@ from .views import (
     RegisterView, UserDetailView, UserListView, UserRetrieveUpdateView,
     get_roles, get_permissions, update_user_role, get_user_stats,
     SystemSettingsView, test_smtp_settings, create_user_with_email, delete_user,
-    ProfileUpdateView, ForgotPasswordView, ResetPasswordView
+    ProfileUpdateView, ForgotPasswordView, ResetPasswordView, update_user_department,
+    get_departments, get_warehouses
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -16,9 +17,12 @@ urlpatterns = [
     path('roles/', get_roles, name='get-roles'),
     path('permissions/', get_permissions, name='get-permissions'),
     path('<int:user_id>/role/', update_user_role, name='update-user-role'),
+    path('<int:user_id>/update-department/', update_user_department, name='update-user-department'),
     path('stats/', get_user_stats, name='user-stats'),
     path('create/', create_user_with_email, name='create-user-with-email'),
     path('<int:user_id>/delete/', delete_user, name='delete-user'),
+    path('departments/', get_departments, name='get-departments'),
+    path('warehouses/', get_warehouses, name='get-warehouses'),
     
     # Password Reset endpoints
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),

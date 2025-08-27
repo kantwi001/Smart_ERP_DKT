@@ -40,7 +40,7 @@ export default function RoutePlanningAdmin() {
   };
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('/api/users/');
+      const res = await axios.get(`${API_BASE}/users/`);
       setUsers(res.data);
     } catch (e) {}
   };

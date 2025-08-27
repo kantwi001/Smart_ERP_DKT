@@ -20,6 +20,7 @@ cleanup_ports() {
     fi
     
     sleep 2
+    echo "✅ Port cleanup completed"
 }
 
 # Function to start backend server

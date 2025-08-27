@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import models
 from sales.models import Sale, Customer
-from accounting.models import Transaction
+from accounting.models import LegacyTransaction
 from users.models import User
 from .models import (
     Report, Survey, SurveyQuestion, SurveyResponse, SurveyAnswer,

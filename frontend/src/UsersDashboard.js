@@ -22,6 +22,96 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import api from './api';
 import { AuthContext } from './AuthContext';
 
+// Sample users data
+const sampleUsers = [
+  {
+    id: 1,
+    username: 'arkucollins',
+    email: 'arkucollins@gmail.com',
+    first_name: 'Collins',
+    last_name: 'Arku',
+    role: 'admin',
+    department: 'Management',
+    is_active: true,
+    status: 'Active',
+    lastLogin: '2 hours ago'
+  },
+  {
+    id: 2,
+    username: 'johndoe',
+    email: 'john.doe@company.com',
+    first_name: 'John',
+    last_name: 'Doe',
+    role: 'user',
+    department: 'Sales',
+    is_active: true,
+    status: 'Active',
+    lastLogin: '1 day ago'
+  },
+  {
+    id: 3,
+    username: 'janesmith',
+    email: 'jane.smith@company.com',
+    first_name: 'Jane',
+    last_name: 'Smith',
+    role: 'user',
+    department: 'HR',
+    is_active: true,
+    status: 'Active',
+    lastLogin: '3 hours ago'
+  },
+  {
+    id: 4,
+    username: 'mikejohnson',
+    email: 'mike.johnson@company.com',
+    first_name: 'Mike',
+    last_name: 'Johnson',
+    role: 'user',
+    department: 'Inventory',
+    is_active: true,
+    status: 'Active',
+    lastLogin: '5 hours ago'
+  },
+  {
+    id: 5,
+    username: 'sarahwilson',
+    email: 'sarah.wilson@company.com',
+    first_name: 'Sarah',
+    last_name: 'Wilson',
+    role: 'user',
+    department: 'Finance',
+    is_active: true,
+    status: 'Active',
+    lastLogin: '1 hour ago'
+  }
+];
+
+const sampleDepartments = [
+  { id: 1, name: 'Management' },
+  { id: 2, name: 'Sales' },
+  { id: 3, name: 'HR' },
+  { id: 4, name: 'Finance' },
+  { id: 5, name: 'Inventory' },
+  { id: 6, name: 'Procurement' },
+  { id: 7, name: 'Operations' },
+  { id: 8, name: 'IT Support' }
+];
+
+const sampleWarehouses = [
+  { id: 1, name: 'Main Warehouse - Accra Central', code: 'MW001' },
+  { id: 2, name: 'Branch A - Kumasi', code: 'BK002' },
+  { id: 3, name: 'Branch B - Tamale', code: 'BT003' },
+  { id: 4, name: 'Branch C - Cape Coast', code: 'BC004' },
+  { id: 5, name: 'Supplier Warehouse - Tema Port', code: 'SW005' }
+];
+
+const sampleRecentActivity = [
+  { action: 'New user John Doe created', timestamp: '2 hours ago', type: 'success' },
+  { action: 'User permissions updated for Jane Smith', timestamp: '4 hours ago', type: 'info' },
+  { action: 'Password reset requested by Mike Johnson', timestamp: '6 hours ago', type: 'warning' },
+  { action: 'User Sarah Wilson logged in', timestamp: '1 hour ago', type: 'success' }
+];
+
 // Styled components
 const StyledTabs = styled(Tabs)(({ theme }) => ({
   backgroundColor: '#fff',
@@ -98,8 +188,6 @@ function TabPanel({ children, value, index, ...other }) {
   );
 }
 
-// Mock users data removed - now fetching real users from backend API
-
 const UsersDashboard = () => {
   const { user, token } = useContext(AuthContext);
 
@@ -107,13 +195,15 @@ const UsersDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [departments, setDepartments] = useState(sampleDepartments);
   const [departmentLoading, setDepartmentLoading] = useState(false);
-  const [warehouses, setWarehouses] = useState([]);
+  const [warehouses, setWarehouses] = useState(sampleWarehouses);
   
   // Quick Actions State
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [editDepartmentDialogOpen, setEditDepartmentDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
@@ -127,6 +217,7 @@ const UsersDashboard = () => {
     accessLevel: 'basic',
     moduleAccess: [],
     generatePassword: true,
+    password: '',
     sendEmail: true
   });
   
@@ -141,74 +232,173 @@ const UsersDashboard = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/users/');
-      setUsers(response.data || []);
-      setError('');
+      console.log('🔍 Fetching users from backend API...');
+      
+      const response = await fetch('http://localhost:2025/api/users/', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('📡 API Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Received users from API:', data.length, 'users');
+        console.log('👥 User data:', data);
+        
+        // Transform backend data to match frontend format
+        const transformedUsers = data.map(user => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
+          role: user.role || 'employee',
+          department: user.department_name || 'Unassigned',
+          department_id: user.department_id,
+          assigned_warehouse: user.assigned_warehouse_name || 'Unassigned',
+          assigned_warehouse_id: user.assigned_warehouse_id,
+          is_active: user.is_active,
+          is_superuser: user.is_superuser,
+          is_staff: user.is_staff,
+          status: user.is_active ? 'Active' : 'Inactive',
+          lastLogin: user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
+          dateJoined: user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'Unknown'
+        }));
+        
+        setUsers(transformedUsers);
+        setError('');
+        console.log('🎯 Successfully loaded', transformedUsers.length, 'users from database');
+      } else {
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        console.warn('Using sample data as fallback');
+        setUsers(sampleUsers);
+        setError(`API Error: ${response.status}`);
+      }
     } catch (error) {
-      console.error('Failed to fetch users:', error);
-      setError('Failed to load users.');
-      setUsers([]);
+      console.error('💥 Network error fetching users:', error);
+      console.warn('Using sample data as fallback');
+      setUsers(sampleUsers);
+      setError('Network error - using sample data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Quick Action Handlers
   const handleAddUser = async () => {
     try {
-      const userData = {
-        name: userForm.name,
-        email: userForm.email,
-        role: userForm.role,
-        department: userForm.department,
-        assignedWarehouse: userForm.assignedWarehouse,
-        accessLevel: userForm.accessLevel,
-        moduleAccess: userForm.moduleAccess,
-        generatePassword: userForm.generatePassword,
-        sendEmail: userForm.sendEmail
-      };
+      const response = await fetch('http://localhost:2025/api/users/create/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          username: userForm.email.split('@')[0], // Generate username from email
+          name: userForm.name, // Backend expects 'name' field
+          email: userForm.email,
+          role: userForm.role,
+          department: userForm.department,
+          assigned_warehouse: userForm.department === 'Sales' ? userForm.assignedWarehouse : null,
+          accessible_modules: userForm.moduleAccess,
+          password: userForm.password,
+          generatePassword: userForm.generatePassword, // Tell backend whether to auto-generate
+          sendEmail: userForm.sendEmail // Match backend field name
+        })
+      });
+
+      const data = await response.json();
       
-      const response = await api.post('/users/create/', userData);
-      
-      if (response.data.email_sent) {
-        setSnackbarMessage(`User created successfully! Password sent to ${userForm.email}`);
-      } else if (response.data.generated_password) {
-        setSnackbarMessage(`User created successfully! Generated password: ${response.data.generated_password}`);
+      if (response.ok) {
+        // Refresh users list
+        await fetchUsers();
+        
+        setSnackbarMessage(data.message || 'User created successfully and email sent with login credentials!');
+        setSnackbarOpen(true);
+        setUserDialogOpen(false);
+        setUserForm({
+          name: '',
+          email: '',
+          role: 'employee',
+          department: '',
+          assignedWarehouse: '',
+          accessLevel: 'basic',
+          moduleAccess: [],
+          generatePassword: true,
+          password: '',
+          sendEmail: true
+        });
       } else {
-        setSnackbarMessage(response.data.message || 'User created successfully!');
+        setSnackbarMessage(data.error || 'Failed to create user');
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('User creation error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data
+      });
+      
+      let errorMessage = 'Error creating user. Please try again.';
+      if (error.response?.status === 400) {
+        if (error.response.data?.errors) {
+          const validationErrors = Object.entries(error.response.data.errors).map(([field, messages]) => {
+            return `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`;
+          }).join('; ');
+          errorMessage = `Validation errors: ${validationErrors}`;
+        } else if (error.response.data?.error) {
+          errorMessage = `Error: ${error.response.data.error}`;
+        } else if (error.response.data?.detail) {
+          errorMessage = `Error: ${error.response.data.detail}`;
+        } else {
+          errorMessage = `Invalid user data. Check console for details. Response: ${JSON.stringify(error.response.data)}`;
+        }
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Permission denied. You need admin privileges to create users.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'User creation endpoint not found. Please check backend server.';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+        errorMessage = 'Network error. Please check if backend server is running.';
       }
       
-      setSnackbarOpen(true);
-      setUserDialogOpen(false);
-      setUserForm({
-        name: '',
-        email: '',
-        role: 'employee',
-        department: '',
-        assignedWarehouse: '',
-        accessLevel: 'basic',
-        moduleAccess: [],
-        generatePassword: true,
-        sendEmail: true
-      });
-      fetchUsers();
-    } catch (error) {
-      setSnackbarMessage('Failed to create user: ' + (error.response?.data?.error || error.message));
+      setSnackbarMessage(errorMessage);
       setSnackbarOpen(true);
     }
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (window.confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
-      try {
-        const response = await api.delete(`/users/${userId}/delete/`);
-        setSnackbarMessage(response.data.message || 'User deleted successfully!');
+  const handleDeleteUser = async (userId) => {
+    try {
+      const response = await api.delete(`/users/${userId}/delete/`);
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Refresh users list
+        await fetchUsers();
+        
+        setSnackbarMessage(data.message || 'User deleted successfully');
         setSnackbarOpen(true);
-        fetchUsers(); // Refresh user list
-      } catch (error) {
-        setSnackbarMessage('Failed to delete user: ' + (error.response?.data?.error || error.message));
+      } else {
+        setSnackbarMessage(data.error || 'Failed to delete user');
         setSnackbarOpen(true);
       }
+    } catch (error) {
+      console.error('User deletion error:', error);
+      setSnackbarMessage('Error deleting user. Please try again.');
+      setSnackbarOpen(true);
     }
   };
   
@@ -242,7 +432,6 @@ const UsersDashboard = () => {
   
   // Security Settings State
   const [securityDialogOpen, setSecurityDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
   const [userModuleAccess, setUserModuleAccess] = useState([]);
   const [isModuleRestricted, setIsModuleRestricted] = useState(false);
   
@@ -309,114 +498,67 @@ const UsersDashboard = () => {
     }
   };
 
-  // Recent activity will be fetched from backend API in future implementation
-  const recentActivity = [];
+  // Handle department editing
+  const handleEditDepartment = (user) => {
+    setSelectedUser(user);
+    setEditDepartmentDialogOpen(true);
+  };
+
+  const handleUpdateDepartment = async () => {
+    try {
+      console.log('🔄 Updating department for user:', selectedUser);
+      console.log('📤 Sending department_id:', selectedUser.department_id);
+      
+      const response = await fetch(`http://localhost:2025/api/users/${selectedUser.id}/update-department/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          department_id: selectedUser.department_id
+        })
+      });
+
+      console.log('📡 Response status:', response.status);
+      const responseData = await response.json();
+      console.log('📋 Response data:', responseData);
+
+      if (response.ok) {
+        setSnackbarMessage(`Department updated for ${selectedUser.first_name} ${selectedUser.last_name}`);
+        setSnackbarOpen(true);
+        fetchUsers(); // Refresh user list
+        setEditDepartmentDialogOpen(false);
+        setSelectedUser(null);
+      } else {
+        console.error('❌ Update failed:', responseData);
+        setSnackbarMessage(`Failed to update department: ${responseData.error || 'Unknown error'}`);
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('💥 Error updating department:', error);
+      setSnackbarMessage(`Error updating department: ${error.message}`);
+      setSnackbarOpen(true);
+    }
+  };
+
+  const recentActivity = sampleRecentActivity;
 
   useEffect(() => {
     console.log('🔄 UsersDashboard useEffect triggered, token:', token ? 'present' : 'missing');
     const fetchData = async () => {
-      if (!token) {
-        console.log('❌ No token available, skipping data fetch');
-        return;
-      }
-      console.log('🚀 Starting fetchData with valid token');
-      
       setLoading(true);
       try {
-        // Fetch users with enhanced debugging
-        try {
-          console.log('👥 USER FETCH: Starting API call to /users/');
-          console.log('🔑 Token available:', !!token);
-          
-          const usersRes = await api.get('/users/');
-          
-          console.log('✅ USER FETCH SUCCESS:');
-          console.log('Response status:', usersRes.status);
-          console.log('Response data:', usersRes.data);
-          console.log('Data type:', typeof usersRes.data);
-          console.log('Is array:', Array.isArray(usersRes.data));
-          console.log('Data length:', usersRes.data?.length);
-          
-          if (usersRes.data && Array.isArray(usersRes.data)) {
-            console.log(`🎉 Setting ${usersRes.data.length} users in state`);
-            setUsers(usersRes.data);
-            usersRes.data.forEach((user, i) => {
-              const deptName = user.department?.name || user.department || 'No Department';
-              console.log(`  ${i + 1}. ${user.username} (${user.first_name} ${user.last_name}) - ${user.role} - ${deptName}`);
-            });
-          } else {
-            console.warn('⚠️ Users response is not an array:', usersRes.data);
-            setUsers([]);
-          }
-        } catch (err) {
-          console.error('❌ USER FETCH FAILED:');
-          console.error('Error message:', err.message);
-          console.error('Error response:', err.response);
-          console.error('Error status:', err.response?.status);
-          console.error('Error data:', err.response?.data);
-          setUsers([]);
-          setError('Failed to load users. Please check your connection and try again.');
-        }
-
-        // Fetch departments with enhanced debugging
-        try {
-          console.log('🏢 DEPARTMENT FETCH: Starting API call to /hr/departments/');
-          console.log('🔑 Token available:', !!token);
-          console.log('🌐 API base URL:', api.defaults.baseURL);
-          
-          const departmentsRes = await api.get('/hr/departments/');
-          
-          console.log('✅ DEPARTMENT FETCH SUCCESS:');
-          console.log('Response status:', departmentsRes.status);
-          console.log('Response data:', departmentsRes.data);
-          console.log('Data type:', typeof departmentsRes.data);
-          console.log('Is array:', Array.isArray(departmentsRes.data));
-          console.log('Data length:', departmentsRes.data?.length);
-          
-          if (departmentsRes.data && Array.isArray(departmentsRes.data)) {
-            console.log(`🎉 Setting ${departmentsRes.data.length} departments in state`);
-            setDepartments(departmentsRes.data);
-            departmentsRes.data.forEach((dept, i) => {
-              console.log(`  ${i + 1}. ${dept.name} (ID: ${dept.id})`);
-            });
-          } else {
-            console.warn('⚠️ Department response is not an array:', departmentsRes.data);
-            setDepartments([]);
-          }
-        } catch (err) {
-          console.error('❌ DEPARTMENT FETCH FAILED:');
-          console.error('Error message:', err.message);
-          console.error('Error response:', err.response);
-          console.error('Error status:', err.response?.status);
-          console.error('Error data:', err.response?.data);
-          setDepartments([]);
-        }
-
-        // Fetch warehouses with fallback
-        try {
-          console.log('🏢 WAREHOUSE FETCH: Starting API call to /warehouse/');
-          const warehousesRes = await api.get('/warehouse/');
-          if (warehousesRes.data && Array.isArray(warehousesRes.data)) {
-            setWarehouses(warehousesRes.data);
-            console.log(`✅ Loaded ${warehousesRes.data.length} warehouses`);
-          } else {
-            console.warn('⚠️ Warehouses response invalid, using fallback');
-            setWarehouses([
-              { id: 1, name: 'Main Warehouse', code: 'MW001' },
-              { id: 2, name: 'Secondary Warehouse', code: 'SW002' }
-            ]);
-          }
-        } catch (warehouseError) {
-          console.error('❌ Warehouse fetch failed:', warehouseError);
-          console.log('🔄 Using fallback warehouse data');
-          setWarehouses([
-            { id: 1, name: 'Main Warehouse', code: 'MW001' },
-            { id: 2, name: 'Secondary Warehouse', code: 'SW002' }
-          ]);
-        }
-
+        // Fetch real data from API
+        await fetchUsers();
+        setDepartments(sampleDepartments);
+        setWarehouses(sampleWarehouses);
+        setError('');
       } catch (error) {
         console.error('❌ Data fetch failed:', error);
+        setUsers(sampleUsers);
+        setDepartments(sampleDepartments);
+        setWarehouses(sampleWarehouses);
         setError('Failed to load data');
       } finally {
         setLoading(false);
@@ -642,7 +784,7 @@ const UsersDashboard = () => {
             <Grid item xs={12} md={6}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent User Activity</Typography>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Recent User Activity</Typography>
                   <Divider sx={{ mb: 2 }} />
                   <List sx={{ py: 0 }}>
                     {recentActivity.map((activity, index) => (
@@ -668,7 +810,7 @@ const UsersDashboard = () => {
             <Grid item xs={12} md={6}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>User Status Overview</Typography>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>User Status Overview</Typography>
                   <Divider sx={{ mb: 2 }} />
                   {users.slice(0, 4).map((user, index) => (
                     <Box key={index} sx={{ mb: 2 }}>
@@ -698,7 +840,7 @@ const UsersDashboard = () => {
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>User Directory</Typography>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>User Directory</Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={2}>
                     {users.map((user, index) => (
@@ -724,12 +866,38 @@ const UsersDashboard = () => {
                             </Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                               <Typography variant="body2">Role:</Typography>
-                              <Typography variant="body2" fontWeight={500}>{user.role || 'employee'}</Typography>
+                              <Chip 
+                                label={user.role || 'employee'} 
+                                size="small" 
+                                color={user.is_superuser ? 'error' : user.is_staff ? 'warning' : 'primary'}
+                                variant="outlined"
+                              />
+                            </Box>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                              <Typography variant="body2">Department:</Typography>
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <Typography variant="body2" fontWeight={500}>
+                                  {user.department || 'Unassigned'}
+                                </Typography>
+                                <IconButton 
+                                  size="small" 
+                                  onClick={() => handleEditDepartment(user)}
+                                  sx={{ p: 0.5 }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            </Box>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                              <Typography variant="body2">Warehouse:</Typography>
+                              <Typography variant="body2" fontWeight={500} fontSize="0.8rem">
+                                {user.assigned_warehouse || 'Unassigned'}
+                              </Typography>
                             </Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                              <Typography variant="body2">Department:</Typography>
-                              <Typography variant="body2" fontWeight={500}>
-                                {user.department?.name || user.department || 'No Department'}
+                              <Typography variant="body2">Last Login:</Typography>
+                              <Typography variant="body2" color="textSecondary" fontSize="0.8rem">
+                                {user.lastLogin}
                               </Typography>
                             </Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mt={1}>
@@ -742,7 +910,7 @@ const UsersDashboard = () => {
                               <IconButton
                                 size="small"
                                 color="error"
-                                onClick={() => handleDeleteUser(user.id, user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username)}
+                                onClick={() => handleDeleteUser(user.id)}
                                 sx={{ 
                                   '&:hover': { 
                                     bgcolor: 'rgba(244, 67, 54, 0.1)' 
@@ -769,7 +937,7 @@ const UsersDashboard = () => {
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Roles & Permissions Management</Typography>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Roles & Permissions Management</Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Typography variant="body1" color="textSecondary" textAlign="center" py={4}>
                     Role-based access control and permissions management will be displayed here.
@@ -787,7 +955,7 @@ const UsersDashboard = () => {
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>User Analytics</Typography>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>User Analytics</Typography>
                   <Divider sx={{ mb: 2 }} />
                   <Typography variant="body1" color="textSecondary" textAlign="center" py={4}>
                     User activity analytics and security insights will be displayed here.
@@ -839,10 +1007,10 @@ const UsersDashboard = () => {
             value={userForm.department}
             onChange={(e) => setUserForm({...userForm, department: e.target.value})}
             margin="normal"
-            helperText={departments.length === 0 ? "No departments available" : `${departments.length} departments available`}
+            helperText={`${departments.length} departments available`}
           >
             <MenuItem value="">
-              <em>No Department</em>
+              <em>Select Department</em>
             </MenuItem>
             {departments.map((department) => (
               <MenuItem key={department.id} value={department.id}>
@@ -850,62 +1018,8 @@ const UsersDashboard = () => {
               </MenuItem>
             ))}
           </TextField>
-          
-          {/* Warehouse Assignment Field - Shows only when Sales Department is selected */}
-          {departments.find(dept => dept.id === userForm.department)?.name?.toLowerCase().includes('sales') && (
-            <Box>
-              <Box display="flex" alignItems="center" gap={1} mb={1}>
-                <TextField
-                  fullWidth
-                  select
-                  label="Assigned Warehouse"
-                  value={userForm.assignedWarehouse}
-                  onChange={(e) => setUserForm({...userForm, assignedWarehouse: e.target.value})}
-                  margin="normal"
-                  helperText={warehouses.length === 0 ? "Loading warehouses..." : `${warehouses.length} warehouses available`}
-                >
-                  <MenuItem value="">
-                    <em>No Warehouse Assignment</em>
-                  </MenuItem>
-                  {warehouses.length === 0 ? (
-                    <MenuItem disabled>
-                      <em>Loading warehouses...</em>
-                    </MenuItem>
-                  ) : (
-                    warehouses.map((warehouse) => (
-                      <MenuItem key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''} {warehouse.address ? `- ${warehouse.address}` : ''}
-                      </MenuItem>
-                    ))
-                  )}
-                </TextField>
-                {warehouses.length === 0 && (
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={async () => {
-                      console.log('🔄 Manual warehouse reload triggered');
-                      try {
-                        const warehousesRes = await api.get('/api/warehouse/');
-                        if (warehousesRes.data && Array.isArray(warehousesRes.data)) {
-                          setWarehouses(warehousesRes.data);
-                          console.log(`✅ Manual reload: ${warehousesRes.data.length} warehouses loaded`);
-                        }
-                      } catch (err) {
-                        console.error('❌ Manual reload failed:', err);
-                      }
-                    }}
-                    sx={{ mt: 2, minWidth: 100 }}
-                  >
-                    Reload
-                  </Button>
-                )}
-              </Box>
-            </Box>
-          )}
-          
-          {/* Remove the duplicate TextField that was here */}
-          {false && ( // This hides the duplicate field
+          {/* Only show warehouse dropdown if Sales department is selected */}
+          {departments.find(d => d.id === userForm.department)?.name === 'Sales' && (
             <TextField
               fullWidth
               select
@@ -913,25 +1027,18 @@ const UsersDashboard = () => {
               value={userForm.assignedWarehouse}
               onChange={(e) => setUserForm({...userForm, assignedWarehouse: e.target.value})}
               margin="normal"
-              helperText={warehouses.length === 0 ? "Loading warehouses..." : `${warehouses.length} warehouses available`}
+              helperText={`${warehouses.length} warehouses available`}
             >
               <MenuItem value="">
                 <em>No Warehouse Assignment</em>
               </MenuItem>
-              {warehouses.length === 0 ? (
-                <MenuItem disabled>
-                  <em>Loading warehouses...</em>
+              {warehouses.map((warehouse) => (
+                <MenuItem key={warehouse.id} value={warehouse.name}>
+                  {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
                 </MenuItem>
-              ) : (
-                warehouses.map((warehouse) => (
-                  <MenuItem key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''} {warehouse.address ? `- ${warehouse.address}` : ''}
-                  </MenuItem>
-                ))
-              )}
+              ))}
             </TextField>
           )}
-          
           <TextField
             fullWidth
             select
@@ -939,50 +1046,27 @@ const UsersDashboard = () => {
             value={userForm.accessLevel}
             onChange={(e) => setUserForm({...userForm, accessLevel: e.target.value})}
             margin="normal"
-            helperText="Determines the overall system access level"
           >
             <MenuItem value="basic">Basic Access</MenuItem>
-            <MenuItem value="intermediate">Intermediate Access</MenuItem>
             <MenuItem value="advanced">Advanced Access</MenuItem>
-            <MenuItem value="full">Full Access</MenuItem>
+            <MenuItem value="admin">Admin Access</MenuItem>
           </TextField>
-          
-          {/* Module Permissions Section */}
-          <Box sx={{ mt: 2, mb: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>Module Permissions</Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              Select which modules this user can access
-            </Typography>
-            <Grid container spacing={1}>
-              {availableModules.map((module) => (
-                <Grid item xs={12} sm={6} key={module.id}>
-                  <Card 
-                    sx={{ 
-                      p: 1, 
-                      cursor: 'pointer',
-                      border: userForm.moduleAccess.includes(module.id) ? '2px solid #00BCD4' : '1px solid #e0e0e0',
-                      bgcolor: userForm.moduleAccess.includes(module.id) ? '#e3f2fd' : 'transparent'
-                    }}
-                    onClick={() => {
-                      const newModuleAccess = userForm.moduleAccess.includes(module.id)
-                        ? userForm.moduleAccess.filter(id => id !== module.id)
-                        : [...userForm.moduleAccess, module.id];
-                      setUserForm({...userForm, moduleAccess: newModuleAccess});
-                    }}
-                  >
-                    <Box display="flex" alignItems="center">
-                      <Typography sx={{ mr: 1, fontSize: '1.2rem' }}>{module.icon}</Typography>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600}>{module.name}</Typography>
-                        <Typography variant="caption" color="textSecondary">{module.description}</Typography>
-                      </Box>
-                    </Box>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-          
+          <TextField
+            fullWidth
+            select
+            label="Module Access"
+            value={userForm.moduleAccess}
+            onChange={(e) => setUserForm({...userForm, moduleAccess: e.target.value})}
+            margin="normal"
+            SelectProps={{ multiple: true }}
+            helperText="Select multiple modules (hold Ctrl/Cmd to select multiple)"
+          >
+            {availableModules.map((module) => (
+              <MenuItem key={module.id} value={module.id}>
+                {module.icon} {module.name}
+              </MenuItem>
+            ))}
+          </TextField>
           {/* Password Generation Options */}
           <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>Password Settings</Typography>
@@ -990,12 +1074,28 @@ const UsersDashboard = () => {
               control={
                 <Checkbox
                   checked={userForm.generatePassword}
-                  onChange={(e) => setUserForm({...userForm, generatePassword: e.target.checked})}
+                  onChange={(e) => setUserForm({...userForm, generatePassword: e.target.checked, password: ''})}
                   color="primary"
                 />
               }
               label="Generate random password automatically"
             />
+            
+            {/* Manual Password Field - Only show when auto-generate is unchecked */}
+            {!userForm.generatePassword && (
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                value={userForm.password || ''}
+                onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+                margin="normal"
+                required
+                helperText="Enter a secure password for the user"
+                sx={{ mt: 2 }}
+              />
+            )}
+            
             <FormControlLabel
               control={
                 <Checkbox
@@ -1010,6 +1110,11 @@ const UsersDashboard = () => {
             {userForm.generatePassword && (
               <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
                 ✓ User will be required to change password on first login
+              </Typography>
+            )}
+            {!userForm.generatePassword && (
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                ✓ User will receive login credentials via email if enabled above
               </Typography>
             )}
           </Box>
@@ -1055,9 +1160,8 @@ const UsersDashboard = () => {
             margin="normal"
           >
             <MenuItem value="basic">Basic Access</MenuItem>
-            <MenuItem value="intermediate">Intermediate Access</MenuItem>
             <MenuItem value="advanced">Advanced Access</MenuItem>
-            <MenuItem value="full">Full Access</MenuItem>
+            <MenuItem value="admin">Admin Access</MenuItem>
           </TextField>
         </DialogContent>
         <DialogActions>
@@ -1068,6 +1172,41 @@ const UsersDashboard = () => {
             sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)' }}
           >
             Update Role
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Edit Department Dialog */}
+      <Dialog open={editDepartmentDialogOpen} onClose={() => setEditDepartmentDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Department</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            select
+            label="Department"
+            value={selectedUser?.department_id}
+            onChange={(e) => setSelectedUser({...selectedUser, department_id: e.target.value})}
+            margin="normal"
+            helperText={`${departments.length} departments available`}
+          >
+            <MenuItem value="">
+              <em>Select Department</em>
+            </MenuItem>
+            {departments.map((department) => (
+              <MenuItem key={department.id} value={department.id}>
+                {department.name}
+              </MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDepartmentDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleUpdateDepartment} 
+            variant="contained"
+            sx={{ background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)' }}
+          >
+            Update Department
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,8 +1,35 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { 
-  Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
-  Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar
+import {
+  Box,
+  Typography,
+  Paper,
+  Grid,
+  Button,
+  Card,
+  CardContent,
+  Avatar,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
+  InputAdornment,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  Tabs,
+  Tab,
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+  Divider,
+  LinearProgress
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -16,8 +43,10 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PaymentIcon from '@mui/icons-material/Payment';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import PrintIcon from '@mui/icons-material/Print';
 import api from './api';
 import { AuthContext } from './AuthContext';
+import { loadCustomersWithFallback, loadProductsWithFallback } from './sharedData';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
 import TimeBasedAnalytics from './components/TimeBasedAnalytics';
 import GanttChart from './components/GanttChart';
@@ -125,6 +154,12 @@ const mockPieData3 = [
   { name: 'Off-Peak', value: 180 },
 ];
 
+const mockTransactions = [
+  { invoice_number: 'INV-001', customer_name: 'John Doe', total: 1000, payment_method: 'Cash', date: '2023-02-15', status: 'Paid' },
+  { invoice_number: 'INV-002', customer_name: 'Jane Doe', total: 2000, payment_method: 'Card', date: '2023-02-16', status: 'Refunded' },
+  { invoice_number: 'INV-003', customer_name: 'Bob Smith', total: 3000, payment_method: 'Mobile Money', date: '2023-02-17', status: 'Paid' },
+];
+
 const POSDashboard = () => {
   const { token, user } = useContext(AuthContext);
   const [tabValue, setTabValue] = useState(0);
@@ -168,13 +203,66 @@ const POSDashboard = () => {
   // Quick Action Handlers
   const handleNewTransaction = async () => {
     try {
-      console.log('Creating new transaction:', transactionForm);
-      setSnackbarMessage('Transaction created successfully!');
-      setSnackbarOpen(true);
-      setTransactionDialogOpen(false);
-      setTransactionForm({ items: '', total: '', paymentMethod: 'cash', customer: '' });
+      // Validate transaction form
+      if (!transactionForm.product || !transactionForm.total) {
+        setSnackbarMessage('Please select a product and enter total amount');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Get selected product details
+      const selectedProduct = products.find(p => p.id === parseInt(transactionForm.product));
+      if (!selectedProduct) {
+        setSnackbarMessage('Selected product not found');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Create transaction data
+      const transactionData = {
+        product_id: selectedProduct.id,
+        quantity: 1, // Default quantity, can be made configurable
+        unit_price: parseFloat(transactionForm.total),
+        total_amount: parseFloat(transactionForm.total),
+        payment_method: transactionForm.paymentMethod,
+        customer_id: transactionForm.customer || null,
+        staff_id: user.id,
+        notes: `POS Transaction - ${selectedProduct.name}`,
+        transaction_type: 'sale'
+      };
+
+      console.log('Creating POS transaction:', transactionData);
+
+      // Submit transaction to backend
+      const token = localStorage.getItem('token');
+      const response = await api.post('/pos/sales/', transactionData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data) {
+        setSnackbarMessage(`Transaction completed successfully! Sale ID: ${response.data.id}`);
+        setSnackbarOpen(true);
+        setTransactionDialogOpen(false);
+        setTransactionForm({ items: '', total: '', paymentMethod: 'cash', customer: '', product: '' });
+        
+        // Refresh transactions list
+        await fetchData();
+      }
     } catch (error) {
-      setSnackbarMessage('Failed to create transaction');
+      console.error('Transaction creation error:', error);
+      let errorMessage = 'Failed to create transaction';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Invalid transaction data. Please check your inputs.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Permission denied. You may not have access to create transactions.';
+      }
+      
+      setSnackbarMessage(errorMessage);
       setSnackbarOpen(true);
     }
   };
@@ -340,65 +428,191 @@ const POSDashboard = () => {
     setSnackbarOpen(true);
   };
 
-  // Mock data for demonstration
-  const recentActivity = [
-    { action: 'Sale #POS-4567 completed - ₵450', timestamp: '2 minutes ago', type: 'success' },
-    { action: 'Cash register opened by John Doe', timestamp: '10 minutes ago', type: 'info' },
-    { action: 'Refund processed for Sale #POS-4566', timestamp: '25 minutes ago', type: 'warning' },
-    { action: 'Daily sales report generated', timestamp: '1 hour ago', type: 'success' },
-    { action: 'Inventory alert: Low stock on Product ABC', timestamp: '2 hours ago', type: 'warning' },
-  ];
+  const handlePrintInvoice = (transaction) => {
+    // Generate a sample invoice with transaction data
+    const invoiceData = {
+      invoiceNumber: transaction.invoice_number,
+      date: transaction.date,
+      customerName: transaction.customer_name,
+      items: [
+        { name: 'Product A', qty: 2, price: 25.00, total: 50.00 },
+        { name: 'Product B', qty: 1, price: 15.50, total: 15.50 },
+        { name: 'Product C', qty: 3, price: 8.75, total: 26.25 }
+      ],
+      subtotal: 91.75,
+      tax: 9.18,
+      total: 100.93,
+      paymentMethod: transaction.payment_method,
+      amountPaid: 105.00,
+      change: 4.07
+    };
+    
+    // Create invoice HTML content
+    const invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice - ${invoiceData.invoiceNumber}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; width: 300px; margin: 0 auto; padding: 20px; }
+          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+          .invoice-info { margin-bottom: 15px; }
+          .items { border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+          .item { display: flex; justify-content: space-between; margin-bottom: 5px; }
+          .totals { margin-top: 10px; }
+          .total-line { display: flex; justify-content: space-between; margin-bottom: 3px; }
+          .final-total { border-top: 1px solid #000; padding-top: 5px; font-weight: bold; }
+          .footer { text-align: center; margin-top: 20px; border-top: 1px solid #000; padding-top: 10px; }
+          @media print { body { width: auto; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>ERP SYSTEM POS</h2>
+          <p>123 Business Street<br>Accra, Ghana<br>Tel: +233 123 456 789</p>
+        </div>
+        
+        <div class="invoice-info">
+          <div><strong>Invoice #:</strong> ${invoiceData.invoiceNumber}</div>
+          <div><strong>Date:</strong> ${invoiceData.date}</div>
+          <div><strong>Customer:</strong> ${invoiceData.customerName}</div>
+        </div>
+        
+        <div class="items">
+          <h3>Items:</h3>
+          ${invoiceData.items.map(item => `
+            <div class="item">
+              <span>${item.name} (${item.qty}x)</span>
+              <span>₵${item.total.toFixed(2)}</span>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="totals">
+          <div class="total-line">
+            <span>Subtotal:</span>
+            <span>₵${invoiceData.subtotal.toFixed(2)}</span>
+          </div>
+          <div class="total-line">
+            <span>Tax (10%):</span>
+            <span>₵${invoiceData.tax.toFixed(2)}</span>
+          </div>
+          <div class="total-line final-total">
+            <span>TOTAL:</span>
+            <span>₵${invoiceData.total.toFixed(2)}</span>
+          </div>
+          <div class="total-line">
+            <span>Payment (${invoiceData.paymentMethod}):</span>
+            <span>₵${invoiceData.amountPaid.toFixed(2)}</span>
+          </div>
+          <div class="total-line">
+            <span>Change:</span>
+            <span>₵${invoiceData.change.toFixed(2)}</span>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>Thank you for your business!</p>
+          <p>Visit us again soon</p>
+          <p><small>Generated on ${new Date().toLocaleString()}</small></p>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+      </html>
+    `;
+    
+    // Open invoice in new window
+    const invoiceWindow = window.open('', '_blank', 'width=400,height=600');
+    invoiceWindow.document.write(invoiceHTML);
+    invoiceWindow.document.close();
+  };
 
   const paymentMethods = [
-    { method: 'Cash', count: 160, percentage: 38 },
-    { method: 'Card', count: 180, percentage: 43 },
+    { method: 'Cash', count: 245, percentage: 58 },
+    { method: 'Card', count: 98, percentage: 23 },
     { method: 'Mobile Money', count: 80, percentage: 19 },
   ];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!token) return;
-      
-      setLoading(true);
+  const fetchData = async () => {
+    if (!token) return;
+    
+    setLoading(true);
+    try {
+      // Fetch transactions with error handling
       try {
-        // Fetch transactions with error handling
-        try {
-          const transactionsRes = await api.get('/pos/transactions/', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setTransactions(transactionsRes.data || []);
-        } catch (err) {
-          console.warn('Failed to load transactions:', err);
-        }
-
-        // Fetch products with error handling
-        try {
-          const productsRes = await api.get('/pos/products/', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setProducts(productsRes.data || []);
-        } catch (err) {
-          console.warn('Failed to load products:', err);
-        }
-
-        // Fetch customers with error handling
-        try {
-          const customersRes = await api.get('/sales/customers/', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setCustomers(customersRes.data || []);
-        } catch (err) {
-          console.warn('Failed to load customers:', err);
-        }
-
+        const transactionsRes = await api.get('/pos/transactions/', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setTransactions(transactionsRes.data || []);
       } catch (err) {
-        setError('Failed to load POS dashboard data.');
-        console.error('POS dashboard error:', err);
-      } finally {
-        setLoading(false);
+        console.warn('Failed to load transactions:', err);
       }
-    };
 
+      // Fetch products with error handling
+      try {
+        console.log('Fetching products from shared data source...');
+        const productsRes = await loadProductsWithFallback(api);
+        console.log('Products data:', productsRes);
+        
+        if (productsRes && Array.isArray(productsRes) && productsRes.length > 0) {
+          setProducts(productsRes);
+        } else {
+          console.warn('No products returned from shared data source, using fallback data');
+          // Fallback sample data for testing
+          setProducts([
+            { id: 1, name: 'Sample Product 1', sku: 'SP001', quantity: 10, prices: [{ price: '25.00' }] },
+            { id: 2, name: 'Sample Product 2', sku: 'SP002', quantity: 5, prices: [{ price: '15.00' }] }
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to load products from shared source:', err);
+        // Use fallback data on error
+        setProducts([
+          { id: 1, name: 'Sample Product 1', sku: 'SP001', quantity: 10, prices: [{ price: '25.00' }] },
+          { id: 2, name: 'Sample Product 2', sku: 'SP002', quantity: 5, prices: [{ price: '15.00' }] }
+        ]);
+      }
+
+      // Fetch customers with error handling
+      try {
+        console.log('Fetching customers from shared data source...');
+        const customersRes = await loadCustomersWithFallback();
+        console.log('Customers data:', customersRes);
+        
+        if (customersRes && Array.isArray(customersRes) && customersRes.length > 0) {
+          setCustomers(customersRes);
+        } else {
+          console.warn('No customers returned from shared data source, using fallback data');
+          // Fallback sample data for testing
+          setCustomers([
+            { id: 1, name: 'Sample Customer 1', email: 'customer1@example.com' },
+            { id: 2, name: 'Sample Customer 2', email: 'customer2@example.com' }
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to load customers:', err);
+        console.error('Customers error response:', err.response);
+        // Use fallback data on error
+        setCustomers([
+          { id: 1, name: 'Sample Customer 1', email: 'customer1@example.com' },
+          { id: 2, name: 'Sample Customer 2', email: 'customer2@example.com' }
+        ]);
+      }
+
+    } catch (err) {
+      setError('Failed to load POS dashboard data.');
+      console.error('POS dashboard error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [token]);
 
@@ -517,6 +731,238 @@ const POSDashboard = () => {
         </Grid>
       </Paper>
 
+      {/* Tabbed Interface */}
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
+        <Tabs
+          value={tabValue}
+          onChange={(e, newValue) => setTabValue(newValue)}
+          variant="fullWidth"
+          sx={{
+            '& .MuiTab-root': {
+              fontWeight: 600,
+              textTransform: 'none',
+              minHeight: 64,
+              '&.Mui-selected': {
+                background: 'linear-gradient(45deg, #FF5722 30%, #D84315 90%)',
+                color: 'white'
+              }
+            }
+          }}
+        >
+          <Tab icon={<TrendingUpIcon />} label="Overview" />
+          <Tab icon={<ReceiptIcon />} label="Transactions" />
+          <Tab icon={<ShoppingCartIcon />} label="Sales" />
+          <Tab icon={<AssessmentIcon />} label="Analytics" />
+        </Tabs>
+
+        {/* Overview Tab */}
+        {tabValue === 0 && (
+          <Box sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              {/* Key Metrics */}
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #FF5722 0%, #D84315 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Transactions</Typography>
+                        <Typography variant="h3" sx={{ fontWeight: 700 }}>
+                          {transactions.length || 420}
+                        </Typography>
+                      </Box>
+                      <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                        <PointOfSaleIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Revenue</Typography>
+                        <Typography variant="h3" sx={{ fontWeight: 700 }}>₵15K</Typography>
+                      </Box>
+                      <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                        <MonetizationOnIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #2196F3 0%, #1565C0 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Cashiers</Typography>
+                        <Typography variant="h3" sx={{ fontWeight: 700 }}>12</Typography>
+                      </Box>
+                      <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                        <PeopleIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #9C27B0 0%, #6A1B9A 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Items Sold</Typography>
+                        <Typography variant="h3" sx={{ fontWeight: 700 }}>230</Typography>
+                      </Box>
+                      <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                        <InventoryIcon sx={{ fontSize: 28 }} />
+                      </Avatar>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Payment Methods */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Payment Methods</Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Box sx={{ space: 2 }}>
+                      {paymentMethods.map((method, idx) => (
+                        <Box key={idx} sx={{ mb: 2 }}>
+                          <Box display="flex" justifyContent="space-between" mb={1}>
+                            <Typography variant="body2">{method.method}</Typography>
+                            <Typography variant="body2" color="primary">{method.count} ({method.percentage}%)</Typography>
+                          </Box>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={method.percentage} 
+                            color={idx === 0 ? 'success' : idx === 1 ? 'primary' : 'warning'} 
+                            sx={{ borderRadius: 1, height: 8 }} 
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+
+        {/* Transactions Tab */}
+        {tabValue === 1 && (
+          <Box sx={{ p: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent Transactions</Typography>
+                <Divider sx={{ mb: 2 }} />
+                {transactions.length > 0 ? (
+                  <List sx={{ py: 0 }}>
+                    {transactions.slice(0, 10).map((transaction, idx) => (
+                      <ListItem key={idx} sx={{ px: 0, py: 1 }}>
+                        <ListItemText 
+                          primary={`Transaction #${transaction.id} - ${transaction.customer_name || 'Walk-in'}`}
+                          secondary={`Amount: $${transaction.total_amount} | Payment: ${transaction.payment_method}`}
+                          primaryTypographyProps={{ fontWeight: 500 }}
+                        />
+                        <Chip 
+                          label="Completed"
+                          size="small" 
+                          color="success"
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>No transactions available</Alert>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+
+        {/* Sales Tab */}
+        {tabValue === 2 && (
+          <Box sx={{ p: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Top Selling Products</Typography>
+                <Divider sx={{ mb: 2 }} />
+                {products.length > 0 ? (
+                  <List sx={{ py: 0 }}>
+                    {products.slice(0, 10).map((product, idx) => (
+                      <ListItem key={idx} sx={{ px: 0, py: 1 }}>
+                        <ListItemText 
+                          primary={`${product.name} - ${product.sku || `SKU-${1000 + idx}`}`}
+                          secondary={`Price: $${product.price || product.prices?.[0]?.price || '0.00'} | Stock: ${product.quantity || 0}`}
+                          primaryTypographyProps={{ fontWeight: 500 }}
+                        />
+                        <Chip 
+                          label={product.quantity > 10 ? 'In Stock' : product.quantity > 0 ? 'Low Stock' : 'Out of Stock'}
+                          size="small" 
+                          color={product.quantity > 10 ? 'success' : product.quantity > 0 ? 'warning' : 'error'}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>No products available</Alert>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+
+        {/* Analytics Tab */}
+        {tabValue === 3 && (
+          <Box sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
+                      <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
+                      Sales Performance
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>94.2%</Typography>
+                      <Typography variant="body2" color="text.secondary">Overall Performance</Typography>
+                      <LinearProgress variant="determinate" value={94.2} sx={{ height: 8, borderRadius: 4, mt: 2 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Transaction Analytics</Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, mr: 1 }}>
+                        <Typography variant="h5">{transactions.length || 420}</Typography>
+                        <Typography variant="caption">Total Transactions</Typography>
+                      </Paper>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
+                        <Typography variant="h5">$107</Typography>
+                        <Typography variant="caption">Avg Transaction</Typography>
+                      </Paper>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+      </Paper>
+
       {/* Loading and Error States */}
       {loading && (
         <Box display="flex" justifyContent="center" my={4}>
@@ -530,695 +976,73 @@ const POSDashboard = () => {
         </Alert>
       )}
 
-      {/* Tabbed Interface */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
-        <StyledTabs
-          value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
-          variant="fullWidth"
-        >
-          <StyledTab icon={<TrendingUpIcon />} label="Overview" />
-          <StyledTab icon={<ReceiptIcon />} label="Transactions" />
-          <StyledTab icon={<ShoppingCartIcon />} label="Sales" />
-          <StyledTab icon={<AssessmentIcon />} label="Analytics" />
-        </StyledTabs>
-
-        {/* Overview Tab */}
-        <TabPanel value={tabValue} index={0}>
-          <Grid container spacing={3}>
-            {/* Key Metrics */}
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Transactions</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        {transactions.length || 420}
-                      </Typography>
-                    </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <PointOfSaleIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
-                  </Box>
-                </CardContent>
-              </MetricCard>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard sx={{ background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' }}>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Revenue</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        ₵15K
-                      </Typography>
-                    </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <MonetizationOnIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
-                  </Box>
-                </CardContent>
-              </MetricCard>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard sx={{ background: 'linear-gradient(135deg, #2196F3 0%, #1565C0 100%)' }}>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Cashiers</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        12
-                      </Typography>
-                    </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <PeopleIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
-                  </Box>
-                </CardContent>
-              </MetricCard>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard sx={{ background: 'linear-gradient(135deg, #9C27B0 0%, #6A1B9A 100%)' }}>
-                <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Items Sold</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        230
-                      </Typography>
-                    </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <InventoryIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
-                  </Box>
-                </CardContent>
-              </MetricCard>
-            </Grid>
-
-            {/* Recent Activity */}
-            <Grid item xs={12} md={8}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <PointOfSaleIcon sx={{ mr: 1, color: '#FF5722' }} />
-                    Recent POS Activity
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <List sx={{ py: 0 }}>
-                    {recentActivity.map((item, idx) => (
-                      <ListItem key={idx} sx={{ px: 0, py: 1 }}>
-                        <ListItemText 
-                          primary={item.action}
-                          secondary={item.timestamp}
-                          primaryTypographyProps={{ fontWeight: 500 }}
-                        />
-                        <Chip 
-                          label={item.type === 'success' ? 'Completed' : item.type === 'warning' ? 'Alert' : 'Info'}
-                          size="small" 
-                          color={item.type === 'success' ? 'success' : item.type === 'warning' ? 'warning' : 'info'}
-                          variant="outlined" 
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Payment Methods */}
-            <Grid item xs={12} md={4}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Payment Methods</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ space: 2 }}>
-                    {paymentMethods.map((method, idx) => (
-                      <Box key={idx} sx={{ mb: 2 }}>
-                        <Box display="flex" justifyContent="space-between" mb={1}>
-                          <Typography variant="body2">{method.method}</Typography>
-                          <Typography variant="body2" color="primary">{method.count} ({method.percentage}%)</Typography>
-                        </Box>
-                        <LinearProgress 
-                          variant="determinate" 
-                          value={method.percentage} 
-                          color={idx === 0 ? 'success' : idx === 1 ? 'primary' : 'warning'} 
-                          sx={{ borderRadius: 1, height: 8 }} 
-                        />
-                      </Box>
-                    ))}
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
-        </TabPanel>
-
-        {/* Transactions Tab */}
-        <TabPanel value={tabValue} index={1}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent Transactions</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  {transactions.length > 0 ? (
-                    <List sx={{ py: 0 }}>
-                      {transactions.slice(0, 10).map((transaction, idx) => (
-                        <ListItem key={idx} sx={{ px: 0, py: 1 }}>
-                          <ListItemText 
-                            primary={`Transaction #${transaction.id || `POS-${4000 + idx}`} - ${transaction.customer?.name || 'Walk-in Customer'}`}
-                            secondary={`Amount: ₵${transaction.total || (Math.random() * 500).toFixed(2)} | Payment: ${transaction.payment_method || 'Cash'} | Time: ${transaction.created_at || 'Just now'}`}
-                            primaryTypographyProps={{ fontWeight: 500 }}
-                          />
-                          <Chip 
-                            label={transaction.status || 'Completed'}
-                            size="small" 
-                            color={transaction.status === 'Completed' ? 'success' : transaction.status === 'Refunded' ? 'warning' : 'info'}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Alert severity="info" sx={{ borderRadius: 2 }}>No transactions available</Alert>
-                  )}
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
-        </TabPanel>
-
-        {/* Sales Tab */}
-        <TabPanel value={tabValue} index={2}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Top Selling Products</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  {products.length > 0 ? (
-                    <List sx={{ py: 0 }}>
-                      {products.slice(0, 10).map((product, idx) => (
-                        <ListItem key={idx} sx={{ px: 0, py: 1 }}>
-                          <ListItemText 
-                            primary={`${product.name || `Product ${idx + 1}`} - ${product.sku || `SKU-${1000 + idx}`}`}
-                            secondary={`Price: ₵${product.price || (Math.random() * 100).toFixed(2)} | Stock: ${product.stock || Math.floor(Math.random() * 50)} | Sales: ${product.sales_count || Math.floor(Math.random() * 100)}`}
-                            primaryTypographyProps={{ fontWeight: 500 }}
-                          />
-                          <Chip 
-                            label={product.stock > 10 ? 'In Stock' : product.stock > 0 ? 'Low Stock' : 'Out of Stock'}
-                            size="small" 
-                            color={product.stock > 10 ? 'success' : product.stock > 0 ? 'warning' : 'error'}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Alert severity="info" sx={{ borderRadius: 2 }}>No products available</Alert>
-                  )}
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
-        </TabPanel>
-
-        {/* Analytics Tab */}
-        <TabPanel value={tabValue} index={3}>
-          <Grid container spacing={3}>
-            {/* Sales Performance Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
-                    Sales Performance Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Overall Performance Score */}
-                    <Box sx={{ textAlign: 'center', mb: 3 }}>
-                      <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
-                        94.2%
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Overall Sales Performance
-                      </Typography>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={94.2} 
-                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
-                      />
-                    </Box>
-                    
-                    {/* Performance Breakdown */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {[
-                        { metric: 'Revenue Target', score: 96, color: '#4CAF50' },
-                        { metric: 'Transaction Volume', score: 92, color: '#2196F3' },
-                        { metric: 'Customer Satisfaction', score: 95, color: '#FF9800' },
-                        { metric: 'Staff Efficiency', score: 94, color: '#9C27B0' }
-                      ].map((item, idx) => (
-                        <Box key={item.metric} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Box sx={{ minWidth: 120 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {item.metric}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ flex: 1 }}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={item.score} 
-                              sx={{ 
-                                height: 6, 
-                                borderRadius: 3,
-                                '& .MuiLinearProgress-bar': { bgcolor: item.color }
-                              }} 
-                            />
-                          </Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
-                            {item.score}%
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Transaction Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <ReceiptIcon sx={{ mr: 1, color: '#FF9800' }} />
-                    Transaction Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Hourly Transaction Chart */}
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Hourly Transactions (Today)
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
-                        {['9AM', '12PM', '3PM', '6PM', '9PM'].map((hour, i) => {
-                          const transactions = [45, 78, 65, 92, 38][i];
-                          const height = (transactions / 100) * 80;
-                          return (
-                            <Box key={hour} sx={{ flex: 1, textAlign: 'center' }}>
-                              <Box 
-                                sx={{ 
-                                  height: height, 
-                                  bgcolor: transactions > 80 ? '#4CAF50' : transactions > 50 ? '#FF9800' : '#F44336', 
-                                  borderRadius: 1,
-                                  mb: 1,
-                                  opacity: 0.8
-                                }} 
-                              />
-                              <Typography variant="caption">{hour}</Typography>
-                              <Typography variant="caption" display="block" color="text.secondary">
-                                {transactions}
-                              </Typography>
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    </Box>
-                    
-                    {/* Transaction Summary */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, mr: 1 }}>
-                        <Typography variant="h5">420</Typography>
-                        <Typography variant="caption">Total Transactions</Typography>
-                      </Paper>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
-                        <Typography variant="h5">$107</Typography>
-                        <Typography variant="caption">Avg Transaction</Typography>
-                      </Paper>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Payment Method Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <PaymentIcon sx={{ mr: 1, color: '#9C27B0' }} />
-                    Payment Method Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Payment Method Breakdown */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {[
-                        { method: 'Credit Card', percentage: 45, amount: 20250, color: '#2196F3' },
-                        { method: 'Cash', percentage: 32, amount: 14400, color: '#4CAF50' },
-                        { method: 'Mobile Pay', percentage: 18, amount: 8100, color: '#FF9800' },
-                        { method: 'Debit Card', percentage: 5, amount: 2250, color: '#9C27B0' }
-                      ].map((payment, idx) => (
-                        <Box key={payment.method}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {payment.method}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              ${payment.amount.toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={payment.percentage} 
-                                sx={{ 
-                                  height: 8, 
-                                  borderRadius: 4,
-                                  '& .MuiLinearProgress-bar': { bgcolor: payment.color }
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
-                              {payment.percentage}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                    
-                    {/* Payment Insights */}
-                    <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Payment Insights
-                      </Typography>
-                      <Typography variant="caption" display="block">
-                        • Credit cards dominate with 45% of transactions
-                      </Typography>
-                      <Typography variant="caption" display="block">
-                        • Mobile payments growing 15% month-over-month
-                      </Typography>
-                      <Typography variant="caption" display="block">
-                        • Cash transactions declining steadily
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Product Performance Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <ShoppingCartIcon sx={{ mr: 1, color: '#FF5722' }} />
-                    Product Performance Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Top Products */}
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Top Selling Products (Today)
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-                      {[
-                        { product: 'Fiesta Condoms', sold: 45, revenue: 675, growth: 12 },
-                        { product: 'Kiss Condoms', sold: 38, revenue: 570, growth: 8 },
-                        { product: 'HIVST Kit', sold: 32, revenue: 960, growth: -3 },
-                        { product: 'Lubes', sold: 28, revenue: 420, growth: 15 }
-                      ].map((item, idx) => (
-                        <Box key={item.product} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Box sx={{ minWidth: 100 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {item.product}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {item.sold} sold • ${item.revenue}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ flex: 1 }}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={(item.sold / 50) * 100} 
-                              sx={{ height: 6, borderRadius: 3 }}
-                              color="primary"
-                            />
-                          </Box>
-                          <Chip 
-                            label={`${item.growth > 0 ? '+' : ''}${item.growth}%`}
-                            size="small"
-                            color={item.growth > 0 ? 'success' : item.growth < 0 ? 'error' : 'default'}
-                            variant="outlined"
-                          />
-                        </Box>
-                      ))}
-                    </Box>
-
-                    {/* Product Metrics */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText', flex: 1, mr: 1 }}>
-                        <Typography variant="h6">230</Typography>
-                        <Typography variant="caption">Items Sold</Typography>
-                      </Paper>
-                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
-                        <Typography variant="h6">18</Typography>
-                        <Typography variant="caption">Product Lines</Typography>
-                      </Paper>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Revenue & Profitability Analytics */}
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <MonetizationOnIcon sx={{ mr: 1, color: '#2196F3' }} />
-                    Revenue & Profitability Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={3}>
-                    {/* Daily Revenue Performance */}
-                    <Grid item xs={12} md={4}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h3" color="primary" sx={{ mb: 1 }}>
-                          $45,000
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                          Daily Revenue
-                        </Typography>
-                        <LinearProgress 
-                          variant="determinate" 
-                          value={90} 
-                          sx={{ height: 8, borderRadius: 4 }} 
-                        />
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                          Target: $50,000
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    {/* Revenue Breakdown */}
-                    <Grid item xs={12} md={8}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                        Revenue Breakdown by Category
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {[
-                          { category: 'Contraceptives', revenue: 18000, margin: 35, growth: 8 },
-                          { category: 'HIVST Kits', revenue: 12000, margin: 42, growth: 12 },
-                          { category: 'Medical Supplies', revenue: 9000, margin: 28, growth: -2 },
-                          { category: 'Family Planning', revenue: 6000, margin: 38, growth: 15 }
-                        ].map((cat, idx) => (
-                          <Box key={cat.category} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ minWidth: 120 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                {cat.category}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                ${cat.revenue.toLocaleString()} • {cat.margin}% margin
-                              </Typography>
-                            </Box>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={(cat.revenue / 20000) * 100} 
-                                sx={{ height: 8, borderRadius: 4 }}
-                                color={cat.revenue > 15000 ? 'success' : cat.revenue > 10000 ? 'primary' : 'warning'}
-                              />
-                            </Box>
-                            <Chip 
-                              label={`${cat.growth > 0 ? '+' : ''}${cat.growth}%`}
-                              size="small"
-                              color={cat.growth > 0 ? 'success' : cat.growth < 0 ? 'error' : 'default'}
-                              variant="outlined"
-                            />
-                          </Box>
-                        ))}
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
-        </TabPanel>
-      </Paper>
-      
-      {/* Transaction Dialog */}
-      <Dialog open={transactionDialogOpen} onClose={() => setTransactionDialogOpen(false)} maxWidth="sm" fullWidth>
+      {/* New Transaction Dialog */}
+      <Dialog open={transactionDialogOpen} onClose={() => setTransactionDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>New Transaction</DialogTitle>
         <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Product"
-            value={transactionForm.product || ''}
-            onChange={(e) => setTransactionForm({...transactionForm, product: e.target.value})}
-            margin="normal"
-            helperText={products.length === 0 ? "No products available" : `${products.length} products available`}
-          >
-            <MenuItem value="">
-              <em>Select a Product</em>
-            </MenuItem>
-            {products.map((product) => (
-              <MenuItem key={product.id} value={product.id}>
-                {product.name} - ₵{product.price || '0.00'}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Total Amount"
-            value={transactionForm.total}
-            onChange={(e) => setTransactionForm({...transactionForm, total: e.target.value})}
-            margin="normal"
-            type="number"
-            InputProps={{ startAdornment: '₵' }}
-          />
-          <TextField
-            fullWidth
-            select
-            label="Payment Method"
-            value={transactionForm.paymentMethod}
-            onChange={(e) => setTransactionForm({...transactionForm, paymentMethod: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="cash">Cash</MenuItem>
-            <MenuItem value="card">Card</MenuItem>
-            <MenuItem value="mobile">Mobile Money</MenuItem>
-            <MenuItem value="credit">Credit</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Customer (Optional)"
-            value={transactionForm.customer}
-            onChange={(e) => setTransactionForm({...transactionForm, customer: e.target.value})}
-            margin="normal"
-            helperText={customers.length === 0 ? "No customers available" : `${customers.length} customers available`}
-          >
-            <MenuItem value="">
-              <em>No Customer</em>
-            </MenuItem>
-            {customers.map((customer) => (
-              <MenuItem key={customer.id} value={customer.id}>
-                {customer.name} - {customer.email || customer.phone || 'No contact'}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Product</InputLabel>
+              <Select
+                value={transactionForm.product}
+                onChange={(e) => setTransactionForm({...transactionForm, product: e.target.value})}
+                label="Product"
+              >
+                {products.map((product) => (
+                  <MenuItem key={product.id} value={product.id}>
+                    {product.name} - ${product.price || product.prices?.[0]?.price || '0.00'} (Stock: {product.quantity})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Customer (Optional)</InputLabel>
+              <Select
+                value={transactionForm.customer}
+                onChange={(e) => setTransactionForm({...transactionForm, customer: e.target.value})}
+                label="Customer (Optional)"
+              >
+                <MenuItem value="">
+                  <em>Walk-in Customer</em>
+                </MenuItem>
+                {customers.map((customer) => (
+                  <MenuItem key={customer.id} value={customer.id}>
+                    {customer.name} - {customer.email}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              label="Total Amount"
+              type="number"
+              value={transactionForm.total}
+              onChange={(e) => setTransactionForm({...transactionForm, total: e.target.value})}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              }}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Payment Method</InputLabel>
+              <Select
+                value={transactionForm.paymentMethod}
+                onChange={(e) => setTransactionForm({...transactionForm, paymentMethod: e.target.value})}
+                label="Payment Method"
+              >
+                <MenuItem value="cash">Cash</MenuItem>
+                <MenuItem value="card">Card</MenuItem>
+                <MenuItem value="mobile">Mobile Money</MenuItem>
+                <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTransactionDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleNewTransaction} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #FF5722 30%, #D84315 90%)' }}
-          >
-            Create Transaction
-          </Button>
+          <Button onClick={handleNewTransaction} variant="contained">Complete Transaction</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Return Dialog - Process Return Functionality */}
-      <Dialog open={returnDialogOpen} onClose={() => setReturnDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Process Return</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Transaction ID"
-            value={returnForm.transactionId}
-            onChange={(e) => setReturnForm({...returnForm, transactionId: e.target.value})}
-            margin="normal"
-            helperText="Enter the original transaction ID to process return"
-          />
-          <TextField
-            fullWidth
-            select
-            label="Reason for Return"
-            value={returnForm.reason}
-            onChange={(e) => setReturnForm({...returnForm, reason: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="defective">Defective Product</MenuItem>
-            <MenuItem value="wrong_item">Wrong Item</MenuItem>
-            <MenuItem value="customer_changed_mind">Customer Changed Mind</MenuItem>
-            <MenuItem value="damaged">Damaged in Transit</MenuItem>
-            <MenuItem value="other">Other</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            label="Refund Amount"
-            value={returnForm.refundAmount}
-            onChange={(e) => setReturnForm({...returnForm, refundAmount: e.target.value})}
-            margin="normal"
-            type="number"
-            InputProps={{ startAdornment: '₵' }}
-          />
-          <TextField
-            fullWidth
-            select
-            label="Refund Method"
-            value={returnForm.refundMethod}
-            onChange={(e) => setReturnForm({...returnForm, refundMethod: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="cash">Cash</MenuItem>
-            <MenuItem value="card">Card</MenuItem>
-            <MenuItem value="mobile">Mobile Money</MenuItem>
-            <MenuItem value="credit">Credit</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            label="Notes (Optional)"
-            value={returnForm.notes}
-            onChange={(e) => setReturnForm({...returnForm, notes: e.target.value})}
-            margin="normal"
-            multiline
-            rows={3}
-            helperText="Additional notes about the return"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReturnDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleSubmitReturn} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)' }}
-          >
-            Process Return
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
       {/* Success/Error Snackbar */}
       <Snackbar
         open={snackbarOpen}

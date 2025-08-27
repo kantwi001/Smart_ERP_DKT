@@ -61,7 +61,7 @@ const LeaveForm = ({ onSuccess }) => {
   useEffect(() => {
     const fetchLeaveBalance = async () => {
       try {
-        const response = await axios.get('/api/hr/leave-balance/');
+        const response = await axios.get('/hr/leave-balance/');
         setLeaveBalance(response.data);
       } catch (err) {
         console.error('Failed to fetch leave balance:', err);
@@ -112,14 +112,14 @@ const LeaveForm = ({ onSuccess }) => {
         calculated_days: calculatedDays
       };
       
-      await axios.post('/api/hr/leave-requests/', submissionData);
+      await axios.post('/hr/leave-requests/', submissionData);
       setSuccess(true);
       setForm({ start_date: '', end_date: '', reason: '', leave_type: '' });
       setCalculatedDays(0);
       setBalanceWarning('');
       
       // Refresh leave balance after successful submission
-      const response = await axios.get('/api/hr/leave-balance/');
+      const response = await axios.get('/hr/leave-balance/');
       setLeaveBalance(response.data);
       
       if (onSuccess) onSuccess();

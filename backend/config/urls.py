@@ -65,6 +65,7 @@ class APIListView(View):
 urlpatterns = [
     path('', APIRootView.as_view(), name='api-root'),
     path('admin/', admin.site.urls),
+    path('api/', APIListView.as_view(), name='api-list'),
     path('api/', include('config.simplejwt_urls')),
     path('api/dashboard/stats/', StatsView.as_view(), name='dashboard-stats'),
     path('api/dashboard/activity/', ActivityView.as_view(), name='dashboard-activity'),

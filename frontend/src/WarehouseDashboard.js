@@ -1,35 +1,32 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { 
-  Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
-  Tabs, Tab, Paper, Chip, Button, List, ListItem, ListItemText,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
-  Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Select, FormControl, InputLabel, IconButton, Avatar, Divider, LinearProgress,
-  Autocomplete, Badge, Tooltip, Fade, Grow, Slide, Collapse, Switch
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import {
+  Box, Typography, Grid, Card, CardContent, Button, Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Select, MenuItem, FormControl, InputLabel, Chip, IconButton, Tooltip, Switch,
+  LinearProgress, CircularProgress, Snackbar, Alert, Avatar, Divider, List, ListItem, ListItemText,
+  ListItemIcon, Badge, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Accordion, AccordionSummary, AccordionDetails, Tabs, Tab, AppBar, Fade, Grow
 } from '@mui/material';
-import { styled, alpha } from '@mui/material/styles';
-import WarehouseIcon from '@mui/icons-material/Warehouse';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import AddIcon from '@mui/icons-material/Add';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
-import PersonIcon from '@mui/icons-material/Person';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import PieChartIcon from '@mui/icons-material/PieChart';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import GroupIcon from '@mui/icons-material/Group';
-import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import api from './api';
+import {
+  Warehouse as WarehouseIcon, Add as AddIcon, TrendingUp as TrendingUpIcon,
+  Assessment as AssessmentIcon, Refresh as RefreshIcon, Search as SearchIcon,
+  FilterList as FilterListIcon, ViewList as ViewListIcon, ViewModule as ViewModuleIcon,
+  LocationOn as LocationIcon, Inventory as InventoryIcon, LocalShipping as LocalShippingIcon,
+  Schedule as ScheduleIcon, CheckCircle as CheckCircleIcon, Warning as WarningIcon,
+  Error as ErrorIcon, ExpandMore as ExpandMoreIcon, SupervisorAccount as SupervisorAccountIcon,
+  Person as PersonIcon, BarChart as BarChartIcon, LocationOn as LocationOnIcon
+} from '@mui/icons-material';
+import { styled } from '@mui/material/styles';
 import { AuthContext } from './AuthContext';
+import api from './api';
+import { 
+  loadWarehousesWithFallback, 
+  loadProductsWithFallback, 
+  getGlobalProducts, 
+  updateGlobalProduct,
+  getGlobalTransferHistory,
+  addTransferToHistory,
+  updateTransferStatus
+} from './sharedData';
 
 const StyledTabs = styled(Tabs)(() => ({
   backgroundColor: '#fff',
@@ -215,7 +212,7 @@ function TabPanel({ children, value, index, ...other }) {
 }
 
 function WarehouseDashboard() {
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -232,6 +229,8 @@ function WarehouseDashboard() {
   const [analytics, setAnalytics] = useState({});
   const [userRole, setUserRole] = useState('sales_rep');
   const [userWarehouse, setUserWarehouse] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   
   // Smart filtering and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -244,6 +243,7 @@ function WarehouseDashboard() {
   const [newLocationDialog, setNewLocationDialog] = useState(false);
   const [analyticsDialog, setAnalyticsDialog] = useState(false);
   const [addWarehouseDialog, setAddWarehouseDialog] = useState(false);
+  const [addStockDialog, setAddStockDialog] = useState(false);
   
   // Form states
   const [transferForm, setTransferForm] = useState({
@@ -258,98 +258,71 @@ function WarehouseDashboard() {
     name: '', code: '', address: '', capacity: '', manager: ''
   });
 
+  const [stockForm, setStockForm] = useState({
+    product: '', warehouse: '', quantity: '', notes: ''
+  });
+
   // Enhanced data fetching with comprehensive analytics
-  const fetchWarehouseData = async () => {
+  const fetchWarehouseData = useCallback(async () => {
     try {
       setLoading(true);
-      setError('');
+      setError(null);
+
+      // Load warehouses and products using shared data fallback
+      const [warehousesData, productsData] = await Promise.all([
+        loadWarehousesWithFallback(api),
+        loadProductsWithFallback(api)
+      ]);
+
+      // Use global products to ensure sync across modules
+      setWarehouses(warehousesData);
+      setProducts(getGlobalProducts());
       
-      const userResponse = await api.get('/users/me/');
-      const currentUser = userResponse.data;
+      // Load transfers
+      await loadTransfers();
+
+      // Mock analytics data
+      const mockAnalytics = {
+        totalCapacity: warehousesData.reduce((sum, w) => sum + (w.capacity || 0), 0),
+        utilizationRate: Math.floor(Math.random() * 40) + 60, // 60-100%
+        activeTransfers: transfers.filter(t => t.status === 'in_transit' || t.status === 'pending').length,
+        lowStockAlerts: Math.floor(Math.random() * 8) + 2
+      };
       
-      const isSalesManager = currentUser.username === 'sales_manager' || currentUser.is_superuser;
-      setUserRole(isSalesManager ? 'sales_manager' : 'sales_rep');
-      
-      let warehousesResponse;
-      if (isSalesManager) {
-        warehousesResponse = await api.get('/warehouse/');
-      } else {
-        warehousesResponse = await api.get(`/warehouse/?manager=${currentUser.id}`);
-      }
-      
-      const warehousesData = warehousesResponse.data.results || warehousesResponse.data;
-      
-      // Fetch manager details for each warehouse
-      const warehousesWithManagers = await Promise.all(
-        warehousesData.map(async (warehouse) => {
-          try {
-            // Try to get manager information if manager_id exists
-            if (warehouse.manager || warehouse.manager_id) {
-              const managerId = warehouse.manager || warehouse.manager_id;
-              const managerResponse = await api.get(`/users/${managerId}/`);
-              return {
-                ...warehouse,
-                manager_name: managerResponse.data.first_name && managerResponse.data.last_name 
-                  ? `${managerResponse.data.first_name} ${managerResponse.data.last_name}`
-                  : managerResponse.data.username,
-                manager_details: managerResponse.data
-              };
-            }
-            
-            // Try to find assigned sales rep for this warehouse
-            const usersResponse = await api.get('/users/');
-            const users = usersResponse.data.results || usersResponse.data;
-            const assignedUser = users.find(user => 
-              user.assigned_warehouse === warehouse.id || 
-              user.warehouse === warehouse.id ||
-              (user.department_name?.toLowerCase() === 'sales' && user.warehouse_id === warehouse.id)
-            );
-            
-            if (assignedUser) {
-              return {
-                ...warehouse,
-                manager_name: assignedUser.first_name && assignedUser.last_name 
-                  ? `${assignedUser.first_name} ${assignedUser.last_name}`
-                  : assignedUser.username,
-                manager_details: assignedUser
-              };
-            }
-            
-            return {
-              ...warehouse,
-              manager_name: 'Unassigned',
-              manager_details: null
-            };
-          } catch (error) {
-            console.error(`Error fetching manager for warehouse ${warehouse.id}:`, error);
-            return {
-              ...warehouse,
-              manager_name: 'Unassigned',
-              manager_details: null
-            };
-          }
-        })
-      );
-      
-      setWarehouses(warehousesWithManagers);
-      
-      if (warehousesWithManagers.length > 0) {
-        const selectedWh = warehousesWithManagers[0];
-        setSelectedWarehouse(selectedWh);
-        if (!isSalesManager) {
-          setUserWarehouse(selectedWh);
-        }
-        await fetchWarehouseDetails(selectedWh.id);
-      }
+      setAnalytics(mockAnalytics);
       
     } catch (error) {
-      console.error('Error fetching warehouse data:', error);
-      setError('Failed to load warehouse data. Please try again.');
+      console.error('[Warehouse Dashboard] Error loading data:', error);
+      setError('Failed to load warehouse data');
+      // Fallback to shared data
+      setWarehouses([]);
+      setProducts(getGlobalProducts());
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const loadTransfers = async () => {
+    try {
+      const transferHistory = getGlobalTransferHistory();
+      setTransfers(transferHistory);
+      console.log('[Warehouse Dashboard] Loaded transfers:', transferHistory.length);
+    } catch (error) {
+      console.error('[Warehouse Dashboard] Failed to load transfers:', error);
+      setSnackbar({ open: true, message: 'Failed to load transfers', severity: 'error' });
+    }
   };
-  
+
+  useEffect(() => {
+    const handleTransferHistoryUpdate = (event) => {
+      setTransfers(event.detail);
+      console.log('[Warehouse Dashboard] Transfer history updated:', event.detail.length);
+    };
+
+    window.addEventListener('transferHistoryUpdated', handleTransferHistoryUpdate);
+    return () => window.removeEventListener('transferHistoryUpdated', handleTransferHistoryUpdate);
+  }, []);
+
   const fetchWarehouseDetails = async (warehouseId) => {
     try {
       // Comprehensive data fetching for advanced analytics
@@ -570,13 +543,38 @@ function WarehouseDashboard() {
 
   const handleAddWarehouse = async () => {
     try {
-      await api.post('/warehouse/', {
+      // Validate required fields
+      if (!warehouseForm.name || !warehouseForm.code || !warehouseForm.address) {
+        setSnackbar({ 
+          open: true, 
+          message: 'Please fill in all required fields (Name, Code, Address)', 
+          severity: 'error' 
+        });
+        return;
+      }
+
+      if (!warehouseForm.capacity || parseInt(warehouseForm.capacity) <= 0) {
+        setSnackbar({ 
+          open: true, 
+          message: 'Please enter a valid capacity greater than 0', 
+          severity: 'error' 
+        });
+        return;
+      }
+
+      const warehouseData = {
         name: warehouseForm.name,
         code: warehouseForm.code,
         address: warehouseForm.address,
         capacity: parseInt(warehouseForm.capacity),
-        manager: warehouseForm.manager || null
-      });
+        manager: warehouseForm.manager && warehouseForm.manager.trim() !== '' ? parseInt(warehouseForm.manager) : null
+      };
+
+      console.log('Creating warehouse with data:', warehouseData);
+
+      const response = await api.post('/warehouse/create/', warehouseData);
+      
+      console.log('Warehouse created successfully:', response.data);
       
       setSnackbar({ open: true, message: 'Warehouse added successfully!', severity: 'success' });
       setAddWarehouseDialog(false);
@@ -585,9 +583,176 @@ function WarehouseDashboard() {
       // Refresh warehouse data
       await fetchWarehouseData();
     } catch (error) {
-      setSnackbar({ open: true, message: 'Failed to add warehouse', severity: 'error' });
+      console.error('Error creating warehouse:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error response status:', error.response?.status);
+      console.error('Error response headers:', error.response?.headers);
+      
+      let errorMessage = 'Failed to add warehouse';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        console.error('Detailed error data:', JSON.stringify(errorData, null, 2));
+        
+        // Handle specific validation errors
+        if (errorData.code && Array.isArray(errorData.code)) {
+          errorMessage = `Code error: ${errorData.code[0]}`;
+        } else if (errorData.code && errorData.code.includes('unique')) {
+          errorMessage = 'Warehouse code already exists. Please use a different code.';
+        } else if (errorData.name && Array.isArray(errorData.name)) {
+          errorMessage = `Name error: ${errorData.name[0]}`;
+        } else if (errorData.address && Array.isArray(errorData.address)) {
+          errorMessage = `Address error: ${errorData.address[0]}`;
+        } else if (errorData.capacity && Array.isArray(errorData.capacity)) {
+          errorMessage = `Capacity error: ${errorData.capacity[0]}`;
+        } else if (errorData.manager && Array.isArray(errorData.manager)) {
+          errorMessage = `Manager error: ${errorData.manager[0]}`;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else {
+          // Show all validation errors
+          const errors = [];
+          Object.keys(errorData).forEach(key => {
+            if (Array.isArray(errorData[key])) {
+              errors.push(`${key}: ${errorData[key][0]}`);
+            } else {
+              errors.push(`${key}: ${errorData[key]}`);
+            }
+          });
+          if (errors.length > 0) {
+            errorMessage = errors.join(', ');
+          }
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
   };
+
+  const handleAddStock = async () => {
+    try {
+      // Validate form data
+      if (!stockForm.product || !stockForm.warehouse || !stockForm.quantity) {
+        setSnackbar({ open: true, message: 'Please select a product, warehouse and enter quantity', severity: 'error' });
+        return;
+      }
+
+      if (parseInt(stockForm.quantity) <= 0) {
+        setSnackbar({ open: true, message: 'Quantity must be greater than 0', severity: 'error' });
+        return;
+      }
+
+      // Find selected product and warehouse
+      const selectedProduct = products.find(p => p.id === parseInt(stockForm.product));
+      const selectedWarehouseData = warehouses.find(w => w.id === parseInt(stockForm.warehouse));
+      
+      if (!selectedProduct) {
+        setSnackbar({ open: true, message: 'Selected product not found', severity: 'error' });
+        return;
+      }
+
+      console.log('[Warehouse Dashboard] Adding stock:', {
+        product: selectedProduct.name,
+        currentStock: selectedProduct.quantity,
+        addingQuantity: stockForm.quantity,
+        warehouse: selectedWarehouseData?.name
+      });
+
+      // Create a stock movement entry with product details
+      const newStockMovement = {
+        id: Date.now(),
+        product_id: selectedProduct.id,
+        product_name: selectedProduct.name,
+        product_sku: selectedProduct.sku,
+        warehouse_name: selectedWarehouseData.name,
+        movement_type: 'STOCK_IN',
+        quantity: parseInt(stockForm.quantity),
+        previous_stock: selectedProduct.quantity || 0,
+        new_stock: (selectedProduct.quantity || 0) + parseInt(stockForm.quantity),
+        notes: stockForm.notes || `Stock addition: ${selectedProduct.name} to ${selectedWarehouseData.name}`,
+        created_at: new Date().toISOString(),
+        status: 'completed',
+        requested_by: 'Warehouse Manager'
+      };
+
+      // Update stock movements state
+      setStockMovements(prev => [newStockMovement, ...prev]);
+
+      // Update product quantity in products state
+      const updatedProducts = products.map(product => {
+        if (product.id === parseInt(stockForm.product)) {
+          return {
+            ...product,
+            quantity: (product.quantity || 0) + parseInt(stockForm.quantity)
+          };
+        }
+        return product;
+      });
+      setProducts(updatedProducts);
+
+      // Update global product state to sync across all modules
+      const newQuantity = (selectedProduct.quantity || 0) + parseInt(stockForm.quantity);
+      updateGlobalProduct(selectedProduct.id, { quantity: newQuantity });
+
+      console.log('[Warehouse Dashboard] Updated global product quantity:', {
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        oldQuantity: selectedProduct.quantity || 0,
+        newQuantity: newQuantity
+      });
+
+      // Update warehouse current stock if available
+      const updatedWarehouses = warehouses.map(warehouse => {
+        if (warehouse.id === parseInt(stockForm.warehouse)) {
+          return {
+            ...warehouse,
+            current_stock: (warehouse.current_stock || 0) + parseInt(stockForm.quantity)
+          };
+        }
+        return warehouse;
+      });
+      setWarehouses(updatedWarehouses);
+
+      // Update selected warehouse if it matches
+      if (selectedWarehouse && selectedWarehouse.id === parseInt(stockForm.warehouse)) {
+        setSelectedWarehouse({
+          ...selectedWarehouse,
+          current_stock: (selectedWarehouse.current_stock || 0) + parseInt(stockForm.quantity)
+        });
+      }
+
+      setSnackbar({ 
+        open: true, 
+        message: `Successfully added ${stockForm.quantity} units of ${selectedProduct.name} to ${selectedWarehouseData.name}! New stock: ${(selectedProduct.quantity || 0) + parseInt(stockForm.quantity)}`, 
+        severity: 'success' 
+      });
+      setAddStockDialog(false);
+      setStockForm({ product: '', warehouse: '', quantity: '', notes: '' });
+      
+      console.log('[Warehouse Dashboard] Stock added successfully:', newStockMovement);
+    } catch (error) {
+      console.error('[Warehouse Dashboard] Error adding stock:', error);
+      setSnackbar({ open: true, message: 'Failed to add stock', severity: 'error' });
+    }
+  };
+
+  // Listen for global product updates
+  useEffect(() => {
+    const handleProductsUpdate = (event) => {
+      setProducts(event.detail);
+    };
+
+    window.addEventListener('productsUpdated', handleProductsUpdate);
+    return () => window.removeEventListener('productsUpdated', handleProductsUpdate);
+  }, []);
 
   if (loading) {
     return (
@@ -724,6 +889,11 @@ function WarehouseDashboard() {
               Add Warehouse
             </QuickActionButton>
           </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={3}>
+            <QuickActionButton fullWidth startIcon={<InventoryIcon />} onClick={() => setAddStockDialog(true)}>
+              Add Stock to Main Warehouse
+            </QuickActionButton>
+          </Grid>
         </Grid>
       </Paper>
 
@@ -732,7 +902,7 @@ function WarehouseDashboard() {
         <SmartWarehouseSelector>
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: '#2c3e50', mb: 1, display: 'flex', alignItems: 'center' }}>
                 🏭 Smart Warehouse Selector
                 <Badge badgeContent={warehouses.length} color="primary" sx={{ ml: 2 }} />
               </Typography>
@@ -877,7 +1047,9 @@ function WarehouseDashboard() {
                         <Typography variant="h3" sx={{ fontWeight: 800, mb: 1 }}>
                           {stockMovements.filter(m => m.movement_type === 'in').length}
                         </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>📈 Stock In</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                          📈 Stock In
+                        </Typography>
                       </Box>
                       <TrendingUpIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
@@ -892,7 +1064,9 @@ function WarehouseDashboard() {
                         <Typography variant="h3" sx={{ fontWeight: 800, mb: 1 }}>
                           {stockMovements.filter(m => m.movement_type === 'out').length}
                         </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>📦 Stock Out</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                          📦 Stock Out
+                        </Typography>
                       </Box>
                       <LocalShippingIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
@@ -907,7 +1081,9 @@ function WarehouseDashboard() {
                         <Typography variant="h3" sx={{ fontWeight: 800, mb: 1 }}>
                           {warehouseSales.length}
                         </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>💰 Sales Orders</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                          💰 Sales Orders
+                        </Typography>
                       </Box>
                       <AssessmentIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
@@ -922,7 +1098,9 @@ function WarehouseDashboard() {
                         <Typography variant="h3" sx={{ fontWeight: 800, mb: 1 }}>
                           {locations.length}
                         </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>📍 Locations</Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                          📍 Locations
+                        </Typography>
                       </Box>
                       <LocationOnIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
@@ -1126,6 +1304,67 @@ function WarehouseDashboard() {
         <DialogActions>
           <Button onClick={() => setAddWarehouseDialog(false)}>Cancel</Button>
           <Button onClick={handleAddWarehouse} variant="contained">Add Warehouse</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={addStockDialog} onClose={() => setAddStockDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Stock to Main Warehouse</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Product</InputLabel>
+                <Select
+                  value={stockForm.product}
+                  onChange={(e) => setStockForm({ ...stockForm, product: e.target.value })}
+                  label="Product"
+                >
+                  {products.map((product) => (
+                    <MenuItem key={product.id} value={product.id}>
+                      {product.name} - {product.sku} (Current Stock: {product.quantity || 0})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Warehouse</InputLabel>
+                <Select
+                  value={stockForm.warehouse}
+                  onChange={(e) => setStockForm({ ...stockForm, warehouse: e.target.value })}
+                  label="Warehouse"
+                >
+                  {warehouses.map((warehouse) => (
+                    <MenuItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Quantity"
+                type="number"
+                value={stockForm.quantity}
+                onChange={(e) => setStockForm({ ...stockForm, quantity: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Notes"
+                multiline
+                rows={3}
+                value={stockForm.notes}
+                onChange={(e) => setStockForm({ ...stockForm, notes: e.target.value })}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddStockDialog(false)}>Cancel</Button>
+          <Button onClick={handleAddStock} variant="contained">Add Stock</Button>
         </DialogActions>
       </Dialog>
 

@@ -15,16 +15,17 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import BusinessIcon from '@mui/icons-material/Business';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 import api from './api';
 import { AuthContext } from './AuthContext';
-import AdvancedAnalytics from './components/AdvancedAnalytics';
-import TimeBasedAnalytics from './components/TimeBasedAnalytics';
-import GanttChart from './components/GanttChart';
-import TransactionIntegration from './components/TransactionIntegration';
+import { loadCustomersWithFallback } from './sharedData';
 import { useTransactionIntegration } from './hooks/useTransactionIntegration';
 import CustomerApprovalService from './services/CustomerApprovalService';
 import CustomerApprovalDialog from './components/CustomerApprovalDialog';
 import LocationPicker from './components/LocationPicker';
+import offlineStorage from './utils/offlineStorage';
 
 // Styled components for modern design
 const StyledTabs = styled(Tabs)(({ theme }) => ({
@@ -139,10 +140,13 @@ const CustomersDashboard = () => {
   
   // Quick Actions State
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [openCustomerDialog, setOpenCustomerDialog] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   
   // Customer approval state
   const [canCreateDirectly, setCanCreateDirectly] = useState(false);
@@ -170,60 +174,107 @@ const CustomersDashboard = () => {
     notes: ''
   });
   
+  // Edit Customer State
+  const [editCustomerOpen, setEditCustomerOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  
   // Quick Action Handlers
   const handleAddCustomer = async () => {
     try {
-      if (canCreateDirectly) {
-        // Superuser/Sales Manager can create customers directly
-        await CustomerApprovalService.createCustomerDirectly(customerForm);
-        setSnackbarMessage('Customer created successfully!');
-        
-        // Record transaction
-        await recordCustomerTransaction({
-          type: 'customer_created',
-          description: `Customer ${customerForm.name} created directly`,
-          amount: 0,
-          metadata: { customer_name: customerForm.name, customer_type: customerForm.customer_type }
+      setIsSubmitting(true);
+      
+      // Validate form
+      if (!customerForm.name || !customerForm.email || !customerForm.phone) {
+        setSnackbar({
+          open: true,
+          message: 'Please fill in all required fields',
+          severity: 'error'
         });
-      } else {
-        // Sales Rep creates approval request
-        const result = await CustomerApprovalService.createCustomerRequest(customerForm);
-        setSnackbarMessage('Customer request submitted for approval!');
-        
-        // Record transaction
-        await recordCustomerTransaction({
-          type: 'customer_request',
-          description: `Customer approval request for ${customerForm.name}`,
-          amount: 0,
-          metadata: { customer_name: customerForm.name, approval_id: result.approval_id }
-        });
-        
-        // Refresh my requests
-        fetchMyRequests();
+        return;
       }
-      
-      setSnackbarOpen(true);
-      setCustomerDialogOpen(false);
-      setCustomerForm({ 
-        name: '', 
-        email: '', 
-        phone: '', 
-        address: '', 
-        customer_type: 'retailer', 
-        payment_terms: 30,
-        latitude: null,
-        longitude: null,
-        location_accuracy: null,
-        location_timestamp: null
+
+      const customerData = {
+        name: customerForm.name,
+        email: customerForm.email,
+        phone: customerForm.phone,
+        address: customerForm.address,
+        city: customerForm.city,
+        country: customerForm.country,
+        customer_type: customerForm.customer_type || 'individual',
+        credit_limit: parseFloat(customerForm.credit_limit) || 0,
+        payment_terms: parseInt(customerForm.payment_terms) || 30,
+        notes: customerForm.notes
+      };
+
+      let newCustomer;
+
+      // Check if online or offline
+      if (navigator.onLine) {
+        try {
+          // Try to create online first
+          const response = await api.post('/customers/', customerData);
+          newCustomer = response.data;
+          
+          // Add to local state
+          setCustomers(prev => [...prev, newCustomer]);
+          
+          setSnackbar({
+            open: true,
+            message: `Customer ${newCustomer.name} added successfully!`,
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Online creation failed, saving offline:', error);
+          // Fallback to offline storage
+          newCustomer = offlineStorage.addCustomer(customerData);
+          
+          // Add to local state with offline flag
+          setCustomers(prev => [...prev, { ...newCustomer, offline_created: true }]);
+          
+          setSnackbar({
+            open: true,
+            message: `Customer saved offline - will sync when connection is restored`,
+            severity: 'warning'
+          });
+        }
+      } else {
+        // Save offline when no connection
+        newCustomer = offlineStorage.addCustomer(customerData);
+        
+        // Add to local state with offline flag
+        setCustomers(prev => [...prev, { ...newCustomer, offline_created: true }]);
+        
+        setSnackbar({
+          open: true,
+          message: `Customer saved offline - will sync when connection is restored`,
+          severity: 'info'
+        });
+      }
+
+      // Reset form
+      setCustomerForm({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        country: '',
+        customer_type: 'individual',
+        credit_limit: '',
+        payment_terms: '30',
+        notes: ''
       });
-      
-      // Refresh data
-      fetchCustomers();
-      refreshData();
+      setOpenCustomerDialog(false);
+
     } catch (error) {
       console.error('Error adding customer:', error);
-      setSnackbarMessage(canCreateDirectly ? 'Failed to create customer' : 'Failed to submit customer request');
-      setSnackbarOpen(true);
+      setSnackbar({
+        open: true,
+        message: 'Failed to add customer. Please try again.',
+        severity: 'error'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -243,12 +294,11 @@ const CustomersDashboard = () => {
   // Customer approval functions
   const fetchCustomers = async () => {
     try {
-      const response = await api.get('/sales/customers/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setCustomers(response.data || []);
+      const customersData = await loadCustomersWithFallback(api);
+      setCustomers(customersData || []);
     } catch (error) {
       console.error('Error fetching customers:', error);
+      setCustomers([]);
     }
   };
   
@@ -296,6 +346,26 @@ const CustomersDashboard = () => {
   
   const handleUpdateProfile = () => {
     window.open('/customers/profiles', '_blank');
+  };
+
+  // Edit Customer Handlers
+  const handleEditCustomer = (customer) => {
+    setEditingCustomer(customer);
+    setEditCustomerOpen(true);
+  };
+
+  const handleSaveCustomer = async () => {
+    try {
+      await CustomerApprovalService.updateCustomer(editingCustomer.id, editingCustomer);
+      setSnackbarMessage('Customer updated successfully!');
+      setSnackbarOpen(true);
+      setEditCustomerOpen(false);
+      fetchCustomers();
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      setSnackbarMessage('Failed to update customer');
+      setSnackbarOpen(true);
+    }
   };
 
   // Mock data for demonstration
@@ -678,6 +748,9 @@ const CustomersDashboard = () => {
                             size="small" 
                             color={customer.status === 'Active' ? 'success' : customer.status === 'Inactive' ? 'error' : 'warning'}
                           />
+                          <IconButton onClick={() => handleEditCustomer(customer)}>
+                            <EditIcon />
+                          </IconButton>
                         </ListItem>
                       ))}
                     </List>
@@ -1261,6 +1334,110 @@ const CustomersDashboard = () => {
             sx={{ background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)' }}
           >
             Create Contact
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Edit Customer Dialog */}
+      <Dialog open={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Edit Customer</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Customer Name"
+                value={editingCustomer?.name}
+                onChange={(e) => setEditingCustomer({...editingCustomer, name: e.target.value})}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Email"
+                value={editingCustomer?.email}
+                onChange={(e) => setEditingCustomer({...editingCustomer, email: e.target.value})}
+                margin="normal"
+                type="email"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Phone"
+                value={editingCustomer?.phone}
+                onChange={(e) => setEditingCustomer({...editingCustomer, phone: e.target.value})}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                select
+                label="Customer Type"
+                value={editingCustomer?.customer_type}
+                onChange={(e) => setEditingCustomer({...editingCustomer, customer_type: e.target.value})}
+                margin="normal"
+                SelectProps={{ native: true }}
+              >
+                <option value="retailer">Retailer</option>
+                <option value="wholesaler">Wholesaler</option>
+                <option value="distributor">Distributor</option>
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Address"
+                value={editingCustomer?.address}
+                onChange={(e) => setEditingCustomer({...editingCustomer, address: e.target.value})}
+                margin="normal"
+                multiline
+                rows={2}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Payment Terms (Days)"
+                value={editingCustomer?.payment_terms}
+                onChange={(e) => setEditingCustomer({...editingCustomer, payment_terms: parseInt(e.target.value) || 30})}
+                margin="normal"
+                type="number"
+                inputProps={{ min: 1, max: 365 }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <LocationPicker
+                onLocationSelect={(location) => {
+                  setEditingCustomer({
+                    ...editingCustomer,
+                    latitude: location?.latitude,
+                    longitude: location?.longitude,
+                    location_accuracy: location?.accuracy,
+                    location_timestamp: location?.timestamp
+                  });
+                }}
+                initialLocation={{
+                  latitude: editingCustomer?.latitude,
+                  longitude: editingCustomer?.longitude
+                }}
+                showMap={true}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditCustomerOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleSaveCustomer} 
+            variant="contained"
+            sx={{ background: 'linear-gradient(45deg, #2196F3 30%, #1565C0 90%)' }}
+          >
+            Save Customer
           </Button>
         </DialogActions>
       </Dialog>

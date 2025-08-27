@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Account, Transaction
-
-admin.site.register(Account)
-admin.site.register(Transaction)
+from .models import (
+    Currency, ChartOfAccounts, JournalEntry, JournalBatch, Budget, BudgetLine,
+    FixedAsset, ExpenseCategory, ExpenseReport, ExpenseItem, RecurringTransaction,
+    LegacyAccount, LegacyTransaction
+)

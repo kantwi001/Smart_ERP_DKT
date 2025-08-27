@@ -19,12 +19,55 @@ import {
   Check as CheckIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
-import GoogleMapsService from '../services/GoogleMapsService';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix leaflet default marker icons
+if (typeof window !== 'undefined') {
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  });
+}
+
+// Custom marker for location selection
+const createLocationIcon = () => {
+  if (typeof window === 'undefined') return null;
+  
+  return new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+};
+
+// Map click handler component
+const MapClickHandler = ({ onLocationSelect }) => {
+  useMapEvents({
+    click: (e) => {
+      const { lat, lng } = e.latlng;
+      const newLocation = {
+        latitude: lat.toFixed(8),
+        longitude: lng.toFixed(8),
+        accuracy: null,
+        timestamp: new Date().toISOString()
+      };
+      onLocationSelect(newLocation);
+    },
+  });
+  return null;
+};
 
 const LocationPicker = ({ 
   onLocationSelect, 
   initialLocation = null, 
-  showMap = true,
+  showMap = true, 
   disabled = false 
 }) => {
   const [loading, setLoading] = useState(false);
@@ -32,17 +75,18 @@ const LocationPicker = ({
   const [success, setSuccess] = useState('');
   const [location, setLocation] = useState(initialLocation);
   const [address, setAddress] = useState('');
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [map, setMap] = useState(null);
-  const [marker, setMarker] = useState(null);
-  
-  const mapRef = useRef(null);
+  const [mapCenter, setMapCenter] = useState([7.9465, -1.0232]); 
+  const [mapZoom, setMapZoom] = useState(7);
+  const [locationIcon, setLocationIcon] = useState(null);
 
   useEffect(() => {
-    if (showMap) {
-      initializeMap();
+    try {
+      const icon = createLocationIcon();
+      setLocationIcon(icon);
+    } catch (error) {
+      console.warn('Could not create location icon:', error);
     }
-  }, [showMap]);
+  }, []);
 
   useEffect(() => {
     if (location && onLocationSelect) {
@@ -50,180 +94,80 @@ const LocationPicker = ({
     }
   }, [location, onLocationSelect]);
 
-  const initializeMap = async () => {
-    try {
-      setLoading(true);
-      await GoogleMapsService.loadGoogleMaps();
-      
-      // Wait for DOM element to be available
-      if (mapRef.current && mapRef.current.offsetParent !== null) {
-        // Add a small delay to ensure DOM is fully rendered
-        setTimeout(() => {
-          try {
-            const mapInstance = GoogleMapsService.createMap(mapRef.current, {
-              zoom: 7,
-              center: { lat: 7.9465, lng: -1.0232 }, // Ghana center
-            });
-
-            setMap(mapInstance);
-            setMapLoaded(true);
-
-            // Add click listener to map
-            mapInstance.addListener('click', (event) => {
-              handleMapClick(event.latLng);
-            });
-
-            // If there's an initial location, show it on the map
-            if (initialLocation && initialLocation.latitude && initialLocation.longitude) {
-              const position = {
-                lat: parseFloat(initialLocation.latitude),
-                lng: parseFloat(initialLocation.longitude)
-              };
-              addMarkerToMap(mapInstance, position);
-              mapInstance.setCenter(position);
-              mapInstance.setZoom(15);
-            }
-          } catch (mapError) {
-            console.error('Map creation error:', mapError);
-            setError('Failed to initialize map');
-          }
-        }, 100);
-      } else {
-        // Retry after a short delay if element is not ready
-        setTimeout(() => {
-          if (mapRef.current) {
-            initializeMap();
-          }
-        }, 200);
-      }
-    } catch (err) {
-      setError('Failed to load Google Maps');
-      console.error('Map initialization error:', err);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (location && location.latitude && location.longitude) {
+      setMapCenter([parseFloat(location.latitude), parseFloat(location.longitude)]);
+      setMapZoom(15);
     }
-  };
-
-  const handleMapClick = (latLng) => {
-    const newLocation = {
-      latitude: latLng.lat(),
-      longitude: latLng.lng(),
-      accuracy: null,
-      timestamp: new Date().toISOString()
-    };
-
-    setLocation(newLocation);
-    addMarkerToMap(map, latLng);
-    reverseGeocodeLocation(newLocation);
-  };
-
-  const addMarkerToMap = (mapInstance, position) => {
-    // Remove existing marker
-    if (marker) {
-      marker.setMap(null);
-    }
-
-    // Add new marker
-    const newMarker = GoogleMapsService.addMarker(mapInstance, position, {
-      title: 'Customer Location',
-      icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#f44336"/>
-          </svg>
-        `),
-        scaledSize: new window.google.maps.Size(24, 24)
-      }
-    });
-
-    setMarker(newMarker);
-  };
+  }, [location]);
 
   const getCurrentLocation = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const currentLocation = await GoogleMapsService.getCurrentLocation();
+      if (!navigator.geolocation) {
+        throw new Error('Geolocation is not supported by this browser');
+      }
+
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000,
+          }
+        );
+      });
+
+      const { latitude, longitude, accuracy } = position.coords;
       
-      // Check if location is in Ghana
-      if (!GoogleMapsService.isInGhana(currentLocation.latitude, currentLocation.longitude)) {
+      const currentLocation = {
+        latitude: latitude.toFixed(8),
+        longitude: longitude.toFixed(8),
+        accuracy: accuracy,
+        timestamp: new Date().toISOString()
+      };
+      
+      const isInGhana = latitude >= 4.5 && latitude <= 11.5 && longitude >= -3.5 && longitude <= 1.5;
+      
+      if (!isInGhana) {
         setError('Location appears to be outside Ghana. Please verify the location.');
       }
       
       setLocation(currentLocation);
       setSuccess('Location captured successfully!');
       
-      // Update map if available
-      if (map) {
-        const position = {
-          lat: currentLocation.latitude,
-          lng: currentLocation.longitude
-        };
-        map.setCenter(position);
-        map.setZoom(15);
-        addMarkerToMap(map, position);
+    } catch (err) {
+      let errorMessage = 'Failed to get location';
+      
+      if (err.code === 1) {
+        errorMessage = 'Location access denied. Please enable location services.';
+      } else if (err.code === 2) {
+        errorMessage = 'Location unavailable. Please try again.';
+      } else if (err.code === 3) {
+        errorMessage = 'Location request timed out. Please try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       
-      // Get address for the location
-      reverseGeocodeLocation(currentLocation);
-      
-    } catch (err) {
-      setError(err.message);
+      setError(errorMessage);
       console.error('Location error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const reverseGeocodeLocation = async (locationData) => {
-    try {
-      const result = await GoogleMapsService.reverseGeocode(
-        locationData.latitude, 
-        locationData.longitude
-      );
-      setAddress(result.formatted_address);
-    } catch (err) {
-      console.warn('Reverse geocoding failed:', err);
-      setAddress('Address not available');
-    }
+  const handleAddressChange = (e) => {
+    setAddress(e.target.value);
   };
 
-  const geocodeAddress = async (addressText) => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const result = await GoogleMapsService.geocodeAddress(addressText);
-      
-      const newLocation = {
-        latitude: result.latitude,
-        longitude: result.longitude,
-        accuracy: null,
-        timestamp: new Date().toISOString()
-      };
-      
-      setLocation(newLocation);
-      setAddress(result.formatted_address);
-      setSuccess('Location found successfully!');
-      
-      // Update map if available
-      if (map) {
-        const position = {
-          lat: result.latitude,
-          lng: result.longitude
-        };
-        map.setCenter(position);
-        map.setZoom(15);
-        addMarkerToMap(map, position);
-      }
-      
-    } catch (err) {
-      setError('Address not found. Please try a different address.');
-      console.error('Geocoding error:', err);
-    } finally {
-      setLoading(false);
-    }
+  const handleMapLocationSelect = (newLocation) => {
+    setLocation(newLocation);
+    setSuccess('Location selected on map!');
+    setError('');
   };
 
   const clearLocation = () => {
@@ -231,16 +175,12 @@ const LocationPicker = ({
     setAddress('');
     setError('');
     setSuccess('');
-    
-    if (marker) {
-      marker.setMap(null);
-      setMarker(null);
-    }
-    
-    if (map) {
-      map.setCenter({ lat: 7.9465, lng: -1.0232 });
-      map.setZoom(7);
-    }
+    setMapCenter([7.9465, -1.0232]);
+    setMapZoom(7);
+  };
+
+  const isInGhana = (lat, lng) => {
+    return lat >= 4.5 && lat <= 11.5 && lng >= -3.5 && lng <= 1.5;
   };
 
   return (
@@ -267,26 +207,16 @@ const LocationPicker = ({
             fullWidth
             label="Address"
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && address.trim()) {
-                geocodeAddress(address);
-              }
-            }}
-            placeholder="Enter address or click map to select location"
+            onChange={handleAddressChange}
+            placeholder="Enter customer address"
             disabled={disabled}
-            InputProps={{
-              endAdornment: address && (
-                <IconButton onClick={() => geocodeAddress(address)} disabled={loading}>
-                  <LocationIcon />
-                </IconButton>
-              )
-            }}
+            multiline
+            rows={2}
           />
         </Grid>
         
         <Grid item xs={12} md={4}>
-          <Box display="flex" gap={1}>
+          <Box display="flex" gap={1} flexDirection="column">
             <Tooltip title="Get Current Location">
               <Button
                 variant="outlined"
@@ -295,15 +225,22 @@ const LocationPicker = ({
                 startIcon={loading ? <CircularProgress size={16} /> : <MyLocationIcon />}
                 fullWidth
               >
-                GPS
+                {loading ? 'Getting GPS...' : 'Get GPS Location'}
               </Button>
             </Tooltip>
             
             {location && (
               <Tooltip title="Clear Location">
-                <IconButton onClick={clearLocation} disabled={disabled}>
-                  <ClearIcon />
-                </IconButton>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={clearLocation}
+                  disabled={disabled}
+                  startIcon={<ClearIcon />}
+                  fullWidth
+                >
+                  Clear Location
+                </Button>
               </Tooltip>
             )}
           </Box>
@@ -337,49 +274,64 @@ const LocationPicker = ({
             )}
           </Grid>
           
-          {GoogleMapsService.isInGhana(location.latitude, location.longitude) ? (
-            <Chip label="Location in Ghana ✓" color="success" size="small" sx={{ mt: 1 }} />
+          {isInGhana(parseFloat(location.latitude), parseFloat(location.longitude)) ? (
+            <Chip label="Location in Ghana " color="success" size="small" sx={{ mt: 1 }} />
           ) : (
-            <Chip label="Location outside Ghana ⚠️" color="warning" size="small" sx={{ mt: 1 }} />
+            <Chip label="Location outside Ghana " color="warning" size="small" sx={{ mt: 1 }} />
           )}
         </Paper>
       )}
 
       {showMap && (
-        <Paper sx={{ p: 1, height: 300, position: 'relative' }}>
-          {loading && !mapLoaded && (
-            <Box 
-              display="flex" 
-              alignItems="center" 
-              justifyContent="center" 
-              height="100%"
-              flexDirection="column"
-              gap={2}
-            >
-              <CircularProgress />
-              <Typography>Loading Google Maps...</Typography>
-            </Box>
-          )}
+        <Paper sx={{ p: 1, height: 400, position: 'relative' }}>
+          <Box position="absolute" top={8} right={8} zIndex={1000}>
+            <Chip 
+              icon={<MapIcon />} 
+              label="Click map to select location" 
+              size="small" 
+              sx={{ bgcolor: 'rgba(255,255,255,0.9)' }}
+            />
+          </Box>
           
-          <div 
-            ref={mapRef} 
-            style={{ 
-              width: '100%', 
-              height: '100%',
-              display: loading && !mapLoaded ? 'none' : 'block'
-            }} 
-          />
-          
-          {mapLoaded && (
-            <Box position="absolute" top={8} right={8}>
-              <Chip 
-                icon={<MapIcon />} 
-                label="Click map to select location" 
-                size="small" 
-                sx={{ bgcolor: 'rgba(255,255,255,0.9)' }}
-              />
-            </Box>
-          )}
+          <MapContainer 
+            center={mapCenter} 
+            zoom={mapZoom} 
+            style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+            key={`${mapCenter[0]}-${mapCenter[1]}-${mapZoom}`}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+              url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            />
+            
+            <MapClickHandler onLocationSelect={handleMapLocationSelect} />
+            
+            {location && location.latitude && location.longitude && (
+              <Marker 
+                position={[parseFloat(location.latitude), parseFloat(location.longitude)]}
+                icon={locationIcon || undefined}
+              >
+                <Popup>
+                  <Box sx={{ minWidth: 150 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                      Selected Location
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Lat:</strong> {parseFloat(location.latitude).toFixed(6)}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Lng:</strong> {parseFloat(location.longitude).toFixed(6)}
+                    </Typography>
+                    {location.accuracy && (
+                      <Typography variant="body2">
+                        <strong>Accuracy:</strong> ±{Math.round(location.accuracy)}m
+                      </Typography>
+                    )}
+                  </Box>
+                </Popup>
+              </Marker>
+            )}
+          </MapContainer>
         </Paper>
       )}
     </Box>

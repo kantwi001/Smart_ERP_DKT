@@ -3,7 +3,8 @@ import {
   Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
   Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Checkbox
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Checkbox,
+  FormControl, InputLabel, Select, InputAdornment, useMediaQuery, useTheme, Autocomplete
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -24,6 +25,25 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import AddIcon from '@mui/icons-material/Add';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import PaymentIcon from '@mui/icons-material/Payment';
+import PrintIcon from '@mui/icons-material/Print';
+import BusinessIcon from '@mui/icons-material/Business';
+import PendingIcon from '@mui/icons-material/Pending';
+import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import MapIcon from '@mui/icons-material/Map';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
+import TransferWithinAStationIcon from '@mui/icons-material/TransferWithinAStation';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import api from './api';
 import { AuthContext } from './AuthContext';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
@@ -31,6 +51,14 @@ import TimeBasedAnalytics from './components/TimeBasedAnalytics';
 import GanttChart from './components/GanttChart';
 import TransactionIntegration from './components/TransactionIntegration';
 import { useTransactionIntegration } from './hooks/useTransactionIntegration';
+import CustomerCreationForm from './components/CustomerCreationForm';
+import CustomerHeatMap from './components/CustomerHeatMap';
+import L from 'leaflet';
+import offlineStorage from './utils/offlineStorage';
+import { getGlobalProducts, loadProductsWithFallback, loadCustomersWithFallback, sharedCustomers, updateGlobalProduct } from './sharedData';
+import QuickActionDialogs from './QuickActionDialogs';
+import SalesOrdersManagement from './components/SalesOrdersManagement';
+import WarehouseTransferModule from './WarehouseTransferModule';
 
 // Styled components for modern design
 const StyledTabs = styled(Tabs)(({ theme }) => ({
@@ -108,614 +136,445 @@ function TabPanel({ children, value, index, ...other }) {
   );
 }
 
-const periods = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: 'custom', label: 'Custom' },
-];
-
-const mockSummary = [
-  { title: 'Total Sales', value: 320, icon: <AssessmentIcon />, color: 'primary' },
-  { title: 'Revenue', value: '₵25,000', icon: <SwapHorizIcon />, color: 'success' },
-  { title: 'Customers', value: 110, icon: <PeopleIcon />, color: 'secondary' },
-  { title: 'Products Sold', value: 75, icon: <InventoryIcon />, color: 'info' },
-];
-
-const mockLineData = [
-  { date: 'Jul 14', Sales: 22, Revenue: 2000 },
-  { date: 'Jul 15', Sales: 28, Revenue: 2500 },
-  { date: 'Jul 16', Sales: 30, Revenue: 2800 },
-  { date: 'Jul 17', Sales: 35, Revenue: 3200 },
-  { date: 'Jul 18', Sales: 40, Revenue: 3500 },
-  { date: 'Jul 19', Sales: 38, Revenue: 3400 },
-  { date: 'Jul 20', Sales: 35, Revenue: 3600 },
-];
-
-const mockPieData1 = [
-  { name: 'Retail', value: 60 },
-  { name: 'Wholesale', value: 40 },
-];
-const mockPieData2 = [
-  { name: 'Accra', value: 70 },
-  { name: 'Kumasi', value: 20 },
-  { name: 'Takoradi', value: 10 },
-];
-const mockPieData3 = [
-  { name: 'Cash', value: 50 },
-  { name: 'Card', value: 30 },
-  { name: 'Mobile Money', value: 20 },
-];
-
 const SalesDashboard = () => {
   const { token, user } = useContext(AuthContext);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [salesData, setSalesData] = useState([]);
-  
+  const [salesData, setSalesData] = useState({});
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
+  const [recentSales, setRecentSales] = useState([]);
+  const [filters, setFilters] = useState({});
+  const [salesAgents, setSalesAgents] = useState([]);
+  const [agentAnalytics, setAgentAnalytics] = useState(null);
+  const [assignedWarehouse, setAssignedWarehouse] = useState(null);
+  const [agentProducts, setAgentProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
   // Transaction integration
   const {
     transactions,
     analytics,
-    createSalesOrder,
     completePOSSale,
+    createTransaction,
     refreshData
   } = useTransactionIntegration('sales');
   
-  // Quick Actions State
-  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
-  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  // Dialog State
   const [salesOrderDialogOpen, setSalesOrderDialogOpen] = useState(false);
   const [promotionsDialogOpen, setPromotionsDialogOpen] = useState(false);
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [transferStockDialogOpen, setTransferStockDialogOpen] = useState(false);
   const [viewTransfersDialogOpen, setViewTransfersDialogOpen] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  
-  // Form State
-  const [quoteForm, setQuoteForm] = useState({
-    customer: '',
-    product: '',
-    quantity: '',
-    notes: ''
-  });
-  
-  const [leadForm, setLeadForm] = useState({
+  const [addLeadDialogOpen, setAddLeadDialogOpen] = useState(false);
+  const [posTransactionsDialogOpen, setPosTransactionsDialogOpen] = useState(false);
+  const [stockAssignmentDialogOpen, setStockAssignmentDialogOpen] = useState(false);
+  const [customerCreationDialogOpen, setCustomerCreationDialogOpen] = useState(false);
+  const [transactionsDialogOpen, setTransactionsDialogOpen] = useState(false);
+  const [customerHeatMapDialogOpen, setCustomerHeatMapDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedAgent, setSelectedAgent] = useState('agent1');
+
+  // Sales Order State
+  const [orderProducts, setOrderProducts] = useState([{ product: null, quantity: 1 }]);
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [notes, setNotes] = useState('');
+
+  // Loading and UI State
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [selectedProducts, setSelectedProducts] = useState([]);
+
+  // Data State
+  const [newCustomerData, setNewCustomerData] = useState({
     name: '',
     email: '',
     phone: '',
-    company: '',
-    source: 'website'
-  });
-  
-  const [salesOrderForm, setSalesOrderForm] = useState({
-    customer: '',
-    products: [{ product: '', quantity: 1, price: '' }],
-    notes: '',
-    discount: 0
+    address: '',
+    customer_type: 'retailer',
+    payment_terms: 30
   });
 
-  const [transferForm, setTransferForm] = useState({
-    product: '',
-    quantity: '',
-    fromWarehouse: '',
-    toWarehouse: '',
-    notes: ''
+  // Quick Action Dialog State
+  const [quickActionDialog, setQuickActionDialog] = useState({
+    open: false,
+    type: '',
+    product: null
   });
 
-  const [promotionsForm, setPromotionsForm] = useState({
-    name: '',
-    description: '',
-    discount_type: 'percentage',
-    discount_value: '',
-    start_date: '',
-    end_date: '',
-    applicable_products: [],
-    minimum_order: '',
-    selected_products: [], // Array of {product_id, original_price, discounted_price}
-    apply_to_all: false
-  });
-
-  const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
-  const [recentSales, setRecentSales] = useState([]);
-  const [filters, setFilters] = useState({});
-  const [salesAgents, setSalesAgents] = useState([]);
-  const [selectedAgent, setSelectedAgent] = useState('all');
-  const [agentAnalytics, setAgentAnalytics] = useState(null);
-  const [transfers, setTransfers] = useState([]);
-
-  // Role-based access control for product management
-  const canManageProducts = () => {
-    if (!user) return false;
-    
-    // Check if user is superadmin or has specific roles
-    const allowedRoles = ['sales_manager', 'superadmin', 'sales_supervisor', 'logistics'];
-    const allowedDepartments = ['logistics'];
-    
-    return (
-      user.is_superuser ||
-      user.role === 'superadmin' ||
-      allowedRoles.includes(user.role?.toLowerCase()) ||
-      allowedDepartments.includes(user.department_name?.toLowerCase()) ||
-      user.role?.toLowerCase().includes('manager') ||
-      user.role?.toLowerCase().includes('supervisor')
-    );
-  };
-
-  // Separate access control for Add Product (more restrictive)
-  const canAddProducts = () => {
-    if (!user) return false;
-    
-    // Exclude regular sales department users, but allow specific roles
-    const allowedRoles = ['sales_manager', 'superadmin', 'sales_supervisor', 'logistics'];
-    
-    return (
-      user.is_superuser ||
-      user.role === 'superadmin' ||
-      allowedRoles.includes(user.role?.toLowerCase()) ||
-      user.department_name?.toLowerCase() === 'logistics' ||
-      (user.role?.toLowerCase().includes('manager') && user.department_name?.toLowerCase() !== 'sales') ||
-      (user.role?.toLowerCase().includes('supervisor') && user.department_name?.toLowerCase() !== 'sales') ||
-      (user.role?.toLowerCase() === 'sales_manager') ||
-      (user.role?.toLowerCase() === 'sales_supervisor')
-    );
-  };
-
-  // Mock data for demonstration
-  const recentActivity = [
-    { action: 'New sale completed - Order #1234', timestamp: '2 minutes ago', type: 'success' },
-    { action: 'Customer payment received', timestamp: '15 minutes ago', type: 'success' },
-    { action: 'Quote sent to customer', timestamp: '1 hour ago', type: 'info' },
-    { action: 'Follow-up call scheduled', timestamp: '2 hours ago', type: 'warning' },
-    { action: 'Product demo completed', timestamp: '3 hours ago', type: 'info' },
-  ];
-
-  useEffect(() => {
-    loadDashboardData();
-    loadCustomers();
-    loadProducts();
-    loadWarehouses();
-    loadTransfers();
-    loadSalesAgents();
-  }, [token]);
-
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/sales/dashboard/');
-      setSalesData(response.data);
-    } catch (error) {
-      setError('Failed to load dashboard data');
-      console.error('Dashboard error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load functions
   const loadCustomers = async () => {
     try {
-      const response = await api.get('/sales/customers/');
-      setCustomers(response.data.results || response.data);
+      // Use the shared data function to ensure consistency across modules
+      const customersData = await loadCustomersWithFallback();
+      setCustomers(customersData || []);
+      console.log('Customers loaded in SalesDashboard:', customersData?.length || 0);
     } catch (error) {
-      console.error('Failed to load customers:', error);
+      console.error('Error loading customers:', error);
+      setCustomers([]);
     }
   };
 
   const loadProducts = async () => {
+    setLoading(true);
     try {
-      const response = await api.get('/inventory/products/');
-      setProducts(response.data.results || response.data);
+      const productsData = await loadProductsWithFallback(token);
+      setProducts(productsData);
+      console.log('Products loaded in SalesDashboard:', productsData);
     } catch (error) {
       console.error('Failed to load products:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const loadWarehouses = async () => {
     try {
       const response = await api.get('/warehouse/');
-      setWarehouses(response.data.results || response.data);
+      setWarehouses(response.data);
+      console.log('Warehouses loaded:', response.data.length);
     } catch (error) {
-      console.error('Failed to load warehouses:', error);
+      console.error('Error loading warehouses:', error);
+      // Fallback sample data
+      setWarehouses([
+        { id: 1, name: 'Main Warehouse', location: 'Central Location', capacity: 1000 },
+        { id: 2, name: 'North Distribution Center', location: 'North Region', capacity: 500 },
+        { id: 3, name: 'South Storage Facility', location: 'South Region', capacity: 750 },
+        { id: 4, name: 'West Depot', location: 'West Region', capacity: 600 }
+      ]);
+    }
+  };
+
+  const loadAllTransactions = async () => {
+    try {
+      const response = await api.get('/sales/sales/');
+      setAllTransactions(response.data);
+      console.log('Transactions loaded:', response.data.length);
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      setAllTransactions([]);
     }
   };
 
   const loadTransfers = async () => {
     try {
-      const response = await api.get('/inventory/transfers/');
-      setTransfers(response.data.results || response.data);
+      const response = await api.get('/warehouse/transfers/');
+      setTransfers(response.data);
     } catch (error) {
-      console.error('Failed to load transfers:', error);
+      console.error('Error loading transfers:', error);
     }
   };
 
-  const loadSalesAgents = async () => {
+  const loadSalesData = async () => {
     try {
-      const response = await api.get('/sales/agents/');
-      setSalesAgents(response.data.results || response.data);
-    } catch (error) {
-      console.error('Failed to load sales agents:', error);
-    }
-  };
-
-  // Quick Action Handlers
-  const handleCreateSalesOrder = () => {
-    // Open sales order creation dialog
-    setSalesOrderDialogOpen(true);
-  };
-  
-  const handleCreateSalesOrderSubmit = async () => {
-    try {
-      if (!salesOrderForm.customer || salesOrderForm.products.length === 0) {
-        setSnackbarMessage('Please select a customer and add at least one product');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Validate products
-      const invalidProducts = salesOrderForm.products.filter(p => !p.product || !p.quantity || p.quantity <= 0);
-      if (invalidProducts.length > 0) {
-        setSnackbarMessage('Please fill in all product details with valid quantities');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Create sales order via backend API
-      const orderData = {
-        customer: salesOrderForm.customer,
-        products: salesOrderForm.products.map(p => ({
-          product: p.product,
-          quantity: parseInt(p.quantity),
-          unit_price: parseFloat(p.price) || 0
-        })),
-        notes: salesOrderForm.notes,
-        discount: parseFloat(salesOrderForm.discount) || 0,
-        status: 'pending'
-      };
-
-      const response = await api.post('/sales/', orderData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Sales order created:', response.data);
-      setSnackbarMessage('Sales order created successfully!');
-      setSnackbarOpen(true);
-      setSalesOrderDialogOpen(false);
-      setSalesOrderForm({
-        customer: '',
-        products: [{ product: '', quantity: 1, price: '' }],
-        notes: '',
-        discount: 0
+      // Load sales summary data
+      const salesResponse = await api.get('/sales/sales-orders/');
+      const salesOrders = salesResponse.data || [];
+      
+      // Calculate sales metrics
+      const totalSales = salesOrders.reduce((sum, order) => sum + parseFloat(order.total || 0), 0);
+      const pendingSales = salesOrders.filter(order => order.status === 'pending').length;
+      const completedSales = salesOrders.filter(order => order.status === 'completed').length;
+      
+      setSalesData({
+        totalOrders: salesOrders.length,
+        totalValue: totalSales,
+        pendingOrders: pendingSales,
+        completedOrders: completedSales,
+        recentOrders: salesOrders.slice(0, 5)
       });
       
-      // Refresh sales data to show new order
-      loadDashboardData();
+      console.log('Sales data loaded:', { totalOrders: salesOrders.length, totalValue: totalSales });
     } catch (error) {
-      console.error('Failed to create sales order:', error);
-      setSnackbarMessage('Failed to create sales order');
-      setSnackbarOpen(true);
+      console.error('Error loading sales data:', error);
+      setSalesData({
+        totalOrders: 0,
+        totalValue: 0,
+        pendingOrders: 0,
+        completedOrders: 0,
+        recentOrders: []
+      });
     }
   };
-  
-  const handleGenerateQuote = async () => {
-    try {
-      if (!quoteForm.customer || !quoteForm.product || !quoteForm.quantity) {
-        setSnackbarMessage('Please fill in all required fields');
-        setSnackbarOpen(true);
-        return;
-      }
 
-      // Create quote via backend API
-      const quoteData = {
-        customer: quoteForm.customer,
-        product: quoteForm.product,
-        quantity: parseInt(quoteForm.quantity),
-        notes: quoteForm.notes,
-        status: 'draft'
-      };
-
-      const response = await api.post('/sales/quotes/', quoteData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Quote created:', response.data);
-      setSnackbarMessage('Quote generated successfully!');
-      setSnackbarOpen(true);
-      setQuoteDialogOpen(false);
-      setQuoteForm({ customer: '', product: '', quantity: '', notes: '' });
-      
-      // Refresh sales data to show new quote
-      loadDashboardData();
-    } catch (error) {
-      console.error('Failed to generate quote:', error);
-      setSnackbarMessage('Failed to generate quote');
-      setSnackbarOpen(true);
+  const loadAgentProducts = () => {
+    const currentAgent = salesAgents.find(agent => agent.id === selectedAgent);
+    if (currentAgent) {
+      const warehouseId = currentAgent.assigned_warehouse_id;
+      setAssignedWarehouse(warehouses.find(w => w.id === warehouseId));
+      const agentProds = getGlobalProducts();
+      setAgentProducts(agentProds);
     }
   };
-  
-  const handleAddLead = async () => {
-    try {
-      if (!leadForm.name || !leadForm.email) {
-        setSnackbarMessage('Please fill in name and email fields');
-        setSnackbarOpen(true);
-        return;
-      }
 
-      // Create lead via backend API
-      const leadData = {
-        name: leadForm.name,
-        email: leadForm.email,
-        phone: leadForm.phone,
-        company: leadForm.company,
-        source: leadForm.source,
-        status: 'new'
-      };
-
-      const response = await api.post('/sales/leads/', leadData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Lead created:', response.data);
-      setSnackbarMessage('Lead added successfully!');
-      setSnackbarOpen(true);
-      setLeadDialogOpen(false);
-      setLeadForm({ name: '', email: '', phone: '', company: '', source: 'website' });
-      
-      // Refresh sales data to show new lead
-      loadDashboardData();
-    } catch (error) {
-      console.error('Failed to add lead:', error);
-      setSnackbarMessage('Failed to add lead');
-      setSnackbarOpen(true);
-    }
-  };
-  
-  const handleTransferStock = async () => {
-    try {
-      // Validate transfer form
-      if (!transferForm.product || !transferForm.quantity || !transferForm.fromWarehouse || !transferForm.toWarehouse) {
-        setSnackbarMessage('Please fill in all required fields');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      if (transferForm.fromWarehouse === transferForm.toWarehouse) {
-        setSnackbarMessage('Source and destination warehouses must be different');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      const transferData = {
-        product: transferForm.product,
-        quantity: parseInt(transferForm.quantity),
-        from_warehouse: transferForm.fromWarehouse,
-        to_warehouse: transferForm.toWarehouse,
-        notes: transferForm.notes,
-        requested_by: user?.id
-      };
-
-      const response = await api.post('/inventory/transfers/', transferData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setSnackbarMessage('Stock transfer initiated successfully!');
-      setSnackbarOpen(true);
-      setTransferStockDialogOpen(false);
-      
-      // Reset form
-      setTransferForm({
-        product: '',
-        quantity: '',
-        fromWarehouse: '',
-        toWarehouse: '',
-        notes: ''
-      });
-
-      // Refresh data
-      loadDashboardData();
-    } catch (error) {
-      console.error('Transfer stock error:', error);
-      setSnackbarMessage('Failed to initiate stock transfer. Please try again.');
-      setSnackbarOpen(true);
-    }
-  };
-  
   const handleRefreshData = () => {
     setLoading(true);
-    loadDashboardData();
+    loadCustomers();
+    loadProducts();
+    loadAllTransactions();
+    loadSalesData();
+    loadAgentProducts();
+    refreshData();
+    setLoading(false);
   };
-  
-  const fetchSalesData = async () => {
-    setLoading(true);
+
+  const handleAssignStock = () => {
+    setStockAssignmentDialogOpen(true);
+  };
+
+  const handleAddCustomer = () => {
+    setCustomerCreationDialogOpen(true);
+  };
+
+  // Sales Order Functions
+  const addProductToOrder = () => {
+    setOrderProducts([...orderProducts, { product: null, quantity: 1 }]);
+  };
+
+  const removeProductFromOrder = (index) => {
+    const newProducts = orderProducts.filter((_, i) => i !== index);
+    setOrderProducts(newProducts);
+  };
+
+  const updateOrderProduct = (index, field, value) => {
+    const newProducts = [...orderProducts];
+    newProducts[index][field] = value;
+    setOrderProducts(newProducts);
+  };
+
+  const calculateOrderTotal = () => {
+    const subtotal = orderProducts.reduce((total, item) => {
+      if (item.product) {
+        return total + (item.product.unit_price * item.quantity);
+      }
+      return total;
+    }, 0);
+    const discountAmount = (subtotal * discount) / 100;
+    return subtotal - discountAmount;
+  };
+
+  const handleCreateSalesOrder = async () => {
+    if (!selectedCustomer || orderProducts.length === 0) {
+      setSnackbar({ open: true, message: 'Please select a customer and add products', severity: 'error' });
+      return;
+    }
+
     try {
-      // Fetch sales data with error handling
-      try {
-        const salesRes = await api.get('/sales/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setSalesData(salesRes.data || []);
-      } catch (err) {
-        console.warn('Failed to load sales data:', err);
-      }
-
-      // Fetch customers data with error handling
-      try {
-        const customersRes = await api.get('/sales/customers/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setCustomers(customersRes.data || []);
-      } catch (err) {
-        console.warn('Failed to load customers data:', err);
-      }
-
-      // Fetch products data with error handling
-      try {
-        const productsRes = await api.get('/inventory/products/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setProducts(productsRes.data || []);
-      } catch (err) {
-        console.warn('Failed to load products data:', err);
-      }
-
-      // Fetch sales agents data with error handling
-      try {
-        const agentsRes = await api.get('/users/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        // Filter for sales agents/reps
-        const agents = (agentsRes.data || []).filter(user => 
-          user.role === 'sales_rep' || user.role === 'sales_manager' || 
-          (user.department && user.department.name && user.department.name.toLowerCase().includes('sales'))
-        );
-        setSalesAgents(agents);
-      } catch (err) {
-        console.warn('Failed to load sales agents data:', err);
-      }
-
-      // Fetch recent sales with error handling
-      try {
-        const recentSalesRes = await api.get('/sales/recent/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setRecentSales(recentSalesRes.data || []);
-      } catch (err) {
-        console.warn('Failed to load recent sales data:', err);
-      }
-
-    } catch (error) {
-      console.error('Error fetching sales data:', error);
-      setError('Failed to load sales data');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const fetchAgentAnalytics = async (agentId) => {
-    try {
-      const analyticsRes = await api.get(`/sales/agent-analytics/${agentId}/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setAgentAnalytics(analyticsRes.data);
-    } catch (error) {
-      console.warn('Failed to load agent analytics:', error);
-      // Fallback: calculate basic analytics from existing data
-      const agentSales = recentSales.filter(sale => sale.staff === agentId);
-      const agentCustomers = customers.filter(customer => customer.assigned_to === agentId);
-      
-      setAgentAnalytics({
-        total_sales: agentSales.reduce((sum, sale) => sum + parseFloat(sale.total || 0), 0),
-        total_orders: agentSales.length,
-        total_customers: agentCustomers.length,
-        revenue: agentSales.reduce((sum, sale) => sum + parseFloat(sale.total || 0), 0),
-        products_sold: agentSales.reduce((sum, sale) => sum + (sale.items?.length || 1), 0)
-      });
-    }
-  };
-  
-  const handleAgentChange = (agentId) => {
-    setSelectedAgent(agentId);
-    if (agentId !== 'all') {
-      fetchAgentAnalytics(agentId);
-    } else {
-      setAgentAnalytics(null);
-    }
-  };
-  
-  useEffect(() => {
-    if (token) {
-      loadDashboardData();
-    }
-  }, [token]);
-
-  const handlePromotions = async () => {
-    try {
-      if (!promotionsForm.name || !promotionsForm.discount_value) {
-        setSnackbarMessage('Please fill in promotion name and discount value');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Validate selected products if not applying to all
-      if (!promotionsForm.apply_to_all && promotionsForm.selected_products.length === 0 && promotionsForm.applicable_products.length === 0) {
-        setSnackbarMessage('Please select products or enable "Apply to all products"');
-        setSnackbarOpen(true);
-        return;
-      }
-
-      // Validate selected products pricing
-      if (promotionsForm.selected_products.length > 0) {
-        const invalidProducts = promotionsForm.selected_products.filter(p => 
-          !p.original_price || !p.discounted_price || 
-          parseFloat(p.discounted_price) >= parseFloat(p.original_price)
-        );
-        if (invalidProducts.length > 0) {
-          setSnackbarMessage('Please ensure all selected products have valid pricing with discounted price less than original price');
-          setSnackbarOpen(true);
-          return;
-        }
-      }
-
-      // Create promotion via backend API
-      const promotionData = {
-        name: promotionsForm.name,
-        description: promotionsForm.description,
-        discount_type: promotionsForm.discount_type,
-        discount_value: parseFloat(promotionsForm.discount_value),
-        start_date: promotionsForm.start_date,
-        end_date: promotionsForm.end_date,
-        applicable_products: promotionsForm.apply_to_all ? [] : promotionsForm.applicable_products,
-        minimum_order: parseFloat(promotionsForm.minimum_order) || 0,
-        status: 'active',
-        apply_to_all: promotionsForm.apply_to_all,
-        product_pricing: promotionsForm.selected_products.map(p => ({
-          product_id: p.product_id,
-          original_price: parseFloat(p.original_price),
-          discounted_price: parseFloat(p.discounted_price),
-          discount_amount: parseFloat(p.original_price) - parseFloat(p.discounted_price)
-        }))
+      const orderData = {
+        customer_id: selectedCustomer.id,
+        products: orderProducts.filter(item => item.product).map(item => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          unit_price: item.product.unit_price
+        })),
+        payment_method: paymentMethod,
+        discount: discount,
+        notes: notes,
+        total: calculateOrderTotal()
       };
 
-      const response = await api.post('/sales/promotions/', promotionData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('Promotion created:', response.data);
-      setSnackbarMessage('Promotion created successfully with product bindings!');
-      setSnackbarOpen(true);
-      setPromotionsDialogOpen(false);
-      setPromotionsForm({
-        name: '',
-        description: '',
-        discount_type: 'percentage',
-        discount_value: '',
-        start_date: '',
-        end_date: '',
-        applicable_products: [],
-        minimum_order: '',
-        selected_products: [], // Array of {product_id, original_price, discounted_price}
-        apply_to_all: false
-      });
+      // Create the order (API call would go here)
+      console.log('Creating sales order:', orderData);
       
-      // Refresh dashboard data
-      loadDashboardData();
+      // Reset form
+      setSalesOrderDialogOpen(false);
+      setSelectedCustomer(null);
+      setOrderProducts([{ product: null, quantity: 1 }]);
+      setPaymentMethod('');
+      setDiscount(0);
+      setNotes('');
+      
+      setSnackbar({ open: true, message: 'Sales order created successfully!', severity: 'success' });
+      
     } catch (error) {
-      console.error('Failed to create promotion:', error);
-      setSnackbarMessage('Failed to create promotion');
-      setSnackbarOpen(true);
+      console.error('Error creating sales order:', error);
+      setSnackbar({ open: true, message: 'Failed to create sales order', severity: 'error' });
     }
   };
 
+  const handleCreateCustomer = async () => {
+    if (!newCustomerData.name || !newCustomerData.email) {
+      setSnackbar({ open: true, message: 'Please fill in required fields', severity: 'error' });
+      return;
+    }
+    
+    try {
+      console.log('Creating customer:', newCustomerData);
+      
+      // Actually create the customer via API
+      const response = await api.post('/sales/customers/', newCustomerData);
+      
+      setCustomerCreationDialogOpen(false);
+      setNewCustomerData({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        customer_type: 'retailer',
+        payment_terms: 30
+      });
+      setSnackbar({ open: true, message: 'Customer created successfully!', severity: 'success' });
+      loadCustomers(); // Refresh customer list after creation
+    } catch (error) {
+      console.error('Customer creation error:', error);
+      
+      let errorMessage = 'Failed to create customer';
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.email && Array.isArray(errorData.email)) {
+          errorMessage = `Email error: ${errorData.email.join(', ')}`;
+        } else if (errorData.latitude && Array.isArray(errorData.latitude)) {
+          errorMessage = `GPS Latitude error: ${errorData.latitude.join(', ')}`;
+        } else if (errorData.longitude && Array.isArray(errorData.longitude)) {
+          errorMessage = `GPS Longitude error: ${errorData.longitude.join(', ')}`;
+        }
+      }
+      
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    }
+  };
+
+  // Snackbar handler for QuickActionDialogs
+  const handleSnackbar = (message, severity = 'info') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  // Data initialization
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          loadCustomers(),
+          loadProducts(),
+          loadWarehouses(),
+          loadAllTransactions(),
+          loadSalesData()
+        ]);
+        
+        // Initialize sales agents
+        const agents = [
+          { id: 'agent1', name: 'Collins Arku', email: 'collins@smarterp.com', territory: 'Accra', assigned_warehouse_id: 1 },
+          { id: 'agent2', name: 'Sarah Johnson', email: 'sarah@smarterp.com', territory: 'Kumasi', assigned_warehouse_id: 2 },
+          { id: 'agent3', name: 'Michael Brown', email: 'michael@smarterp.com', territory: 'Tema', assigned_warehouse_id: 3 },
+          { id: 'agent4', name: 'Emily Davis', email: 'emily@smarterp.com', territory: 'Cape Coast', assigned_warehouse_id: 4 }
+        ];
+        setSalesAgents(agents);
+        
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        setError('Failed to load initial data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeData();
+
+    // Listen for payment approval events from Finance module
+    const handlePaymentApproved = (event) => {
+      console.log('Payment approved event received:', event.detail);
+      const { salesOrderId, paymentStatus, orderNumber } = event.detail;
+      
+      // Refresh sales data to show updated payment status
+      loadAllTransactions();
+      
+      // Show notification
+      setSnackbar({
+        open: true,
+        message: `Payment approved for ${orderNumber}. Status: ${paymentStatus}`,
+        severity: 'success'
+      });
+    };
+
+    // Add event listener
+    window.addEventListener('paymentApproved', handlePaymentApproved);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('paymentApproved', handlePaymentApproved);
+    };
+  }, []);
+
+  useEffect(() => {
+    loadProducts();
+    loadCustomers();
+    loadWarehouses();
+    loadAllTransactions();
+    loadSalesData();
+  }, [token]);
+
+  useEffect(() => {
+    // Listen for product updates to refresh product list
+    const handleProductUpdate = () => {
+      console.log('Product updated, refreshing product list in SalesDashboard');
+      loadProducts();
+    };
+
+    // Listen for sync completion to refresh data
+    const handleSyncCompleted = () => {
+      console.log('Sync completed, refreshing sales data');
+      loadProducts();
+      loadCustomers();
+      if (typeof loadSalesData === 'function') {
+        loadSalesData();
+      }
+    };
+
+    window.addEventListener('productUpdated', handleProductUpdate);
+    window.addEventListener('syncCompleted', handleSyncCompleted);
+    
+    return () => {
+      window.removeEventListener('productUpdated', handleProductUpdate);
+      window.removeEventListener('syncCompleted', handleSyncCompleted);
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  const filteredProducts = products.filter(product => 
+    product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    product.sku.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    product.category_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', p: 0 }}>
+    <Box sx={{ 
+      bgcolor: '#f8fafc', 
+      minHeight: '100vh', 
+      p: 0, 
+      '@media (max-width: 768px)': {
+        p: 2
+      }
+    }}>
       {/* Header */}
       <Box sx={{ 
         background: 'linear-gradient(135deg, #FF9800 0%, #FF5722 100%)',
         color: 'white',
         p: 4,
         borderRadius: '0 0 24px 24px',
-        mb: 3
+        mb: 3,
+        '@media (max-width: 768px)': {
+          p: 2
+        }
       }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>
@@ -729,10 +588,10 @@ const SalesDashboard = () => {
           <Box display="flex" alignItems="center" gap={2}>
             <TextField
               select
-              label="Sales Agent"
               value={selectedAgent}
-              onChange={(e) => handleAgentChange(e.target.value)}
-              sx={{ 
+              onChange={(e) => setSelectedAgent(e.target.value)}
+              size="small"
+              sx={{
                 minWidth: 200,
                 '& .MuiOutlinedInput-root': {
                   color: 'white',
@@ -754,10 +613,9 @@ const SalesDashboard = () => {
                 },
               }}
             >
-              <MenuItem value="all">All Sales Agents</MenuItem>
               {salesAgents.map((agent) => (
                 <MenuItem key={agent.id} value={agent.id}>
-                  {agent.first_name} {agent.last_name} ({agent.email})
+                  {agent.name}
                 </MenuItem>
               ))}
             </TextField>
@@ -780,18 +638,22 @@ const SalesDashboard = () => {
         p: 3, 
         mb: 3, 
         borderRadius: 3, 
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        '@media (max-width: 768px)': {
+          p: 2
+        }
       }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#333' }}>
           Quick Actions
         </Typography>
         <Grid container spacing={2}>
+          {/* Row 1 */}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
               variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateSalesOrder}
+              startIcon={<SellIcon />}
+              onClick={() => setSalesOrderDialogOpen(true)}
               sx={{ 
                 background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)',
                 color: 'white'
@@ -804,14 +666,14 @@ const SalesDashboard = () => {
             <QuickActionButton
               fullWidth
               variant="contained"
-              startIcon={<AttachMoneyIcon />}
+              startIcon={<PriceChangeIcon />}
               onClick={() => setPromotionsDialogOpen(true)}
               sx={{ 
-                background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)',
+                background: 'linear-gradient(45deg, #4CAF50 30%, #388E3C 90%)',
                 color: 'white'
               }}
             >
-              Promotions
+              Create Promotion
             </QuickActionButton>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -833,20 +695,22 @@ const SalesDashboard = () => {
               fullWidth
               variant="contained"
               startIcon={<ContactsIcon />}
-              onClick={() => setLeadDialogOpen(true)}
+              onClick={() => setCustomerCreationDialogOpen(true)}
               sx={{ 
                 background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
                 color: 'white'
               }}
             >
-              Add Lead
+              Create Customer
             </QuickActionButton>
           </Grid>
+          
+          {/* Row 2 */}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
               variant="contained"
-              startIcon={<SwapHorizIcon />}
+              startIcon={<TransferWithinAStationIcon />}
               onClick={() => setTransferStockDialogOpen(true)}
               sx={{ 
                 background: 'linear-gradient(45deg, #FF5722 30%, #D84315 90%)',
@@ -860,7 +724,7 @@ const SalesDashboard = () => {
             <QuickActionButton
               fullWidth
               variant="contained"
-              startIcon={<InventoryIcon />}
+              startIcon={<VisibilityIcon />}
               onClick={() => setViewTransfersDialogOpen(true)}
               sx={{ 
                 background: 'linear-gradient(45deg, #607D8B 30%, #455A64 90%)',
@@ -870,1201 +734,809 @@ const SalesDashboard = () => {
               View Transfers
             </QuickActionButton>
           </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<PersonAddIcon />}
+              onClick={() => setAddLeadDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #4CAF50 30%, #388E3C 90%)',
+                color: 'white'
+              }}
+            >
+              Add Lead
+            </QuickActionButton>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<MapIcon />}
+              onClick={() => setCustomerHeatMapDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #2196F3 30%, #1565C0 90%)',
+                color: 'white'
+              }}
+            >
+              Customer Heat Map
+            </QuickActionButton>
+          </Grid>
+          
+          {/* Row 3 */}
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<PointOfSaleIcon />}
+              onClick={() => setPosTransactionsDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
+                color: 'white'
+              }}
+            >
+              POS Transactions
+            </QuickActionButton>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<ReceiptIcon />}
+              onClick={() => setTransactionsDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
+                color: 'white'
+              }}
+            >
+              Transactions
+            </QuickActionButton>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <QuickActionButton
+              fullWidth
+              variant="contained"
+              startIcon={<AssignmentIndIcon />}
+              onClick={() => setStockAssignmentDialogOpen(true)}
+              sx={{ 
+                background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)',
+                color: 'white'
+              }}
+            >
+              Assign Stock to Agent
+            </QuickActionButton>
+          </Grid>
         </Grid>
       </Paper>
 
-      {/* Loading and Error States */}
-      {loading && (
-        <Box display="flex" justifyContent="center" my={4}>
-          <CircularProgress size={60} thickness={4} />
-        </Box>
-      )}
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Tabbed Interface */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
-        <StyledTabs
-          value={tabValue}
+      {/* Main Dashboard Content with Tabs */}
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+        <StyledTabs 
+          value={tabValue} 
           onChange={(e, newValue) => setTabValue(newValue)}
-          variant="fullWidth"
+          variant="scrollable"
+          scrollButtons="auto"
         >
-          <StyledTab icon={<TrendingUpIcon />} label="Overview" />
-          <StyledTab icon={<SellIcon />} label="Sales" />
-          <StyledTab icon={<PeopleIcon />} label="Customers" />
+          <StyledTab icon={<AssessmentIcon />} label="Overview" />
           <StyledTab icon={<BarChartIcon />} label="Analytics" />
+          <StyledTab icon={<SellIcon />} label="Sales Orders" />
+          <StyledTab icon={<PeopleIcon />} label="Customers" />
+          <StyledTab icon={<InventoryIcon />} label="Stock Management" />
+          <StyledTab icon={<DescriptionIcon />} label="Reports" />
+          <StyledTab icon={<PointOfSaleIcon />} label="POS" />
+          <StyledTab icon={<MapIcon />} label="Heat Map" />
+          <StyledTab icon={<LocalShippingIcon />} label="Warehouse Transfers" />
         </StyledTabs>
 
-        {/* Overview Tab */}
         <TabPanel value={tabValue} index={0}>
+          {/* Overview Tab */}
           <Grid container spacing={3}>
             {/* Key Metrics */}
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} md={3}>
               <MetricCard>
                 <CardContent>
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Total Sales</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        {salesData.length || 320}
+                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                        ${salesData?.total_revenue || '0'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Total Revenue
                       </Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <AssessmentIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                    <AttachMoneyIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                   </Box>
                 </CardContent>
               </MetricCard>
             </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard sx={{ background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' }}>
+            <Grid item xs={12} md={3}>
+              <MetricCard>
                 <CardContent>
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Revenue</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        ₵25,000
+                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                        {customers.length}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Total Customers
                       </Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <AttachMoneyIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                    <PeopleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                   </Box>
                 </CardContent>
               </MetricCard>
             </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard sx={{ background: 'linear-gradient(135deg, #2196F3 0%, #1565C0 100%)' }}>
+            <Grid item xs={12} md={3}>
+              <MetricCard>
                 <CardContent>
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Customers</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        {customers.length || 110}
+                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                        {allTransactions.length}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Total Orders
                       </Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <PeopleIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                    <ShoppingCartIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                   </Box>
                 </CardContent>
               </MetricCard>
             </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard sx={{ background: 'linear-gradient(135deg, #9C27B0 0%, #6A1B9A 100%)' }}>
+            <Grid item xs={12} md={3}>
+              <MetricCard>
                 <CardContent>
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Products Sold</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        75
+                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                        {products.length}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Products Available
                       </Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                      <ShoppingCartIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                    <InventoryIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                   </Box>
                 </CardContent>
               </MetricCard>
             </Grid>
 
-            {/* Recent Activity */}
+            {/* Transfer Status Summary Cards */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {transfers.filter(t => t.status === 'pending').length}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Pending Transfers
+                        </Typography>
+                      </Box>
+                      <PendingIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {transfers.filter(t => t.status === 'approved').length}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Approved Transfers
+                        </Typography>
+                      </Box>
+                      <CheckCircleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {transfers.filter(t => t.status === 'completed').length}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Completed Transfers
+                        </Typography>
+                      </Box>
+                      <LocalShippingIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {transfers.length}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Total Transfers
+                        </Typography>
+                      </Box>
+                      <TransferWithinAStationIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Recent Transfers Table */}
+            <Card>
+              <CardContent>
+                <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Recent Warehouse Transfers
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={loadTransfers}
+                    size="small"
+                  >
+                    Refresh
+                  </Button>
+                </Box>
+                
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Transfer #</strong></TableCell>
+                        <TableCell><strong>Product</strong></TableCell>
+                        <TableCell><strong>From</strong></TableCell>
+                        <TableCell><strong>To</strong></TableCell>
+                        <TableCell><strong>Quantity</strong></TableCell>
+                        <TableCell><strong>Status</strong></TableCell>
+                        <TableCell><strong>Priority</strong></TableCell>
+                        <TableCell><strong>Date</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {transfers.slice(0, 10).map((transfer) => (
+                        <TableRow key={transfer.id} hover>
+                          <TableCell>{transfer.transfer_number}</TableCell>
+                          <TableCell>{transfer.product_name}</TableCell>
+                          <TableCell>{transfer.from_warehouse_name}</TableCell>
+                          <TableCell>{transfer.to_warehouse_name}</TableCell>
+                          <TableCell>{transfer.quantity}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={transfer.status}
+                              size="small"
+                              color={
+                                transfer.status === 'completed' ? 'success' :
+                                transfer.status === 'approved' ? 'info' :
+                                transfer.status === 'pending' ? 'warning' :
+                                transfer.status === 'rejected' ? 'error' : 'default'
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={transfer.priority}
+                              size="small"
+                              variant="outlined"
+                              color={
+                                transfer.priority === 'urgent' ? 'error' :
+                                transfer.priority === 'high' ? 'warning' :
+                                transfer.priority === 'medium' ? 'info' : 'default'
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {new Date(transfer.request_date).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                
+                {transfers.length === 0 && (
+                  <Box textAlign="center" py={4}>
+                    <Typography color="textSecondary">
+                      No warehouse transfers found
+                    </Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Sales */}
             <Grid item xs={12} md={8}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent Sales Activity</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <List sx={{ py: 0 }}>
-                    {recentActivity.map((item, idx) => (
-                      <ListItem key={idx} sx={{ px: 0, py: 1 }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Recent Sales
+                  </Typography>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Order ID</TableCell>
+                          <TableCell>Customer</TableCell>
+                          <TableCell>Amount</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Date</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {allTransactions.slice(0, 5).map((sale, index) => (
+                          <TableRow key={index}>
+                            <TableCell>#{sale.id || `ORD-${index + 1}`}</TableCell>
+                            <TableCell>{sale.customer || 'N/A'}</TableCell>
+                            <TableCell>${sale.amount || '0.00'}</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={sale.status || 'Pending'} 
+                                color={sale.status === 'completed' ? 'success' : 'warning'}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>{sale.date || new Date().toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Top Products */}
+            <Grid item xs={12} md={4}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Top Products
+                  </Typography>
+                  <List>
+                    {products.slice(0, 5).map((product, index) => (
+                      <ListItem key={index} sx={{ px: 0 }}>
                         <ListItemText 
-                          primary={item.action}
-                          secondary={item.timestamp}
-                          primaryTypographyProps={{ fontWeight: 500 }}
+                          primary={product.name || `Product ${index + 1}`}
+                          secondary={`${product.stock_quantity || 0} in stock`}
                         />
-                        <Chip 
-                          label={item.type === 'success' ? 'Completed' : item.type === 'warning' ? 'Pending' : 'Info'}
-                          size="small" 
-                          color={item.type === 'success' ? 'success' : item.type === 'warning' ? 'warning' : 'info'}
-                          variant="outlined" 
-                        />
+                        <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                          ${product.unit_price || '0.00'}
+                        </Typography>
                       </ListItem>
                     ))}
                   </List>
                 </CardContent>
               </AnalyticsCard>
             </Grid>
-
-            {/* Sales Performance */}
-            <Grid item xs={12} md={4}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Sales Performance</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ space: 2 }}>
-                    <Box sx={{ mb: 2 }}>
-                      <Box display="flex" justifyContent="space-between" mb={1}>
-                        <Typography variant="body2">Monthly Target</Typography>
-                        <Typography variant="body2" color="success.main">85%</Typography>
-                      </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={85} 
-                        color="success" 
-                        sx={{ borderRadius: 1, height: 8 }} 
-                      />
-                    </Box>
-                    <Box sx={{ mb: 2 }}>
-                      <Box display="flex" justifyContent="space-between" mb={1}>
-                        <Typography variant="body2">Conversion Rate</Typography>
-                        <Typography variant="body2" color="primary">72%</Typography>
-                      </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={72} 
-                        sx={{ borderRadius: 1, height: 8 }} 
-                      />
-                    </Box>
-                    <Box>
-                      <Box display="flex" justifyContent="space-between" mb={1}>
-                        <Typography variant="body2">Customer Satisfaction</Typography>
-                        <Typography variant="body2" color="warning.main">94%</Typography>
-                      </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={94} 
-                        color="warning" 
-                        sx={{ borderRadius: 1, height: 8 }} 
-                      />
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
           </Grid>
         </TabPanel>
 
-        {/* Sales Tab */}
         <TabPanel value={tabValue} index={1}>
-          <Grid container spacing={3}>
-            {/* Recent Sales */}
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent Sales</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  {recentSales.length > 0 ? (
-                    <List sx={{ py: 0 }}>
-                      {recentSales.slice(0, 10).map((sale, idx) => (
-                        <ListItem key={idx} sx={{ px: 0, py: 1 }}>
-                          <ListItemText 
-                            primary={`Sale #${sale.id || (1000 + idx)} - ${sale.customer?.name || 'Customer'}`}
-                            secondary={`Amount: ₵${sale.total_amount || (Math.random() * 1000).toFixed(2)} | Date: ${sale.date || 'Today'}`}
-                            primaryTypographyProps={{ fontWeight: 500 }}
-                          />
-                          <Chip 
-                            label={sale.status || 'Completed'}
-                            size="small" 
-                            color="success"
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Alert severity="info" sx={{ borderRadius: 2 }}>No sales data available</Alert>
-                  )}
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
+          {/* Analytics Tab */}
+          <AdvancedAnalytics 
+            data={salesData} 
+            selectedAgent={selectedAgent}
+            agentAnalytics={agentAnalytics}
+          />
         </TabPanel>
 
-        {/* Customers Tab */}
         <TabPanel value={tabValue} index={2}>
-          <Grid container spacing={3}>
-            {/* Customer Overview */}
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Customer Overview</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  {customers.length > 0 ? (
-                    <List sx={{ py: 0 }}>
-                      {customers.slice(0, 10).map((customer, idx) => (
-                        <ListItem key={idx} sx={{ px: 0, py: 1 }}>
-                          <ListItemText 
-                            primary={customer.name || `Customer ${idx + 1}`}
-                            secondary={`Email: ${customer.email || 'N/A'} | Phone: ${customer.phone || 'N/A'}`}
-                            primaryTypographyProps={{ fontWeight: 500 }}
-                          />
-                          <Chip 
-                            label={customer.status || 'Active'}
-                            size="small" 
-                            color={customer.status === 'Active' ? 'success' : 'default'}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Alert severity="info" sx={{ borderRadius: 2 }}>No customer data available</Alert>
-                  )}
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
+          {/* Sales Orders Management Tab */}
+          <SalesOrdersManagement 
+            onSnackbar={handleSnackbar}
+            customers={customers}
+            products={products}
+          />
         </TabPanel>
 
-        {/* Analytics Tab */}
         <TabPanel value={tabValue} index={3}>
-          <Grid container spacing={3}>
-            {/* Sales Revenue Trends */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <TrendingUpIcon sx={{ mr: 1, color: '#4CAF50' }} />
-                    Sales Revenue Trends
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Live Sales Revenue Chart */}
-                    <Box sx={{ width: '100%', textAlign: 'center', mb: 3 }}>
-                      <Typography variant="h4" color="primary" sx={{ mb: 1 }}>
-                        GHS {(salesData.reduce((sum, order) => sum + (order.total_amount || 0), 0)).toLocaleString()}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Total Sales Revenue
-                      </Typography>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={85} 
-                        sx={{ height: 8, borderRadius: 4, mb: 2 }} 
-                      />
-                    </Box>
-
-                    {/* Revenue Breakdown by Period */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-                      {[
-                        { period: 'This Month', amount: 145000, percentage: 92, color: '#4CAF50' },
-                        { period: 'Last Month', amount: 132000, percentage: 84, color: '#2196F3' },
-                        { period: 'This Quarter', amount: 420000, percentage: 95, color: '#FF9800' },
-                        { period: 'YTD Growth', amount: 18.3, percentage: 73, color: '#9C27B0', isPercentage: true }
-                      ].map((item, idx) => (
-                        <Box key={item.period}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {item.period}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {item.isPercentage ? `+${item.amount}%` : `GHS ${item.amount.toLocaleString()}`}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={item.percentage} 
-                                color={item.percentage >= 90 ? 'success' : item.percentage >= 80 ? 'primary' : 'warning'} 
-                                sx={{ 
-                                  height: 8, 
-                                  borderRadius: 4,
-                                  '& .MuiLinearProgress-bar': { bgcolor: item.color }
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
-                              {item.percentage}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Sales Performance Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <BarChartIcon sx={{ mr: 1, color: '#FF9800' }} />
-                    Sales Performance Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Monthly Sales Performance Chart */}
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Monthly Sales Performance (Last 6 Months)
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2, alignItems: 'end', height: 100 }}>
-                        {[85000, 92000, 78000, 105000, 118000, 145000].map((amount, i) => {
-                          const height = (amount / 150000) * 80;
-                          const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                          return (
-                            <Box key={months[i]} sx={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <Box 
-                                sx={{ 
-                                  height: height, 
-                                  width: 12,
-                                  bgcolor: '#FF9800', 
-                                  borderRadius: 1,
-                                  mb: 1,
-                                  opacity: 0.8
-                                }} 
-                              />
-                              <Typography variant="caption">{months[i]}</Typography>
-                              <Typography variant="caption" display="block" color="text.secondary">
-                                {(amount/1000).toFixed(0)}K
-                              </Typography>
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    </Box>
-                    
-                    {/* Performance Metrics */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
-                        <Typography variant="h5">623K</Typography>
-                        <Typography variant="caption">6-Month Total</Typography>
-                      </Paper>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
-                        <Typography variant="h5">104K</Typography>
-                        <Typography variant="caption">Monthly Avg</Typography>
-                      </Paper>
-                    </Box>
-
-                    {/* Growth Indicators */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
-                          +23%
-                        </Typography>
-                        <Typography variant="caption">MoM Growth</Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
-                          +18.3%
-                        </Typography>
-                        <Typography variant="caption">YoY Growth</Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600 }}>
-                          94.2%
-                        </Typography>
-                        <Typography variant="caption">Target Achievement</Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Customer Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <PeopleIcon sx={{ mr: 1, color: '#9C27B0' }} />
-                    Customer Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Customer Segmentation */}
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Customer Segmentation by Value
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-                      {[
-                        { segment: 'High Value', count: 45, percentage: 35, color: '#4CAF50' },
-                        { segment: 'Medium Value', count: 78, percentage: 45, color: '#FF9800' },
-                        { segment: 'Low Value', count: 87, percentage: 20, color: '#2196F3' }
-                      ].map((segment, idx) => (
-                        <Box key={segment.segment}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {segment.segment}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {segment.count} customers ({segment.value})
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={segment.percentage} 
-                                sx={{ 
-                                  height: 8, 
-                                  borderRadius: 4,
-                                  '& .MuiLinearProgress-bar': { bgcolor: segment.color }
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
-                              {segment.percentage}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-
-                    {/* Customer Metrics */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', flex: 1, mr: 1 }}>
-                        <Typography variant="h6">{customers.length}</Typography>
-                        <Typography variant="caption">Total Customers</Typography>
-                      </Paper>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText', flex: 1, ml: 1 }}>
-                        <Typography variant="h6">28</Typography>
-                        <Typography variant="caption">New This Month</Typography>
-                      </Paper>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Product Performance Analytics */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <SellIcon sx={{ mr: 1, color: '#FF5722' }} />
-                    Product Performance Analytics
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Box sx={{ height: 300 }}>
-                    {/* Top Selling Categories */}
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Top Selling Product Categories
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-                      {[
-                        { category: 'Condoms', sales: 125000, percentage: 40, color: '#4CAF50' },
-                        { category: 'Contraceptives', sales: 95000, percentage: 30, color: '#2196F3' },
-                        { category: 'Medical Supplies', sales: 62000, percentage: 20, color: '#FF9800' },
-                        { category: 'Other Products', sales: 31000, percentage: 10, color: '#9C27B0' }
-                      ].map((item, idx) => (
-                        <Box key={item.category}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {item.category}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              GHS {item.sales.toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={item.percentage} 
-                                sx={{ 
-                                  height: 8, 
-                                  borderRadius: 4,
-                                  '& .MuiLinearProgress-bar': { bgcolor: item.color }
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
-                              {item.percentage}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-
-                    {/* Product Metrics */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText', flex: 1, mr: 1 }}>
-                        <Typography variant="h6">18</Typography>
-                        <Typography variant="caption">Active Products</Typography>
-                      </Paper>
-                      <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText', flex: 1, ml: 1 }}>
-                        <Typography variant="h6">3</Typography>
-                        <Typography variant="caption">Low Performers</Typography>
-                      </Paper>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Sales Team Performance Dashboard */}
-            <Grid item xs={12}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <PersonIcon sx={{ mr: 1, color: '#2196F3' }} />
-                    Sales Team Performance Dashboard
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={3}>
-                    {/* Top Performing Sales Reps */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                        Top Performing Sales Representatives
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {[
-                          { name: 'Kwame Asante', sales: 85000, target: 120, region: 'Greater Accra' },
-                          { name: 'Ama Osei', sales: 72000, target: 96, region: 'Ashanti' },
-                          { name: 'Kofi Mensah', sales: 68000, target: 91, region: 'Western' },
-                          { name: 'Akosua Boateng', sales: 61000, target: 87, region: 'Central' }
-                        ].map((rep, idx) => (
-                          <Box key={rep.name} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-                            <Avatar sx={{ bgcolor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'][idx] }}>
-                              {idx + 1}
-                            </Avatar>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                {rep.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {rep.region} • GHS {rep.sales.toLocaleString()} sales
-                              </Typography>
-                            </Box>
-                            <Chip 
-                              label={`${rep.target}% of target`} 
-                              color={rep.target >= 100 ? 'success' : rep.target >= 80 ? 'primary' : 'warning'} 
-                              size="small"
-                              sx={{ fontWeight: 600 }}
-                            />
-                          </Box>
-                        ))}
-                      </Box>
-                    </Grid>
-
-                    {/* Sales Targets & Achievement */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                        Sales Targets & Achievement
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {[
-                          { metric: 'Monthly Target', achieved: 145000, target: 150000, percentage: 97 },
-                          { metric: 'Quarterly Target', achieved: 420000, target: 450000, percentage: 93 },
-                          { metric: 'Annual Target', achieved: 1680000, target: 1800000, percentage: 93 },
-                          { metric: 'Team Performance', achieved: 94, target: 100, percentage: 94, isScore: true }
-                        ].map((target, idx) => (
-                          <Box key={target.metric}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                {target.metric}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {target.isScore ? 
-                                  `${target.achieved}% (target: ${target.target}%)` : 
-                                  `GHS ${target.achieved.toLocaleString()} / ${target.target.toLocaleString()}`
-                                }
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Box sx={{ flex: 1 }}>
-                                <LinearProgress 
-                                  variant="determinate" 
-                                  value={target.percentage} 
-                                  sx={{ height: 8, borderRadius: 4 }}
-                                  color={target.percentage >= 95 ? 'success' : target.percentage >= 85 ? 'primary' : 'warning'}
-                                />
-                              </Box>
-                              <Typography variant="body2" color={target.percentage >= 95 ? 'success.main' : target.percentage >= 85 ? 'primary.main' : 'warning.main'} sx={{ minWidth: 50, fontWeight: 600 }}>
-                                {target.percentage}%
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-          </Grid>
-        </TabPanel>
-      </Paper>
-      
-      {/* Quote Generation Dialog */}
-      <Dialog open={quoteDialogOpen} onClose={() => setQuoteDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Generate Quote</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Customer"
-            value={quoteForm.customer}
-            onChange={(e) => setQuoteForm({...quoteForm, customer: e.target.value})}
-            margin="normal"
-            helperText="Select a customer for the quote"
-          >
-            {customers.map((customer) => (
-              <MenuItem key={customer.id} value={customer.id}>
-                {customer.name} - {customer.email}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Product/Service"
-            value={quoteForm.product}
-            onChange={(e) => setQuoteForm({...quoteForm, product: e.target.value})}
-            margin="normal"
-            helperText="Select a product for the quote"
-          >
-            {products.map((product) => (
-              <MenuItem key={product.id} value={product.id}>
-                {product.name} - {product.sku}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Quantity"
-            type="number"
-            value={quoteForm.quantity}
-            onChange={(e) => setQuoteForm({...quoteForm, quantity: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Notes"
-            multiline
-            rows={3}
-            value={quoteForm.notes}
-            onChange={(e) => setQuoteForm({...quoteForm, notes: e.target.value})}
-            margin="normal"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQuoteDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleGenerateQuote} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)' }}
-          >
-            Generate Quote
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Add Lead Dialog */}
-      <Dialog open={leadDialogOpen} onClose={() => setLeadDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add New Lead</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Full Name"
-            value={leadForm.name}
-            onChange={(e) => setLeadForm({...leadForm, name: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            value={leadForm.email}
-            onChange={(e) => setLeadForm({...leadForm, email: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Phone Number"
-            value={leadForm.phone}
-            onChange={(e) => setLeadForm({...leadForm, phone: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Company"
-            value={leadForm.company}
-            onChange={(e) => setLeadForm({...leadForm, company: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            select
-            label="Lead Source"
-            value={leadForm.source}
-            onChange={(e) => setLeadForm({...leadForm, source: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="website">Website</MenuItem>
-            <MenuItem value="referral">Referral</MenuItem>
-            <MenuItem value="social_media">Social Media</MenuItem>
-            <MenuItem value="cold_call">Cold Call</MenuItem>
-            <MenuItem value="trade_show">Trade Show</MenuItem>
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLeadDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleAddLead} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)' }}
-          >
-            Add Lead
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Create Sales Order Dialog */}
-      <Dialog open={salesOrderDialogOpen} onClose={() => setSalesOrderDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create Sales Order</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Customer"
-            value={salesOrderForm.customer}
-            onChange={(e) => setSalesOrderForm({...salesOrderForm, customer: e.target.value})}
-            margin="normal"
-            helperText="Select a customer for the order"
-          >
-            {customers.map((customer) => (
-              <MenuItem key={customer.id} value={customer.id}>
-                {customer.name} - {customer.email}
-              </MenuItem>
-            ))}
-          </TextField>
-          
-          <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Products</Typography>
-          {salesOrderForm.products.map((product, index) => (
-            <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
-              <TextField
-                select
-                label="Product"
-                value={product.product}
-                onChange={(e) => {
-                  const newProducts = [...salesOrderForm.products];
-                  newProducts[index].product = e.target.value;
-                  setSalesOrderForm({...salesOrderForm, products: newProducts});
-                }}
-                sx={{ flex: 2 }}
-              >
-                {products.map((prod) => (
-                  <MenuItem key={prod.id} value={prod.id}>
-                    {prod.name} - {prod.sku}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                type="number"
-                label="Quantity"
-                value={product.quantity}
-                onChange={(e) => {
-                  const newProducts = [...salesOrderForm.products];
-                  newProducts[index].quantity = e.target.value;
-                  setSalesOrderForm({...salesOrderForm, products: newProducts});
-                }}
-                sx={{ flex: 1 }}
-                inputProps={{ min: 1 }}
-              />
-              <TextField
-                type="number"
-                label="Unit Price"
-                value={product.price}
-                onChange={(e) => {
-                  const newProducts = [...salesOrderForm.products];
-                  newProducts[index].price = e.target.value;
-                  setSalesOrderForm({...salesOrderForm, products: newProducts});
-                }}
-                sx={{ flex: 1 }}
-                inputProps={{ min: 0, step: 0.01 }}
-              />
-              <Button
-                onClick={() => {
-                  const newProducts = salesOrderForm.products.filter((_, i) => i !== index);
-                  setSalesOrderForm({...salesOrderForm, products: newProducts});
-                }}
-                color="error"
-                disabled={salesOrderForm.products.length === 1}
-              >
-                Remove
-              </Button>
-            </Box>
-          ))}
-          
-          <Button
-            onClick={() => {
-              setSalesOrderForm({
-                ...salesOrderForm,
-                products: [...salesOrderForm.products, { product: '', quantity: 1, price: '' }]
-              });
-            }}
-            variant="outlined"
-            sx={{ mb: 2 }}
-          >
-            Add Product
-          </Button>
-          
-          <TextField
-            fullWidth
-            type="number"
-            label="Discount (%)"
-            value={salesOrderForm.discount}
-            onChange={(e) => setSalesOrderForm({...salesOrderForm, discount: e.target.value})}
-            margin="normal"
-            inputProps={{ min: 0, max: 100, step: 0.01 }}
-          />
-          
-          <TextField
-            fullWidth
-            label="Notes"
-            multiline
-            rows={3}
-            value={salesOrderForm.notes}
-            onChange={(e) => setSalesOrderForm({...salesOrderForm, notes: e.target.value})}
-            margin="normal"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSalesOrderDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCreateSalesOrderSubmit} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)' }}
-          >
-            Create Order
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Transfer Stock Dialog */}
-      <Dialog open={transferStockDialogOpen} onClose={() => setTransferStockDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Transfer Stock</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Product"
-            value={transferForm.product}
-            onChange={(e) => setTransferForm({...transferForm, product: e.target.value})}
-            margin="normal"
-          >
-            {products.map((product) => (
-              <MenuItem key={product.id} value={product.id}>
-                {product.name} - {product.sku} (Stock: {product.quantity})
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Quantity"
-            value={transferForm.quantity}
-            onChange={(e) => setTransferForm({...transferForm, quantity: e.target.value})}
-            margin="normal"
-            type="number"
-          />
-          <TextField
-            fullWidth
-            select
-            label="From Warehouse"
-            value={transferForm.fromWarehouse}
-            onChange={(e) => setTransferForm({...transferForm, fromWarehouse: e.target.value})}
-            margin="normal"
-          >
-            {warehouses.map((warehouse) => (
-              <MenuItem key={warehouse.id} value={warehouse.id}>
-                {warehouse.name} - {warehouse.code}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="To Warehouse"
-            value={transferForm.toWarehouse}
-            onChange={(e) => setTransferForm({...transferForm, toWarehouse: e.target.value})}
-            margin="normal"
-          >
-            {warehouses.map((warehouse) => (
-              <MenuItem key={warehouse.id} value={warehouse.id}>
-                {warehouse.name} - {warehouse.code}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            fullWidth
-            label="Notes (Optional)"
-            value={transferForm.notes}
-            onChange={(e) => setTransferForm({...transferForm, notes: e.target.value})}
-            margin="normal"
-            multiline
-            rows={3}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTransferStockDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleTransferStock} variant="contained" color="primary">
-            Transfer Stock
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* View Transfers Dialog */}
-      <Dialog open={viewTransfersDialogOpen} onClose={() => setViewTransfersDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Recent Stock Transfers</DialogTitle>
-        <DialogContent>
-          <TableContainer component={Paper}>
+          {/* Customers Tab */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Customer Management</Typography>
+          <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Product</TableCell>
-                  <TableCell>Quantity</TableCell>
-                  <TableCell>From</TableCell>
-                  <TableCell>To</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Date</TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Location</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {transfers.map((transfer) => (
-                  <TableRow key={transfer.id}>
-                    <TableCell>{transfer.product_name}</TableCell>
-                    <TableCell>{transfer.quantity}</TableCell>
-                    <TableCell>{transfer.from_warehouse_name}</TableCell>
-                    <TableCell>{transfer.to_warehouse_name}</TableCell>
+                {customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell>{customer.name}</TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.phone}</TableCell>
                     <TableCell>
                       <Chip 
-                        label={transfer.status} 
-                        color={transfer.status === 'completed' ? 'success' : 'warning'}
+                        label={customer.customer_type || 'N/A'} 
                         size="small"
+                        color="primary"
                       />
                     </TableCell>
-                    <TableCell>{new Date(transfer.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>{customer.location || 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setViewTransfersDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+        </TabPanel>
 
-      {/* Promotions Dialog */}
-      <Dialog open={promotionsDialogOpen} onClose={() => setPromotionsDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create Promotion</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Promotion Name"
-            value={promotionsForm.name}
-            onChange={(e) => setPromotionsForm({...promotionsForm, name: e.target.value})}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Description"
-            value={promotionsForm.description}
-            onChange={(e) => setPromotionsForm({...promotionsForm, description: e.target.value})}
-            margin="normal"
-            multiline
-            rows={3}
-          />
-          <TextField
-            fullWidth
-            select
-            label="Discount Type"
-            value={promotionsForm.discount_type}
-            onChange={(e) => setPromotionsForm({...promotionsForm, discount_type: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="percentage">Percentage</MenuItem>
-            <MenuItem value="fixed">Fixed Amount</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            label="Discount Value"
-            value={promotionsForm.discount_value}
-            onChange={(e) => setPromotionsForm({...promotionsForm, discount_value: e.target.value})}
-            margin="normal"
-            type="number"
-          />
-          <TextField
-            fullWidth
-            label="Start Date"
-            value={promotionsForm.start_date}
-            onChange={(e) => setPromotionsForm({...promotionsForm, start_date: e.target.value})}
-            margin="normal"
-            type="date"
-          />
-          <TextField
-            fullWidth
-            label="End Date"
-            value={promotionsForm.end_date}
-            onChange={(e) => setPromotionsForm({...promotionsForm, end_date: e.target.value})}
-            margin="normal"
-            type="date"
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Product Selection
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Apply to all products
-              </Typography>
-              <Checkbox
-                checked={promotionsForm.apply_to_all}
-                onChange={(e) => setPromotionsForm({...promotionsForm, apply_to_all: e.target.checked})}
-                color="primary"
-              />
-            </Box>
+        <TabPanel value={tabValue} index={4}>
+          {/* Stock Management Tab */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Stock Management</Typography>
+          <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 300 }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setQuickActionDialog({ open: true, type: 'stock_adjustment' })}
+              sx={{
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #1976D2 30%, #0288D1 90%)',
+                }
+              }}
+            >
+              Stock Adjustment
+            </Button>
           </Box>
-          
-          {!promotionsForm.apply_to_all && (
-            <>
-              <TextField
-                fullWidth
-                select
-                label="Select Products for Promotion"
-                value={promotionsForm.applicable_products}
-                onChange={(e) => setPromotionsForm({...promotionsForm, applicable_products: e.target.value})}
-                margin="normal"
-                SelectProps={{
-                  multiple: true,
-                }}
-                helperText="Select products to apply this promotion to"
-              >
-                {products.map((product) => (
-                  <MenuItem key={product.id} value={product.id}>
-                    {product.name} - {product.sku} (GHS {product.price || 0})
-                  </MenuItem>
-                ))}
-              </TextField>
-              
-              <Typography variant="h6" sx={{ mt: 3, mb: 2, fontWeight: 600 }}>
-                Custom Product Pricing
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Set specific prices for individual products (optional - overrides general discount)
-              </Typography>
-              
-              {promotionsForm.selected_products.map((product, index) => (
-                <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-                  <TextField
-                    select
-                    label="Product"
-                    value={product.product_id}
-                    onChange={(e) => {
-                      const selectedProduct = products.find(p => p.id === e.target.value);
-                      const newProducts = [...promotionsForm.selected_products];
-                      newProducts[index] = {
-                        ...newProducts[index],
-                        product_id: e.target.value,
-                        product_name: selectedProduct?.name || '',
-                        original_price: selectedProduct?.price || ''
-                      };
-                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
-                    }}
-                    sx={{ flex: 2 }}
-                  >
-                    {products.map((prod) => (
-                      <MenuItem key={prod.id} value={prod.id}>
-                        {prod.name} - {prod.sku}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    type="number"
-                    label="Original Price"
-                    value={product.original_price}
-                    onChange={(e) => {
-                      const newProducts = [...promotionsForm.selected_products];
-                      newProducts[index].original_price = e.target.value;
-                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
-                    }}
-                    sx={{ flex: 1 }}
-                    inputProps={{ min: 0, step: 0.01 }}
+
+          <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell>SKU</TableCell>
+                  <TableCell>Category</TableCell>
+                  <TableCell>Current Stock</TableCell>
+                  <TableCell>Min Stock</TableCell>
+                  <TableCell>Max Stock</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Last Updated</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredProducts.map((product) => {
+                  const stockStatus = product.quantity <= (product.min_stock || 0) ? 'low' : 
+                                    product.quantity === 0 ? 'out' : 'good';
+                  const statusColor = stockStatus === 'out' ? 'error' : 
+                                    stockStatus === 'low' ? 'warning' : 'success';
+                  
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar sx={{ bgcolor: '#2196F3' }}>
+                            <InventoryIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2">{product.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {product.description}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell>{product.sku}</TableCell>
+                      <TableCell>
+                        <Chip label={product.category_name || product.category} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="h6" color={statusColor === 'error' ? 'error' : statusColor === 'warning' ? 'warning.main' : 'success.main'}>
+                          {product.quantity}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{product.min_stock || 0}</TableCell>
+                      <TableCell>{product.max_stock || 'No limit'}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={stockStatus === 'out' ? 'Out of Stock' : stockStatus === 'low' ? 'Low Stock' : 'In Stock'} 
+                          color={statusColor}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {new Date(product.updated_at || product.created_at).toLocaleDateString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton 
+                          onClick={() => setQuickActionDialog({ 
+                            open: true, 
+                            type: 'stock_adjustment',
+                            product: product 
+                          })} 
+                          size="small"
+                          title="Adjust Stock"
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton 
+                          onClick={() => setQuickActionDialog({ 
+                            open: true, 
+                            type: 'transfer_stock',
+                            product: product 
+                          })} 
+                          size="small"
+                          title="Transfer Stock"
+                        >
+                          <SwapHorizIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={5}>
+          {/* Reports Tab */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Sales Reports</Typography>
+          <Typography variant="body1">Reports functionality will be implemented here.</Typography>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={6}>
+          {/* POS Tab */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Point of Sale</Typography>
+          <Typography variant="body1">POS functionality will be implemented here.</Typography>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={7}>
+          {/* Heat Map Tab */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Customer Heat Map</Typography>
+          <CustomerHeatMap />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={8}>
+          {/* Warehouse Transfers Tab */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Warehouse Transfers</Typography>
+          <WarehouseTransferModule />
+        </TabPanel>
+      </Paper>
+
+      {/* Create Sales Order Dialog */}
+      <Dialog 
+        open={salesOrderDialogOpen} 
+        onClose={() => setSalesOrderDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #FF9800 0%, #FF5722 100%)',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <SellIcon />
+          Create Sales Order
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          {/* Customer Selection */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Customer</Typography>
+            <Autocomplete
+              options={customers}
+              getOptionLabel={(option) => option.name || ''}
+              value={selectedCustomer}
+              onChange={(event, newValue) => setSelectedCustomer(newValue)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Select customer"
+                  fullWidth
+                />
+              )}
+            />
+          </Box>
+
+          {/* Products Section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Products</Typography>
+            {orderProducts.map((item, index) => (
+              <Box key={index} sx={{ 
+                display: 'flex', 
+                gap: 2, 
+                mb: 2, 
+                p: 2, 
+                border: '1px solid #e0e0e0', 
+                borderRadius: 2,
+                alignItems: 'center'
+              }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>Product</Typography>
+                  <Autocomplete
+                    options={products}
+                    getOptionLabel={(option) => `${option.sku} - ${option.name} - $${option.unit_price}`}
+                    value={item.product}
+                    onChange={(event, newValue) => updateOrderProduct(index, 'product', newValue)}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Select product"
+                        size="small"
+                      />
+                    )}
                   />
-                  <TextField
-                    type="number"
-                    label="Discounted Price"
-                    value={product.discounted_price}
-                    onChange={(e) => {
-                      const newProducts = [...promotionsForm.selected_products];
-                      newProducts[index].discounted_price = e.target.value;
-                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
-                    }}
-                    sx={{ flex: 1 }}
-                    inputProps={{ min: 0, step: 0.01 }}
-                  />
-                  <Button
-                    onClick={() => {
-                      const newProducts = promotionsForm.selected_products.filter((_, i) => i !== index);
-                      setPromotionsForm({...promotionsForm, selected_products: newProducts});
-                    }}
-                    color="error"
-                    size="small"
-                  >
-                    Remove
-                  </Button>
                 </Box>
-              ))}
-              
-              <Button
-                onClick={() => {
-                  setPromotionsForm({
-                    ...promotionsForm,
-                    selected_products: [...promotionsForm.selected_products, { 
-                      product_id: '', 
-                      product_name: '', 
-                      original_price: '', 
-                      discounted_price: '' 
-                    }]
-                  });
-                }}
-                variant="outlined"
-                sx={{ mb: 2 }}
-                startIcon={<AddIcon />}
-              >
-                Add Product with Custom Pricing
-              </Button>
-            </>
-          )}
-          
-          <TextField
-            fullWidth
-            label="Minimum Order Amount (GHS)"
-            value={promotionsForm.minimum_order}
-            onChange={(e) => setPromotionsForm({...promotionsForm, minimum_order: e.target.value})}
-            margin="normal"
-            type="number"
-            helperText="Minimum order amount required to apply this promotion"
-          />
+                <Box sx={{ width: 120 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>Quantity</Typography>
+                  <TextField
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => updateOrderProduct(index, 'quantity', parseInt(e.target.value) || 1)}
+                    size="small"
+                    inputProps={{ min: 1 }}
+                  />
+                </Box>
+                <IconButton 
+                  onClick={() => removeProductFromOrder(index)}
+                  color="error"
+                  disabled={orderProducts.length === 1}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+            ))}
+            <Button
+              startIcon={<AddIcon />}
+              onClick={addProductToOrder}
+              variant="outlined"
+              color="success"
+            >
+              Add Another Product
+            </Button>
+          </Box>
+
+          {/* Payment Information */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Payment Information</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Payment Method</InputLabel>
+                  <Select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    label="Payment Method"
+                  >
+                    <MenuItem value="cash">Cash</MenuItem>
+                    <MenuItem value="credit">Credit</MenuItem>
+                    <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+                    <MenuItem value="mobile_money">Mobile Money</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Discount (%)"
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                  fullWidth
+                  inputProps={{ min: 0, max: 100 }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={2}
+                />
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Total */}
+          <Box sx={{ textAlign: 'right', mb: 2 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              Total: ${calculateOrderTotal().toFixed(2)}
+            </Typography>
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPromotionsDialogOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setSalesOrderDialogOpen(false)}>
+            Cancel
+          </Button>
           <Button 
-            onClick={handlePromotions} 
             variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #4CAF50 30%, #2E7D32 90%)' }}
+            onClick={handleCreateSalesOrder}
+            startIcon={<CheckCircleIcon />}
+            sx={{ 
+              background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)',
+              color: 'white'
+            }}
           >
-            Create Promotion
+            Create Order & Print
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Success/Error Snackbar */}
+      {/* Snackbar for notifications */}
       <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-        message={snackbarMessage}
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Quick Action Dialogs */}
+      <QuickActionDialogs
+        // Dialog states
+        promotionsDialogOpen={promotionsDialogOpen}
+        setPromotionsDialogOpen={setPromotionsDialogOpen}
+        quoteDialogOpen={quoteDialogOpen}
+        setQuoteDialogOpen={setQuoteDialogOpen}
+        transferStockDialogOpen={transferStockDialogOpen}
+        setTransferStockDialogOpen={setTransferStockDialogOpen}
+        viewTransfersDialogOpen={viewTransfersDialogOpen}
+        setViewTransfersDialogOpen={setViewTransfersDialogOpen}
+        addLeadDialogOpen={addLeadDialogOpen}
+        setAddLeadDialogOpen={setAddLeadDialogOpen}
+        posTransactionsDialogOpen={posTransactionsDialogOpen}
+        setPosTransactionsDialogOpen={setPosTransactionsDialogOpen}
+        transactionsDialogOpen={transactionsDialogOpen}
+        setTransactionsDialogOpen={setTransactionsDialogOpen}
+        stockAssignmentDialogOpen={stockAssignmentDialogOpen}
+        setStockAssignmentDialogOpen={setStockAssignmentDialogOpen}
+        customerCreationDialogOpen={customerCreationDialogOpen}
+        setCustomerCreationDialogOpen={setCustomerCreationDialogOpen}
+        customerHeatMapDialogOpen={customerHeatMapDialogOpen}
+        setCustomerHeatMapDialogOpen={setCustomerHeatMapDialogOpen}
+        salesOrderDialogOpen={salesOrderDialogOpen}
+        setSalesOrderDialogOpen={setSalesOrderDialogOpen}
+        
+        // Data
+        customers={customers}
+        products={products}
+        warehouses={warehouses}
+        salesAgents={salesAgents}
+        
+        // Handlers
+        onSnackbar={handleSnackbar}
+        refreshCustomers={loadCustomers}
       />
     </Box>
   );

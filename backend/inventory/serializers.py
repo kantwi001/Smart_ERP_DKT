@@ -9,7 +9,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class ProductPriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductPrice
-        fields = ['currency', 'price']
+        fields = ['id', 'product', 'currency', 'price']
 
 class ProductSerializer(serializers.ModelSerializer):
     prices = ProductPriceSerializer(many=True, read_only=True)

@@ -23,7 +23,7 @@ const PayrollForm = ({ onSuccess }) => {
     setError('');
     setSuccess(false);
     try {
-      await axios.post('/api/hr/payroll/', form);
+      await axios.post('/hr/payroll/', form);
       setSuccess(true);
       setForm({ employee: '', period: '', amount: '', status: '' });
       if (onSuccess) onSuccess();

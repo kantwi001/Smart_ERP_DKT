@@ -675,3 +675,288 @@
     padding-bottom: max(var(--mobile-padding-lg), env(safe-area-inset-bottom)) !important;
   }
 }
+
+/* Enhanced Mobile App Navigation - Touch-Optimized */
+@media (max-width: 768px) {
+  /* App Bar mobile optimizations */
+  .MuiAppBar-root {
+    height: 64px !important;
+    min-height: 64px !important;
+  }
+  
+  .MuiToolbar-root {
+    min-height: 64px !important;
+    padding: 0 8px !important;
+    gap: 8px !important;
+  }
+  
+  /* Hamburger menu button - Enhanced touch target */
+  .MuiToolbar-root .MuiIconButton-root:first-of-type {
+    width: 48px !important;
+    height: 48px !important;
+    padding: 12px !important;
+    margin-right: 8px !important;
+    border-radius: 8px !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    transition: all 0.2s ease !important;
+  }
+  
+  .MuiToolbar-root .MuiIconButton-root:first-of-type:active {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    transform: scale(0.95) !important;
+  }
+  
+  .MuiToolbar-root .MuiIconButton-root:first-of-type .MuiSvgIcon-root {
+    font-size: 28px !important;
+    color: white !important;
+  }
+  
+  /* App title - Responsive sizing */
+  .MuiToolbar-root .MuiTypography-h6 {
+    font-size: clamp(1rem, 4vw, 1.25rem) !important;
+    font-weight: 600 !important;
+    flex-grow: 1 !important;
+    margin-left: 8px !important;
+  }
+  
+  /* Network sync component in header */
+  .MuiToolbar-root .MuiBox-root:last-of-type {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-right: 8px !important;
+  }
+  
+  /* User avatar and logout button */
+  .MuiToolbar-root .MuiAvatar-root {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1rem !important;
+  }
+  
+  .MuiToolbar-root .MuiButton-root {
+    min-width: auto !important;
+    padding: 8px 12px !important;
+    font-size: 0.875rem !important;
+    border-radius: 6px !important;
+    text-transform: none !important;
+  }
+  
+  /* Mobile drawer optimizations */
+  .MuiDrawer-paper {
+    width: 280px !important;
+    background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%) !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  }
+  
+  /* Drawer list items - Enhanced touch targets */
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root {
+    min-height: 52px !important;
+    padding: 8px 16px !important;
+    margin: 4px 8px !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root:hover {
+    background-color: rgba(25, 118, 210, 0.08) !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root:active {
+    background-color: rgba(25, 118, 210, 0.12) !important;
+    transform: scale(0.98) !important;
+  }
+  
+  /* List item icons - Larger for better visibility */
+  .MuiDrawer-paper .MuiListItemIcon-root {
+    min-width: 40px !important;
+    margin-right: 12px !important;
+  }
+  
+  .MuiDrawer-paper .MuiListItemIcon-root .MuiSvgIcon-root {
+    font-size: 24px !important;
+    color: #424242 !important;
+  }
+  
+  /* List item text - Readable sizing */
+  .MuiDrawer-paper .MuiListItemText-root .MuiTypography-root {
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    color: #424242 !important;
+    line-height: 1.3 !important;
+  }
+  
+  /* Selected/active list items */
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root.Mui-selected {
+    background-color: rgba(25, 118, 210, 0.12) !important;
+    border-left: 4px solid #1976d2 !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root.Mui-selected .MuiListItemIcon-root .MuiSvgIcon-root {
+    color: #1976d2 !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root.Mui-selected .MuiListItemText-root .MuiTypography-root {
+    color: #1976d2 !important;
+    font-weight: 600 !important;
+  }
+  
+  /* Expandable menu items */
+  .MuiDrawer-paper .MuiCollapse-root .MuiList-root {
+    padding: 0 !important;
+    background-color: rgba(0, 0, 0, 0.02) !important;
+    border-radius: 8px !important;
+    margin: 4px 8px !important;
+  }
+  
+  .MuiDrawer-paper .MuiCollapse-root .MuiListItem-root {
+    padding-left: 24px !important;
+    min-height: 48px !important;
+    margin: 2px 4px !important;
+  }
+  
+  /* Expand/collapse icons */
+  .MuiDrawer-paper .MuiListItem-root .MuiSvgIcon-root:last-child {
+    font-size: 20px !important;
+    color: #666 !important;
+  }
+  
+  /* Badge styling for notifications */
+  .MuiDrawer-paper .MuiListItem-root .MuiBadge-root {
+    margin-left: auto !important;
+  }
+  
+  .MuiDrawer-paper .MuiListItem-root .MuiBadge-badge {
+    background-color: #f44336 !important;
+    color: white !important;
+    font-size: 0.75rem !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    border-radius: 10px !important;
+  }
+  
+  /* Drawer backdrop */
+  .MuiDrawer-root .MuiBackdrop-root {
+    background-color: rgba(0, 0, 0, 0.3) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+  
+  /* Main content area adjustments */
+  .MuiBox-root[role="main"] {
+    padding: 16px 8px !important;
+    margin-top: 64px !important;
+    min-height: calc(100vh - 64px) !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Network sync chip in header - Mobile optimized */
+  .MuiChip-root {
+    height: 28px !important;
+    font-size: 0.75rem !important;
+    border-radius: 14px !important;
+  }
+  
+  .MuiChip-root .MuiChip-icon {
+    font-size: 16px !important;
+    margin-left: 6px !important;
+    margin-right: -4px !important;
+  }
+  
+  .MuiChip-root .MuiChip-label {
+    padding: 0 8px !important;
+    font-weight: 500 !important;
+  }
+}
+
+/* Extra small devices (phones in portrait) */
+@media (max-width: 480px) {
+  .MuiDrawer-paper {
+    width: 260px !important;
+  }
+  
+  .MuiToolbar-root {
+    padding: 0 4px !important;
+  }
+  
+  .MuiToolbar-root .MuiIconButton-root:first-of-type {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 10px !important;
+  }
+  
+  .MuiToolbar-root .MuiTypography-h6 {
+    font-size: clamp(0.9rem, 4vw, 1.1rem) !important;
+    margin-left: 4px !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root {
+    min-height: 48px !important;
+    padding: 6px 12px !important;
+  }
+  
+  .MuiDrawer-paper .MuiListItemText-root .MuiTypography-root {
+    font-size: 0.9rem !important;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .MuiAppBar-root {
+    height: 56px !important;
+    min-height: 56px !important;
+  }
+  
+  .MuiToolbar-root {
+    min-height: 56px !important;
+  }
+  
+  .MuiBox-root[role="main"] {
+    margin-top: 56px !important;
+    min-height: calc(100vh - 56px) !important;
+  }
+  
+  .MuiDrawer-paper {
+    width: 240px !important;
+  }
+}
+
+/* Touch interaction improvements */
+@media (hover: none) and (pointer: coarse) {
+  .MuiToolbar-root .MuiIconButton-root:first-of-type:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root:hover {
+    background-color: transparent !important;
+  }
+  
+  .MuiDrawer-paper .MuiList-root .MuiListItem-root:active {
+    background-color: rgba(25, 118, 210, 0.15) !important;
+  }
+}
+
+/* Safe area support for devices with notches */
+@supports (padding: max(0px)) {
+  .MuiAppBar-root {
+    padding-top: env(safe-area-inset-top) !important;
+    height: calc(64px + env(safe-area-inset-top)) !important;
+  }
+  
+  .MuiToolbar-root {
+    min-height: 64px !important;
+  }
+  
+  .MuiBox-root[role="main"] {
+    margin-top: calc(64px + env(safe-area-inset-top)) !important;
+    padding-left: max(8px, env(safe-area-inset-left)) !important;
+    padding-right: max(8px, env(safe-area-inset-right)) !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
+  
+  .MuiDrawer-paper {
+    padding-top: env(safe-area-inset-top) !important;
+  }
+}

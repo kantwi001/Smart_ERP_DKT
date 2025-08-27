@@ -1,0 +1,18 @@
+{
+  "appId": "com.smarterp.warehouse",
+  "appName": "Smart ERP - Warehouse Edition",
+  "webDir": "build",
+  "server": {
+    "allowNavigation": [
+      "erp.tarinnovation.com"
+    ]
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "Storage": {
+      "enabled": true
+    }
+  }
+}

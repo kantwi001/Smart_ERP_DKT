@@ -10,6 +10,10 @@ class Product(models.Model):
     sku = models.CharField(max_length=50, unique=True)
     quantity = models.IntegerField(default=0)
     description = models.TextField(blank=True)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    min_stock = models.IntegerField(default=0)
+    max_stock = models.IntegerField(null=True, blank=True)
+    unit = models.CharField(max_length=50, default='piece')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

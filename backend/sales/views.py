@@ -1,16 +1,29 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Q, Sum, Count
 from django.utils import timezone
-from django.db.models import Sum, Count, Q
 from datetime import datetime, timedelta
-from .models import Customer, Sale, CustomerApproval, Quote, Lead, Promotion, PromotionProduct
-from .serializers import CustomerSerializer, SaleSerializer, CustomerApprovalSerializer, CustomerApprovalActionSerializer, QuoteSerializer, LeadSerializer, PromotionSerializer, PromotionProductSerializer
+from .models import (
+    Customer, CustomerApproval, Quote, Lead, Sale, Promotion, PromotionProduct,
+    SalesOrder, SalesOrderItem, FinanceTransaction, Payment
+)
+from .serializers import (
+    CustomerSerializer, CustomerApprovalSerializer, QuoteSerializer, 
+    LeadSerializer, SaleSerializer, PromotionSerializer, PromotionProductSerializer,
+    SalesOrderSerializer, SalesOrderItemSerializer, FinanceTransactionSerializer, PaymentSerializer
+)
 
 class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all()
+    queryset = Customer.objects.all().order_by('-id')  # Show all customers for all regions, newest first
     serializer_class = CustomerSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Return all customers for all regions - no filtering by region
+        """
+        return Customer.objects.all().order_by('-id')
     
     def create(self, request, *args, **kwargs):
         """
@@ -447,6 +460,177 @@ class PromotionProductViewSet(viewsets.ModelViewSet):
         
         return queryset
 
+class SalesOrderViewSet(viewsets.ModelViewSet):
+    queryset = SalesOrder.objects.all()
+    serializer_class = SalesOrderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a sales order"""
+        sales_order = self.get_object()
+        sales_order.status = 'approved'
+        sales_order.save()
+        return Response({'message': 'Sales order approved', 'status': sales_order.status})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a sales order"""
+        sales_order = self.get_object()
+        sales_order.status = 'rejected'
+        sales_order.save()
+        return Response({'message': 'Sales order rejected', 'status': sales_order.status})
+
+class SalesOrderItemViewSet(viewsets.ModelViewSet):
+    queryset = SalesOrderItem.objects.all()
+    serializer_class = SalesOrderItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class FinanceTransactionViewSet(viewsets.ModelViewSet):
+    queryset = FinanceTransaction.objects.all()
+    serializer_class = FinanceTransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['post'])
+    def approve_cheque(self, request, pk=None):
+        """Approve a cheque payment"""
+        finance_transaction = self.get_object()
+        finance_transaction.status = 'approved'
+        finance_transaction.save()
+        return Response({'message': 'Cheque payment approved', 'status': finance_transaction.status})
+
+    @action(detail=True, methods=['post'])
+    def reject_cheque(self, request, pk=None):
+        """Reject a cheque payment"""
+        finance_transaction = self.get_object()
+        finance_transaction.status = 'rejected'
+        finance_transaction.save()
+        return Response({'message': 'Cheque payment rejected', 'status': finance_transaction.status})
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ['status', 'payment_method', 'sales_order']
+    search_fields = ['payment_number', 'sales_order__order_number', 'reference']
+    ordering_fields = ['created_at', 'amount', 'payment_date']
+    ordering = ['-created_at']
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a payment (Finance team only)"""
+        payment = self.get_object()
+        
+        if payment.status != 'pending':
+            return Response(
+                {'error': 'Payment is not pending approval'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        payment.status = 'approved'
+        payment.approved_by = request.user
+        payment.approved_at = timezone.now()
+        payment.save()
+        
+        # For approved payments, mark as completed and update receivables
+        if payment.payment_method in ['cash', 'mobile_money']:
+            payment.status = 'completed'
+            payment.save()
+            self.update_customer_receivables(payment)
+        
+        return Response({
+            'message': 'Payment approved successfully',
+            'status': payment.status
+        })
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a payment (Finance team only)"""
+        payment = self.get_object()
+        
+        if payment.status != 'pending':
+            return Response(
+                {'error': 'Payment is not pending approval'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        rejection_reason = request.data.get('reason', '')
+        
+        payment.status = 'rejected'
+        payment.approved_by = request.user
+        payment.approved_at = timezone.now()
+        payment.notes = f"Rejected: {rejection_reason}"
+        payment.save()
+        
+        return Response({
+            'message': 'Payment rejected',
+            'status': payment.status
+        })
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        """Complete an approved payment (Finance team only)"""
+        payment = self.get_object()
+        
+        if payment.status != 'approved':
+            return Response(
+                {'error': 'Payment must be approved first'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        payment.status = 'completed'
+        payment.save()
+        
+        # Update customer receivables and balance
+        self.update_customer_receivables(payment)
+        
+        return Response({
+            'message': 'Payment completed and receivables updated',
+            'status': payment.status
+        })
+
+    def update_customer_receivables(self, payment):
+        """Update customer receivables when payment is completed"""
+        try:
+            # Create finance transaction for payment received
+            FinanceTransaction.objects.create(
+                sales_order=payment.sales_order,
+                customer=payment.sales_order.customer,
+                transaction_type='payment',
+                amount=payment.amount,
+                payment_method=payment.payment_method,
+                reference_number=payment.payment_number,
+                status='completed',
+                created_by=payment.approved_by or payment.created_by,
+                description=f"Payment received - {payment.payment_method} - {payment.payment_number}"
+            )
+            
+            # Update any pending receivable transactions
+            receivable_transactions = FinanceTransaction.objects.filter(
+                sales_order=payment.sales_order,
+                transaction_type='receivable',
+                status='pending'
+            )
+            
+            remaining_payment = payment.amount
+            for transaction in receivable_transactions:
+                if remaining_payment <= 0:
+                    break
+                    
+                if remaining_payment >= transaction.amount:
+                    transaction.status = 'completed'
+                    remaining_payment -= transaction.amount
+                else:
+                    # Partial payment - create new transaction for remaining
+                    transaction.amount -= remaining_payment
+                    remaining_payment = 0
+                
+                transaction.save()
+                
+        except Exception as e:
+            # Log error but don't fail the payment completion
+            print(f"Error updating receivables: {e}")
+
 class DashboardViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -472,4 +656,33 @@ class DashboardViewSet(viewsets.ViewSet):
             },
             'recent_sales': SaleSerializer(recent_sales, many=True).data,
             'analytics': list(sales_by_month),
+        })
+
+    @action(detail=False, methods=['get'])
+    def customer_locations(self, request):
+        """Provide customer location data for heat map (Superadmin only)"""
+        user = request.user
+        
+        # Restrict to superadmin users only
+        if not (user.is_superuser or (hasattr(user, 'role') and user.role == 'superadmin')):
+            return Response(
+                {'error': 'Access denied. Heat map is restricted to Superadmin users only.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get customers with valid GPS coordinates
+        customers_with_location = Customer.objects.filter(
+            latitude__isnull=False,
+            longitude__isnull=False
+        ).exclude(
+            latitude=0,
+            longitude=0
+        ).values(
+            'id', 'name', 'customer_type', 'latitude', 'longitude', 
+            'address', 'phone', 'email', 'created_at'
+        )
+        
+        return Response({
+            'count': customers_with_location.count(),
+            'customers': list(customers_with_location)
         })

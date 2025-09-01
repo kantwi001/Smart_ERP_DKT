@@ -1,0 +1,40 @@
+{
+	"appId": "com.smarterp.mobile",
+	"appName": "Smart ERP Mobile",
+	"webDir": "frontend/build",
+	"plugins": {
+		"CapacitorHttp": {
+			"enabled": true
+		},
+		"Storage": {
+			"enabled": true
+		},
+		"Network": {
+			"enabled": true
+		},
+		"StatusBar": {
+			"style": "dark",
+			"backgroundColor": "#FF9800"
+		},
+		"SplashScreen": {
+			"launchShowDuration": 2000,
+			"backgroundColor": "#FF9800",
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": false
+		},
+		"Keyboard": {
+			"resize": "body",
+			"style": "dark"
+		}
+	},
+	"android": {
+		"allowMixedContent": true,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": true
+	},
+	"ios": {
+		"contentInset": "automatic",
+		"scrollEnabled": true
+	},
+	"packageClassList": []
+}

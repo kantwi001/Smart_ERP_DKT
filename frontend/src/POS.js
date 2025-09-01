@@ -78,7 +78,7 @@ const POS = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await api.get('/api/inventory/products/', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.get('/inventory/products/', { headers: { Authorization: `Bearer ${token}` } });
       console.log('Products API Response:', res.data);
       console.log('Products count:', res.data.length);
       if (res.data && Array.isArray(res.data)) {

@@ -4,11 +4,26 @@ import { AuthContext } from './AuthContext';
 import { 
   getGlobalTransferHistory,
   addTransferToHistory,
-  updateTransferStatus,
   getGlobalProducts,
-  loadWarehousesWithFallback
 } from './sharedData';
-import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Chip, FormControl, InputLabel, Select } from '@mui/material';
+import { 
+  Typography, Paper, Table, TableBody, TableCell, TableContainer, 
+  TableHead, TableRow, CircularProgress, Alert, Box, Button, Dialog, 
+  DialogTitle, DialogContent, DialogActions, TextField, MenuItem, 
+  Chip, FormControl, InputLabel, Select, IconButton, Tooltip,
+  Grid, Card, CardContent
+} from '@mui/material';
+import {
+  CheckCircle as ApproveIcon,
+  Cancel as RejectIcon,
+  LocalShipping as CompleteIcon,
+  Add as AddIcon,
+  Refresh as RefreshIcon,
+  Visibility as VisibilityIcon,
+  AttachFile as AttachFileIcon,
+  CloudUpload as CloudUploadIcon,
+  Download as DownloadIcon
+} from '@mui/icons-material';
 
 const WarehouseTransfers = () => {
   const { token } = useContext(AuthContext);
@@ -20,6 +35,13 @@ const WarehouseTransfers = () => {
   const [products, setProducts] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [user, setUser] = useState({});
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [actionLoading, setActionLoading] = useState(null);
+  const [statusCounts, setStatusCounts] = useState({ pending: 0, approved: 0, completed: 0, rejected: 0 });
+  const [waybillDialog, setWaybillDialog] = useState(false);
+  const [selectedTransferForWaybill, setSelectedTransferForWaybill] = useState(null);
+  const [waybillFile, setWaybillFile] = useState(null);
+  const [waybillUploading, setWaybillUploading] = useState(false);
 
   useEffect(() => {
     fetchTransfers();
@@ -33,13 +55,46 @@ const WarehouseTransfers = () => {
     setLoading(true);
     setError(null);
     try {
-      // Use global transfer history instead of API
-      const transferHistory = getGlobalTransferHistory();
-      setTransfers(transferHistory);
-      console.log('[Warehouse Transfers] Loaded transfers:', transferHistory.length);
+      // Load transfers from warehouse API
+      const response = await api.get('/warehouse/transfers/');
+      
+      if (response.data && Array.isArray(response.data)) {
+        setTransfers(response.data);
+        console.log('[Warehouse Transfers] Loaded transfers:', response.data.length);
+        
+        // Calculate status counts
+        const counts = response.data.reduce((acc, transfer) => {
+          acc[transfer.status] = (acc[transfer.status] || 0) + 1;
+          return acc;
+        }, { pending: 0, approved: 0, completed: 0, rejected: 0 });
+        setStatusCounts(counts);
+        
+      } else {
+        console.warn('[Warehouse Transfers] Invalid response format:', response.data);
+        setTransfers([]);
+        setError('Invalid data format received from server');
+      }
+      
     } catch (err) {
       console.error('[Warehouse Transfers] Error loading transfers:', err);
-      setError('Failed to load transfers.');
+      console.error('Error details:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message
+      });
+      
+      if (err.response?.status === 401) {
+        setError('Authentication failed. Please log in again.');
+      } else if (err.response?.status === 403) {
+        setError('You do not have permission to view transfers.');
+      } else if (err.response?.status === 404) {
+        setError('Transfer endpoint not found. Please check server configuration.');
+      } else {
+        setError(`Failed to load transfers: ${err.response?.data?.error || err.message}`);
+      }
+      
+      setTransfers([]);
     } finally {
       setLoading(false);
     }
@@ -56,10 +111,23 @@ const WarehouseTransfers = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const warehouses = await loadWarehousesWithFallback();
-      setWarehouses(warehouses);
+      // Direct API call instead of loadWarehousesWithFallback
+      const response = await fetch(`${api.defaults.baseURL}/warehouse/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const warehouses = await response.json();
+        setWarehouses(warehouses);
+      } else {
+        console.warn('Failed to load warehouses from API');
+        setWarehouses([]);
+      }
     } catch (err) {
       console.error('Failed to load warehouses:', err);
+      setWarehouses([]);
     }
   };
 
@@ -100,161 +168,285 @@ const WarehouseTransfers = () => {
       const fromWarehouse = warehouses.find(w => w.name === form.fromWarehouse || w.id === parseInt(form.fromWarehouse));
       const toWarehouse = warehouses.find(w => w.name === form.toWarehouse || w.id === parseInt(form.toWarehouse));
 
-      // Create transfer record
+      if (!selectedProduct || !fromWarehouse || !toWarehouse) {
+        setError('Invalid product or warehouse selection');
+        return;
+      }
+
+      // Create transfer via backend API
       const transferData = {
-        product: selectedProduct?.name || form.product,
-        productSku: selectedProduct?.sku || 'MANUAL-TRANSFER',
+        from_warehouse: fromWarehouse.id,
+        to_warehouse: toWarehouse.id,
+        product: selectedProduct.id,
         quantity: parseInt(form.quantity),
-        from: fromWarehouse?.name || form.fromWarehouse,
-        to: toWarehouse?.name || form.toWarehouse,
-        status: 'pending',
-        transferType: 'inter_warehouse',
-        requestedBy: user?.first_name + ' ' + user?.last_name || 'Warehouse Manager',
-        approvedBy: null,
-        notes: form.notes || `Transfer ${selectedProduct?.name || form.product} from ${fromWarehouse?.name || form.fromWarehouse} to ${toWarehouse?.name || form.toWarehouse}`
+        priority: 'medium',
+        request_notes: form.notes || `Transfer ${selectedProduct.name} from ${fromWarehouse.name} to ${toWarehouse.name}`
       };
 
-      // Add to transfer history
-      addTransferToHistory(transferData);
+      console.log('🔄 Creating transfer with data:', transferData);
+      console.log('🔗 API endpoint:', '/warehouse/transfers/create/');
+      console.log('🏢 From warehouse:', fromWarehouse);
+      console.log('🏢 To warehouse:', toWarehouse);
+      console.log('📦 Product:', selectedProduct);
+
+      const response = await api.post('/warehouse/transfers/create/', transferData);
       
+      console.log('Transfer created successfully:', response.data);
       setError(null);
       setForm({ product: '', quantity: '', fromWarehouse: '', toWarehouse: '', notes: '' });
       handleClose();
+      fetchTransfers(); // Refresh the transfers list
     } catch (err) {
       console.error('Failed to create transfer:', err);
-      setError('Failed to create transfer.');
+      const errorMessage = err.response?.data?.error || 'Failed to create transfer.';
+      setError(errorMessage);
     }
   };
 
-  // Print waybill for a warehouse transfer
-  const handlePrintWaybill = (transfer) => {
+  const handleApprove = async (transferId) => {
+    setActionLoading(transferId);
     try {
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank');
-      
-      // Generate waybill HTML content
-      const waybillHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Waybill - ${transfer.referenceNumber}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .company-name { font-size: 24px; font-weight: bold; color: #1976d2; }
-            .waybill-title { font-size: 20px; margin: 10px 0; }
-            .reference { font-size: 14px; color: #666; }
-            .details-section { margin: 20px 0; }
-            .details-row { display: flex; justify-content: space-between; margin: 10px 0; }
-            .details-label { font-weight: bold; }
-            .transfer-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .transfer-table th, .transfer-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            .transfer-table th { background-color: #f5f5f5; }
-            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
-            .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
-            .signature-box { width: 200px; text-align: center; }
-            .signature-line { border-top: 1px solid #000; margin-top: 40px; padding-top: 5px; }
-            @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="company-name">Smart ERP Software</div>
-            <div class="waybill-title">WAREHOUSE TRANSFER WAYBILL</div>
-            <div class="reference">Reference: ${transfer.referenceNumber}</div>
-          </div>
-          
-          <div class="details-section">
-            <div class="details-row">
-              <span><span class="details-label">Date:</span> ${transfer.date}</span>
-              <span><span class="details-label">Status:</span> ${transfer.status.toUpperCase()}</span>
-            </div>
-            <div class="details-row">
-              <span><span class="details-label">Transfer Type:</span> ${transfer.transferType === 'inter_warehouse' ? 'Inter-Warehouse' : 'Supplier'}</span>
-              <span><span class="details-label">Requested By:</span> ${transfer.requestedBy}</span>
-            </div>
-          </div>
-          
-          <div class="details-section">
-            <h3>Transfer Details</h3>
-            <div class="details-row">
-              <span><span class="details-label">From Warehouse:</span> ${transfer.from}</span>
-              <span><span class="details-label">To Warehouse:</span> ${transfer.to}</span>
-            </div>
-          </div>
-          
-          <table class="transfer-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th>Quantity</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>${transfer.product}</td>
-                <td>${transfer.productSku}</td>
-                <td>${transfer.quantity}</td>
-                <td>${transfer.notes || 'N/A'}</td>
-              </tr>
-            </tbody>
-          </table>
-          
-          <div class="details-section">
-            <div class="details-row">
-              <span><span class="details-label">Approved By:</span> ${transfer.approvedBy || 'Pending Approval'}</span>
-              <span><span class="details-label">Print Date:</span> ${new Date().toLocaleString()}</span>
-            </div>
-          </div>
-          
-          <div class="signatures">
-            <div class="signature-box">
-              <div class="signature-line">Sender Signature</div>
-            </div>
-            <div class="signature-box">
-              <div class="signature-line">Receiver Signature</div>
-            </div>
-          </div>
-          
-          <div class="footer">
-            <p>This is a computer-generated waybill. Please verify all details before processing.</p>
-            <p>Smart ERP Software - Warehouse Management System</p>
-          </div>
-          
-          <script>
-            window.onload = function() {
-              window.print();
-              window.onafterprint = function() {
-                window.close();
-              };
-            };
-          </script>
-        </body>
-        </html>
-      `;
-      
-      // Write content to print window and trigger print
-      printWindow.document.write(waybillHTML);
-      printWindow.document.close();
-      
-      console.log(`Waybill printed for transfer: ${transfer.referenceNumber}`);
+      await api.put(`/warehouse/transfers/${transferId}/`, {
+        status: 'approved'
+      });
+      fetchTransfers(); // Refresh the transfers list
     } catch (err) {
-      console.error('Failed to print waybill:', err);
-      alert('Failed to print waybill. Please try again.');
+      console.error('Failed to approve transfer:', err);
+      setError('Failed to approve transfer');
+    } finally {
+      setActionLoading(null);
     }
   };
+
+  const handleReject = async (transferId) => {
+    setActionLoading(transferId);
+    try {
+      await api.put(`/warehouse/transfers/${transferId}/`, {
+        status: 'rejected'
+      });
+      fetchTransfers(); // Refresh the transfers list
+    } catch (err) {
+      console.error('Failed to reject transfer:', err);
+      setError('Failed to reject transfer');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleComplete = async (transferId) => {
+    setActionLoading(transferId);
+    try {
+      await api.post(`/warehouse/transfers/${transferId}/complete/`);
+      fetchTransfers(); // Refresh the transfers list
+    } catch (err) {
+      console.error('Failed to complete transfer:', err);
+      setError('Failed to complete transfer');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDownloadWaybill = async (transferId) => {
+    console.log(`[Waybill] Attempting to download waybill for transfer ${transferId}`);
+    
+    try {
+      const response = await api.get(`/warehouse/transfers/${transferId}/waybill/`, {
+        responseType: 'blob'
+      });
+      
+      console.log('[Waybill] Response received:', {
+        status: response.status,
+        contentType: response.headers['content-type'],
+        dataSize: response.data.size
+      });
+      
+      // Check if response is PDF or HTML
+      const contentType = response.headers['content-type'];
+      
+      if (contentType === 'application/pdf') {
+        // Handle PDF download
+        console.log('[Waybill] Processing PDF download');
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `waybill_${transferId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        console.log('[Waybill] PDF download triggered successfully');
+      } else if (contentType && contentType.includes('text/html')) {
+        // Handle HTML response (fallback)
+        console.log('[Waybill] Processing HTML fallback');
+        const blob = new Blob([response.data], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        console.log('[Waybill] HTML waybill opened in new tab');
+      } else {
+        // Handle JSON error response
+        console.log('[Waybill] Unexpected content type, checking for JSON error');
+        const text = await response.data.text();
+        try {
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.error || 'Unknown server error');
+        } catch (parseError) {
+          throw new Error(`Unexpected response format: ${contentType}`);
+        }
+      }
+      
+    } catch (error) {
+      console.error('[Waybill] Download error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      
+      if (error.response?.status === 404) {
+        setError('Transfer not found. Please refresh and try again.');
+      } else if (error.response?.status === 403) {
+        setError('You do not have permission to download this waybill.');
+      } else if (error.response?.status === 500) {
+        setError('Server error generating waybill. Please try again or contact support.');
+      } else if (error.message.includes('Network Error')) {
+        setError('Cannot connect to server. Please check if the backend is running.');
+      } else {
+        setError(error.response?.data?.error || error.message || 'Failed to download waybill');
+      }
+    }
+  };
+
+  const openWaybillUploadDialog = (transfer) => {
+    setSelectedTransferForWaybill(transfer);
+    setWaybillDialog(true);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'warning';
+      case 'approved':
+        return 'success';
+      case 'completed':
+        return 'primary';
+      case 'rejected':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  const filteredTransfers = transfers.filter(tr => {
+    if (statusFilter === 'all') return true;
+    return tr.status === statusFilter;
+  });
+
+  useEffect(() => {
+    const counts = { pending: 0, approved: 0, completed: 0, rejected: 0 };
+    transfers.forEach(tr => {
+      counts[tr.status]++;
+    });
+    setStatusCounts(counts);
+  }, [transfers]);
 
   return (
     <Box>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h5">Warehouse Transfers</Typography>
-        <Button variant="contained" onClick={handleOpen}>New Transfer</Button>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5">🚚 Warehouse Transfer Management</Typography>
+        <Box display="flex" gap={2}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Status Filter</InputLabel>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              label="Status Filter"
+            >
+              <MenuItem value="all">All Transfers</MenuItem>
+              <MenuItem value="pending">Pending Approval</MenuItem>
+              <MenuItem value="approved">Approved</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+            </Select>
+          </FormControl>
+          <Button 
+            variant="outlined" 
+            startIcon={<RefreshIcon />}
+            onClick={fetchTransfers}
+          >
+            Refresh
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            onClick={handleOpen}
+          >
+            Create Transfer Request
+          </Button>
+        </Box>
       </Box>
+      
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Manage warehouse transfers with approval workflow
+      </Typography>
+
+      <Grid container spacing={2} mb={3}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#FFF3E0', borderLeft: '4px solid #FF9800' }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h4" color="#FF9800">{statusCounts.pending}</Typography>
+                  <Typography variant="body2">Pending Approval</Typography>
+                </Box>
+                <Box sx={{ color: '#FF9800', fontSize: '2rem' }}>⏳</Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#E3F2FD', borderLeft: '4px solid #2196F3' }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h4" color="#2196F3">{statusCounts.approved}</Typography>
+                  <Typography variant="body2">Approved</Typography>
+                </Box>
+                <Box sx={{ color: '#2196F3', fontSize: '2rem' }}>✓</Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#E8F5E8', borderLeft: '4px solid #4CAF50' }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h4" color="#4CAF50">{statusCounts.completed}</Typography>
+                  <Typography variant="body2">Completed</Typography>
+                </Box>
+                <Box sx={{ color: '#4CAF50', fontSize: '2rem' }}>🚚</Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#FFEBEE', borderLeft: '4px solid #F44336' }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h4" color="#F44336">{statusCounts.rejected}</Typography>
+                  <Typography variant="body2">Rejected</Typography>
+                </Box>
+                <Box sx={{ color: '#F44336', fontSize: '2rem' }}>✗</Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       {loading ? (
         <CircularProgress />
       ) : error ? (
@@ -264,31 +456,106 @@ const WarehouseTransfers = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>SKU</TableCell>
+                <TableCell>Transfer #</TableCell>
+                <TableCell>Product</TableCell>
                 <TableCell>Quantity</TableCell>
-                <TableCell>From</TableCell>
-                <TableCell>To</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Print</TableCell>
+                <TableCell>From Warehouse</TableCell>
+                <TableCell>To Warehouse</TableCell>
+                <TableCell>Requested Date</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {transfers.length === 0 ? (
+              {filteredTransfers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">No transfers found.</TableCell>
+                  <TableCell colSpan={8} align="center">
+                    <Box py={4}>
+                      <Typography variant="body1" color="text.secondary">
+                        {statusFilter === 'all' ? 'No transfers found.' : `No ${statusFilter} transfers found.`}
+                      </Typography>
+                    </Box>
+                  </TableCell>
                 </TableRow>
               ) : (
-                transfers.map(tr => (
+                filteredTransfers.map(tr => (
                   <TableRow key={tr.id}>
-                    <TableCell>{tr.sku || (tr.product && tr.product.sku) || ''}</TableCell>
-                    <TableCell>{tr.quantity}</TableCell>
-                    <TableCell>{tr.from_location}</TableCell>
-                    <TableCell>{tr.to_location}</TableCell>
-                    <TableCell>{tr.created_at ? new Date(tr.created_at).toLocaleString() : '-'}</TableCell>
                     <TableCell>
-                      <Button size="small" variant="outlined" color="primary" onClick={() => handlePrintWaybill(tr)}>
-                        Print Waybill
-                      </Button>
+                      <Typography variant="body2" fontWeight="bold">
+                        {tr.transfer_number || `TRF-${tr.id}`}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {tr.product?.name || tr.product_name || 'Unknown Product'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{tr.quantity}</TableCell>
+                    <TableCell>
+                      {tr.from_warehouse?.name || tr.from_location || 'Unknown'}
+                    </TableCell>
+                    <TableCell>
+                      {tr.to_warehouse?.name || tr.to_location || 'Unknown'}
+                    </TableCell>
+                    <TableCell>
+                      {tr.request_date ? new Date(tr.request_date).toLocaleDateString() : 
+                       tr.created_at ? new Date(tr.created_at).toLocaleDateString() : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={tr.status?.toUpperCase() || 'UNKNOWN'} 
+                        color={getStatusColor(tr.status)} 
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box display="flex" gap={1}>
+                        {tr.status === 'pending' && (
+                          <>
+                            <Tooltip title="Approve Transfer">
+                              <IconButton 
+                                size="small" 
+                                color="success"
+                                onClick={() => handleApprove(tr.id)}
+                                disabled={actionLoading === tr.id}
+                              >
+                                <ApproveIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Reject Transfer">
+                              <IconButton 
+                                size="small" 
+                                color="error"
+                                onClick={() => handleReject(tr.id)}
+                                disabled={actionLoading === tr.id}
+                              >
+                                <RejectIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                        {tr.status === 'approved' && (
+                          <Tooltip title="Mark as Completed">
+                            <IconButton 
+                              size="small" 
+                              color="primary"
+                              onClick={() => handleComplete(tr.id)}
+                              disabled={actionLoading === tr.id}
+                            >
+                              <CompleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Download Waybill">
+                          <IconButton
+                            onClick={() => handleDownloadWaybill(tr.id)}
+                            color="primary"
+                            size="small"
+                          >
+                            <DownloadIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))

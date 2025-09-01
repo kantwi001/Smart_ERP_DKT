@@ -1,0 +1,60 @@
+import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+
+// Production backend URL
+const API_BASE_URL = 'https://backend-shy-sun-4450.fly.dev/api';
+
+// Create axios instance with production settings
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  }
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Add platform info for mobile apps
+    if (Capacitor.isNativePlatform()) {
+      config.headers['X-Platform'] = Capacitor.getPlatform();
+      config.headers['X-App-Version'] = '2.0.0';
+    }
+    
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (Capacitor.isNativePlatform()) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// API endpoints for production
+export const authEndpoints = [
+  '/token/',
+  '/token/refresh/',
+  '/users/me/',
+  '/users/system/settings/'
+];
+
+export { API_BASE_URL };
+export default api;

@@ -20,48 +20,60 @@ import {
   Clear as ClearIcon
 } from '@mui/icons-material';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-// Fix leaflet default marker icons
-if (typeof window !== 'undefined') {
-  delete L.Icon.Default.prototype._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  });
-}
-
-// Custom marker for location selection
-const createLocationIcon = () => {
-  if (typeof window === 'undefined') return null;
-  
-  return new L.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-  });
-};
+import { createLocationIcon } from './LeafletIconFix';
 
 // Map click handler component
 const MapClickHandler = ({ onLocationSelect }) => {
   useMapEvents({
     click: (e) => {
       const { lat, lng } = e.latlng;
-      const newLocation = {
-        latitude: lat.toFixed(8),
-        longitude: lng.toFixed(8),
-        accuracy: null,
-        timestamp: new Date().toISOString()
-      };
-      onLocationSelect(newLocation);
+      onLocationSelect({ lat, lng });
     },
   });
   return null;
+};
+
+// Location marker component with safe icon handling
+const LocationMarker = ({ position, onPositionChange }) => {
+  const markerRef = useRef(null);
+  const [icon, setIcon] = useState(null);
+
+  useEffect(() => {
+    // Safely create icon
+    const locationIcon = createLocationIcon();
+    setIcon(locationIcon);
+  }, []);
+
+  const eventHandlers = {
+    dragend() {
+      const marker = markerRef.current;
+      if (marker != null) {
+        const newPos = marker.getLatLng();
+        onPositionChange({ lat: newPos.lat, lng: newPos.lng });
+      }
+    },
+  };
+
+  if (!position || !icon) return null;
+
+  return (
+    <Marker
+      draggable={true}
+      eventHandlers={eventHandlers}
+      position={[position.lat, position.lng]}
+      ref={markerRef}
+      icon={icon}
+    >
+      <Popup>
+        <div>
+          <strong>Selected Location</strong><br />
+          Lat: {position.lat.toFixed(6)}<br />
+          Lng: {position.lng.toFixed(6)}
+        </div>
+      </Popup>
+    </Marker>
+  );
 };
 
 const LocationPicker = ({ 
@@ -77,16 +89,6 @@ const LocationPicker = ({
   const [address, setAddress] = useState('');
   const [mapCenter, setMapCenter] = useState([7.9465, -1.0232]); 
   const [mapZoom, setMapZoom] = useState(7);
-  const [locationIcon, setLocationIcon] = useState(null);
-
-  useEffect(() => {
-    try {
-      const icon = createLocationIcon();
-      setLocationIcon(icon);
-    } catch (error) {
-      console.warn('Could not create location icon:', error);
-    }
-  }, []);
 
   useEffect(() => {
     if (location && onLocationSelect) {
@@ -307,29 +309,10 @@ const LocationPicker = ({
             <MapClickHandler onLocationSelect={handleMapLocationSelect} />
             
             {location && location.latitude && location.longitude && (
-              <Marker 
-                position={[parseFloat(location.latitude), parseFloat(location.longitude)]}
-                icon={locationIcon || undefined}
-              >
-                <Popup>
-                  <Box sx={{ minWidth: 150 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                      Selected Location
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Lat:</strong> {parseFloat(location.latitude).toFixed(6)}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Lng:</strong> {parseFloat(location.longitude).toFixed(6)}
-                    </Typography>
-                    {location.accuracy && (
-                      <Typography variant="body2">
-                        <strong>Accuracy:</strong> ±{Math.round(location.accuracy)}m
-                      </Typography>
-                    )}
-                  </Box>
-                </Popup>
-              </Marker>
+              <LocationMarker 
+                position={{ lat: parseFloat(location.latitude), lng: parseFloat(location.longitude) }} 
+                onPositionChange={handleMapLocationSelect} 
+              />
             )}
           </MapContainer>
         </Paper>

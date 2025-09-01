@@ -231,7 +231,7 @@ class DashboardService {
   static async getSalesSummary() {
     try {
       const [ordersRes, customersRes, revenueRes] = await Promise.allSettled([
-        api.get('/sales/orders/'),
+        api.get('/sales/sales-orders/'),
         api.get('/sales/customers/'),
         api.get('/reporting/dashboard/revenue/')
       ]);

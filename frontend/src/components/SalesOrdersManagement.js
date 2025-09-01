@@ -45,6 +45,7 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
     try {
       setLoading(true);
       const response = await api.get('/sales/sales-orders/');
+      console.log('Sales orders loaded:', response.data);
       setSalesOrders(response.data);
     } catch (error) {
       console.error('Error loading sales orders:', error);
@@ -103,24 +104,28 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
         },
       });
       
-      // Only update payment status for cash and mobile money (auto-approved)
-      // Credit payments (cheque, bank_transfer) require finance approval
+      // Update payment and order status based on payment method
       if (paymentForm.payment_method === 'cash' || paymentForm.payment_method === 'mobile_money') {
         const totalPaid = parseFloat(paymentForm.amount);
         const orderTotal = parseFloat(selectedOrder.total);
         
         if (totalPaid >= orderTotal) {
           await api.patch(`/sales/sales-orders/${selectedOrder.id}/`, {
+            status: 'confirmed',
             payment_status: 'paid'
           });
         } else {
           await api.patch(`/sales/sales-orders/${selectedOrder.id}/`, {
+            status: 'confirmed',
             payment_status: 'partial'
           });
         }
         onSnackbar('Payment applied successfully', 'success');
       } else {
-        // For cheque and bank transfer, keep status as pending until finance approval
+        // For cheque and bank transfer, update payment status to 'paid' but keep order status as pending for finance approval
+        await api.patch(`/sales/sales-orders/${selectedOrder.id}/`, {
+          payment_status: 'paid'
+        });
         onSnackbar('Payment submitted for finance approval', 'info');
       }
 
@@ -209,35 +214,39 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
 
   const reprintInvoice = (order) => {
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        onSnackbar('Pop-up blocked. Please allow pop-ups to print invoices.', 'warning');
-        return;
-      }
-
-      // Use customer data directly from order object (from serializer)
-      const customerName = order.customer_name || 'N/A';
-      const customerEmail = order.customer_email || 'N/A';
-      const customerPhone = order.customer_phone || 'N/A';
-      const salesAgentName = order.sales_agent_name || 'N/A';
-      const salesAgentEmail = order.sales_agent_email || 'N/A';
+      const customer = customers.find(c => c.id === order.customer) || {};
+      const customerName = customer.name || 'N/A';
+      const customerEmail = customer.email || 'N/A';
+      const customerPhone = customer.phone || 'N/A';
+      const salesAgentName = order.sales_agent_name || 'Sales Agent';
+      const salesAgentEmail = order.sales_agent_email || 'agent@company.com';
       
+      // Generate barcode data (simple format: ORDER-YYYYMMDD-ID)
+      const barcodeData = `ORDER-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${order.id}`;
+      
+      const printWindow = window.open('', '_blank');
       printWindow.document.write(`
         <html>
           <head>
-            <title>Invoice #${order.order_number || order.id}</title>
+            <title>Sales Invoice - ${order.order_number || order.id}</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 30px; line-height: 1.6; color: #333; }
-              .header { text-align: center; margin-bottom: 40px; border-bottom: 3px solid #2196F3; padding-bottom: 20px; }
+              body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+              .header { text-align: center; border-bottom: 2px solid #2196F3; padding-bottom: 20px; margin-bottom: 30px; }
               .company-name { font-size: 24px; font-weight: bold; color: #2196F3; margin-bottom: 10px; }
-              .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
-              .section-title { font-size: 16px; font-weight: bold; color: #2196F3; margin-bottom: 15px; }
-              .detail-row { display: flex; justify-content: space-between; margin: 8px 0; }
-              .total-amount { font-size: 20px; font-weight: bold; color: #2196F3; text-align: right; border-top: 2px solid #2196F3; padding-top: 10px; }
+              .section { margin-bottom: 25px; }
+              .section-title { font-size: 16px; font-weight: bold; color: #2196F3; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+              .detail-row { display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0; }
               .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              .items-table th, .items-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
               .items-table th { background-color: #f5f5f5; font-weight: bold; }
-              @media print { body { margin: 0; } .no-print { display: none; } }
+              .items-table tr:nth-child(even) { background-color: #f9f9f9; }
+              .total-amount { font-size: 18px; font-weight: bold; color: #2196F3; text-align: right; margin-top: 20px; padding: 15px; background-color: #f0f8ff; border-radius: 5px; }
+              .no-items { text-align: center; color: #666; font-style: italic; padding: 20px; }
+              .barcode-section { text-align: center; margin: 20px 0; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9; }
+              .barcode { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; letter-spacing: 3px; margin: 10px 0; }
+              .barcode-lines { font-family: 'Courier New', monospace; font-size: 8px; line-height: 0.8; margin: 5px 0; }
+              .no-print { display: block; }
+              @media print { .no-print { display: none; } }
             </style>
           </head>
           <body>
@@ -247,6 +256,56 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
               <div>Invoice #${order.order_number || order.id}</div>
               <div style="font-size: 12px; margin-top: 10px;">${new Date().toLocaleDateString()}</div>
             </div>
+            
+            <div class="barcode-section">
+              <div style="font-size: 12px; color: #666; margin-bottom: 10px; text-align: center;">Verification Barcode</div>
+              <div style="display: flex; justify-content: center; align-items: end; height: 60px; margin: 15px 0;">
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 3px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 2px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 3px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 2px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 3px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 2px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 3px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 2px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 3px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 2px;"></div>
+                <div style="width: 1px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 2px; height: 60px; background: #000; margin-right: 1px;"></div>
+                <div style="width: 3px; height: 60px; background: #000; margin-right: 1px;"></div>
+              </div>
+              <div style="font-family: 'Courier New', monospace; font-size: 14px; font-weight: bold; text-align: center; letter-spacing: 2px; color: #333; margin-top: 5px;">
+                0 ${barcodeData.replace(/[^0-9]/g, '').slice(0,6).padEnd(6, '0')} ${barcodeData.replace(/[^0-9]/g, '').slice(6,12).padEnd(6, '0')} 0
+              </div>
+            </div>
+            
             <div class="section">
               <div class="section-title">Customer Information</div>
               <div class="detail-row"><span>Customer:</span><span>${customerName}</span></div>
@@ -258,33 +317,70 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
               <div class="detail-row"><span>Sales Agent:</span><span>${salesAgentName}</span></div>
               <div class="detail-row"><span>Agent Email:</span><span>${salesAgentEmail}</span></div>
             </div>
-            ${order.items && order.items.length > 0 ? `
             <div class="section">
               <div class="section-title">Order Items</div>
-              <table class="items-table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${order.items.map(item => `
+              ${(order.items && order.items.length > 0) ? `
+                <table class="items-table">
+                  <thead>
                     <tr>
-                      <td>${item.product_name || 'N/A'}</td>
-                      <td>${item.product_sku || 'N/A'}</td>
-                      <td>${item.quantity || 0}</td>
-                      <td>$${parseFloat(item.unit_price || 0).toFixed(2)}</td>
-                      <td>$${parseFloat(item.line_total || 0).toFixed(2)}</td>
+                      <th>Product</th>
+                      <th>SKU</th>
+                      <th>Quantity</th>
+                      <th>Unit Price</th>
+                      <th>Total</th>
                     </tr>
-                  `).join('')}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    ${order.items.map(item => `
+                      <tr>
+                        <td>${item.product_name || 'Product'}</td>
+                        <td>${item.product_sku || 'N/A'}</td>
+                        <td>${item.quantity || 0}</td>
+                        <td>$${parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                        <td>$${parseFloat(item.line_total || (item.quantity * item.unit_price) || 0).toFixed(2)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              ` : (order.salesorderitem_set && order.salesorderitem_set.length > 0) ? `
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>SKU</th>
+                      <th>Quantity</th>
+                      <th>Unit Price</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${order.salesorderitem_set.map(item => `
+                      <tr>
+                        <td>${item.product_name || 'Product'}</td>
+                        <td>${item.product_sku || 'N/A'}</td>
+                        <td>${item.quantity || 0}</td>
+                        <td>$${parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                        <td>$${parseFloat((item.quantity * item.unit_price) || 0).toFixed(2)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              ` : `
+                <div style="text-align: center; padding: 20px; background-color: #f5f5f5; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0; color: #666; font-size: 14px;">
+                    <strong>Debug Info:</strong><br>
+                    Items: ${JSON.stringify(order.items || 'null')}<br>
+                    SalesOrderItemSet: ${JSON.stringify(order.salesorderitem_set || 'null')}<br>
+                    Order Keys: ${Object.keys(order).join(', ')}
+                  </p>
+                  <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+                  <p><strong>Product Information:</strong></p>
+                  <p>Order Total: $${parseFloat(order.total || 0).toFixed(2)}</p>
+                  <p>Payment Method: ${order.payment_method || 'N/A'}</p>
+                  <p><em>Product details will be loaded from backend API.</em></p>
+                </div>
+              `}
             </div>
-            ` : ''}
             <div class="section">
               <div class="section-title">Order Summary</div>
               <div class="detail-row"><span>Payment Method:</span><span>${order.payment_method || 'N/A'}</span></div>
@@ -299,6 +395,13 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
               <div>${order.notes}</div>
             </div>
             ` : ''}
+            
+            <div class="section" style="font-size: 11px; color: #666; text-align: center; margin-top: 30px;">
+              <div>Invoice generated on ${new Date().toLocaleString()}</div>
+              <div>Verification Code: ${barcodeData}</div>
+              <div>For support, contact: support@smarterp.com</div>
+            </div>
+            
             <div class="no-print" style="margin-top: 30px; text-align: center;">
               <button onclick="window.print()" style="padding: 10px 20px; background-color: #2196F3; color: white; border: none; border-radius: 4px;">Print Invoice</button>
               <button onclick="window.close()" style="padding: 10px 20px; margin-left: 10px; background-color: #666; color: white; border: none; border-radius: 4px;">Close</button>
@@ -316,6 +419,117 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
       onSnackbar('Failed to open print window. Please try again.', 'error');
     }
   };
+
+  const printReceipt = (order) => {
+    try {
+      const customer = customers.find(c => c.id === order.customer) || {};
+      const customerName = customer.name || 'N/A';
+      const salesAgentName = order.sales_agent_name || 'Sales Agent';
+      
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Receipt - ${order.order_number || order.id}</title>
+            <style>
+              body { font-family: 'Courier New', monospace; margin: 10px; font-size: 12px; line-height: 1.4; }
+              .receipt-header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 15px; }
+              .company-name { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+              .receipt-title { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+              .receipt-number { font-size: 12px; margin-bottom: 10px; }
+              .section { margin-bottom: 15px; }
+              .section-title { font-weight: bold; margin-bottom: 8px; text-decoration: underline; }
+              .detail-line { display: flex; justify-content: space-between; margin-bottom: 3px; }
+              .items-section { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; margin: 15px 0; }
+              .item-line { display: flex; justify-content: space-between; margin-bottom: 5px; }
+              .item-details { font-size: 11px; color: #666; margin-left: 10px; margin-bottom: 3px; }
+              .total-section { border-top: 1px solid #000; padding-top: 10px; margin-top: 15px; }
+              .total-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
+              .footer { text-align: center; margin-top: 20px; border-top: 1px dashed #000; padding-top: 10px; font-size: 10px; }
+              .no-print { display: block; text-align: center; margin-top: 20px; }
+              @media print { .no-print { display: none; } }
+            </style>
+          </head>
+          <body>
+            <div class="receipt-header">
+              <div class="company-name">SmartERP Software</div>
+              <div class="receipt-title">PAYMENT RECEIPT</div>
+              <div class="receipt-number">Receipt #${order.order_number || order.id}</div>
+              <div>${new Date().toLocaleString()}</div>
+            </div>
+            
+            <div class="section">
+              <div class="section-title">Customer Details</div>
+              <div class="detail-line"><span>Customer:</span><span>${customerName}</span></div>
+              <div class="detail-line"><span>Sales Agent:</span><span>${salesAgentName}</span></div>
+            </div>
+            
+            <div class="items-section">
+              <div class="section-title">Items Purchased</div>
+              ${order.items && order.items.length > 0 ? 
+                order.items.map(item => `
+                  <div class="item-line">
+                    <span>${item.product_name || 'Product'}</span>
+                    <span>$${parseFloat(item.line_total || (item.quantity * item.unit_price) || 0).toFixed(2)}</span>
+                  </div>
+                  <div class="item-details">
+                    SKU: ${item.product_sku || 'N/A'} | Qty: ${item.quantity || 0} | Unit: $${parseFloat(item.unit_price || 0).toFixed(2)}
+                  </div>
+                `).join('') : 
+                '<div>No items available</div>'
+              }
+            </div>
+            
+            <div class="section">
+              <div class="detail-line"><span>Subtotal:</span><span>$${parseFloat(order.subtotal || 0).toFixed(2)}</span></div>
+              ${order.discount_amount > 0 ? `<div class="detail-line"><span>Discount:</span><span>-$${parseFloat(order.discount_amount || 0).toFixed(2)}</span></div>` : ''}
+              <div class="total-section">
+                <div class="total-line"><span>TOTAL PAID:</span><span>$${parseFloat(order.total || 0).toFixed(2)}</span></div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <div class="detail-line"><span>Payment Method:</span><span>${order.payment_method?.toUpperCase() || 'N/A'}</span></div>
+              <div class="detail-line"><span>Payment Status:</span><span>${order.payment_status?.toUpperCase() || 'N/A'}</span></div>
+              <div class="detail-line"><span>Order Status:</span><span>${order.status?.toUpperCase() || 'N/A'}</span></div>
+            </div>
+            
+            <div class="footer">
+              <div>Thank you for your business!</div>
+              <div>SmartERP Software - Your Business Partner</div>
+              ${order.notes ? `<div style="margin-top: 10px;">Notes: ${order.notes}</div>` : ''}
+            </div>
+            
+            <div class="no-print">
+              <button onclick="window.print()" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; margin-right: 10px;">Print Receipt</button>
+              <button onclick="window.close()" style="padding: 8px 16px; background-color: #666; color: white; border: none; border-radius: 4px;">Close</button>
+            </div>
+          </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 250);
+      
+    } catch (error) {
+      console.error('Print receipt error:', error);
+      onSnackbar('Failed to open print window. Please try again.', 'error');
+    }
+  };
+
+  const refreshOrderStatus = async () => {
+    try {
+      await loadSalesOrders();
+    } catch (error) {
+      console.error('Error refreshing orders:', error);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(refreshOrderStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getStatusChip = (status) => {
     const statusConfig = {
@@ -540,6 +754,18 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
                               <PrintIcon />
                             </IconButton>
                           </Tooltip>
+                          
+                          {(order.payment_status === 'paid' && order.status === 'confirmed') && (
+                            <Tooltip title="Print Receipt">
+                              <IconButton
+                                size="small"
+                                color="success"
+                                onClick={() => printReceipt(order)}
+                              >
+                                <ReceiptIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -594,10 +820,10 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
                     <TableBody>
                       {selectedOrder.items.map((item, index) => (
                         <TableRow key={index}>
-                          <TableCell>{item.product_name || 'Product'}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>${item.product_name || 'Product'}</TableCell>
+                          <TableCell>${item.quantity}</TableCell>
                           <TableCell>${parseFloat(item.unit_price || 0).toFixed(2)}</TableCell>
-                          <TableCell>${(item.quantity * parseFloat(item.unit_price || 0)).toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.line_total || (item.quantity * item.unit_price) || 0).toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -690,17 +916,6 @@ const SalesOrdersManagement = ({ onSnackbar, customers, products }) => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Snackbar */}
-      {snackbar.open && (
-        <Alert
-          severity={snackbar.severity}
-          onClose={() => setSnackbar({...snackbar, open: false})}
-          sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999 }}
-        >
-          {snackbar.message}
-        </Alert>
-      )}
     </Box>
   );
 };

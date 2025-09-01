@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import React, { useContext, useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   AppBar, 
   Toolbar, 
@@ -58,6 +58,7 @@ import ResetPassword from './ResetPassword';
 import Inventory from './Inventory';
 import WarehouseTransfers from './WarehouseTransfers';
 import Dashboard from './Dashboard';
+import ExecutiveDashboard from './ExecutiveDashboard';
 import HRDashboard from './HR/HRDashboard';
 import InventoryDashboard from './InventoryDashboard';
 import SalesDashboard from './SalesDashboard';
@@ -131,7 +132,11 @@ const theme = createTheme({
 });
 
 function AppShell() {
-  const { user, logout } = useContext(AuthContext);
+  // Safe destructuring with fallback values
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user || null;
+  const logout = authContext?.logout || (() => {});
+  
   const location = useLocation();
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -296,7 +301,7 @@ function AppShell() {
     // Superusers and admins see everything
     if (user?.is_superuser || user?.role === 'superadmin' || user?.role === 'admin') {
       return [
-        { text: 'Dashboard', icon: <AssessmentIcon />, path: '/' },
+        { text: 'Executive Dashboard', icon: <AssessmentIcon />, path: '/executive-dashboard' },
         { text: 'Employee Dashboard', icon: <PersonIcon />, path: '/employee-dashboard' },
         {
           text: 'HR', icon: <PeopleIcon />, subItems: [
@@ -562,7 +567,7 @@ function AppShell() {
   }
 
   // Add authentication status check
-  const isAuthenticated = user;
+  const isAuthenticated = user && (user.id || user.username);
   
   // If not authenticated, show login screen instead of dashboards
   if (!isAuthenticated && location.pathname !== '/login') {
@@ -811,6 +816,7 @@ function AppShell() {
                 </ProtectedRoute>
               } />
               <Route path="/employee-dashboard" element={<ProtectedRoute><EmployeeDashboard /></ProtectedRoute>} />
+              <Route path="/executive-dashboard" element={<ProtectedRoute><ExecutiveDashboard /></ProtectedRoute>} />
               <Route path="/mobile-employee" element={<ProtectedRoute><MobileEmployeeApp /></ProtectedRoute>} />
               <Route path="/inventory" element={<ProtectedRoute><InventoryDashboard /></ProtectedRoute>} />
               <Route path="/inventory/management" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
@@ -889,18 +895,41 @@ function AppShell() {
 }
 
 function App() {
-  // Check if running on mobile platform
-  if (Capacitor.isNativePlatform()) {
-    return <MobileApp />;
-  }
+  const [mobileMode, setMobileMode] = React.useState(false);
+
+  React.useEffect(() => {
+    const isMobileMode = () => {
+      // Force desktop mode on port 3000
+      if (window.location.port === '3000') {
+        console.log("🖥️ Port 3000 detected - forcing desktop mode");
+        return false;
+      }
+      
+      const envMobileMode = process.env.REACT_APP_MOBILE_MODE === "true";
+      const isCapacitor = window.Capacitor !== undefined;
+      const urlMobile = window.location.pathname.includes("/mobile") || 
+                       window.location.search.includes("mobile=true");
+      
+      console.log("🔍 Mobile mode detection:", {
+        port: window.location.port,
+        envMobileMode,
+        isCapacitor,
+        urlMobile,
+        finalDecision: envMobileMode || isCapacitor || urlMobile
+      });
+      
+      return envMobileMode || isCapacitor || urlMobile;
+    };
+
+    setMobileMode(isMobileMode());
+  }, []);
 
   return (
     <AuthProvider>
       <Router>
-        <AppShell />
+        {mobileMode ? <MobileApp /> : <AppShell />}
       </Router>
     </AuthProvider>
   );
 }
-
 export default App;

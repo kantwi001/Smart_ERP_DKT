@@ -1,18 +1,23 @@
 // Shared data source for warehouses, products, and customers across all modules
 // This ensures consistency between Inventory, Sales, and other modules
+import { Capacitor } from '@capacitor/core';
 
-// Dynamic API base URL detection for mobile compatibility
+console.log('🔄 sharedData.js module loading...');
+
+// Dynamic API base URL detection for mobile compatibility - consistent with api.js
 const getApiBaseUrl = () => {
-  // Check if running in mobile app (Capacitor)
-  if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-    // For mobile apps, use the computer's IP address
-    return 'http://10.0.2.2:2025'; // Android emulator
+  // Mobile apps always use Fly.dev production backend
+  if (Capacitor.isNativePlatform()) {
+    return 'https://backend-shy-sun-4450.fly.dev/api';
   }
-  // For web browsers, use localhost
-  return 'http://localhost:2025';
+  
+  // Web app uses localhost for development
+  return 'http://localhost:2025/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+export { API_BASE_URL };
 
 // Global transaction storage with localStorage persistence
 export let sharedTransactions = JSON.parse(localStorage.getItem('sharedTransactions') || '[]');
@@ -23,105 +28,14 @@ let globalTransactionHistory = JSON.parse(localStorage.getItem('globalTransactio
 // Global payment history for workflow management
 let globalPaymentHistory = JSON.parse(localStorage.getItem('globalPaymentHistory') || '[]');
 
-// Global products state with immediate sample data
+// Global products state - NO SAMPLE DATA, only real PostgreSQL data
 let globalProducts = JSON.parse(localStorage.getItem('globalProducts') || '[]');
-if (globalProducts.length === 0) {
-  globalProducts = [
-    {
-      id: 1,
-      name: 'Smartphone',
-      sku: 'SP001',
-      unit_price: 299.99,
-      stock_quantity: 50,
-      warehouse_id: 1,
-      reorder_level: 10,
-      category: 'Electronics'
-    },
-    {
-      id: 2,
-      name: 'Laptop Computer', 
-      sku: 'LP002',
-      unit_price: 899.99,
-      stock_quantity: 25,
-      warehouse_id: 1,
-      reorder_level: 5,
-      category: 'Electronics'
-    },
-    {
-      id: 3,
-      name: 'Coffee Beans',
-      sku: 'CB003',
-      unit_price: 12.99,
-      stock_quantity: 100,
-      warehouse_id: 2,
-      reorder_level: 20,
-      category: 'Food & Beverage'
-    }
-  ];
-  localStorage.setItem('globalProducts', JSON.stringify(globalProducts));
-}
 
-// Global customers state with immediate sample data
+// Global customers state - NO SAMPLE DATA, only real PostgreSQL data
 export let sharedCustomers = JSON.parse(localStorage.getItem('sharedCustomers') || '[]');
-if (sharedCustomers.length === 0) {
-  sharedCustomers = [
-    {
-      id: 11,
-      name: 'Eddy Clinic',
-      email: 'edmundsekyere@gmail.com',
-      phone: '0505154709',
-      location: 'Dworwulu',
-      customer_type: 'wholesaler',
-      gps_coordinates: 'Available',
-      address: 'Dworwulu, Accra',
-      contact_person: 'Edmund Sekyere'
-    },
-    {
-      id: 12,
-      name: 'Emmanuel Hospital',
-      email: 'edmondsekyere@gmail.com', 
-      phone: '0245015626',
-      location: 'Achimota',
-      customer_type: 'distributor',
-      gps_coordinates: 'Not Available',
-      address: 'Achimota, Accra',
-      contact_person: 'Emmanuel Brown'
-    }
-  ];
-  localStorage.setItem('sharedCustomers', JSON.stringify(sharedCustomers));
-}
 
-// Global warehouses state with immediate sample data
+// Global warehouses state - NO SAMPLE DATA, only real PostgreSQL data
 let globalWarehouses = JSON.parse(localStorage.getItem('globalWarehouses') || '[]');
-if (globalWarehouses.length === 0) {
-  globalWarehouses = [
-    {
-      id: 1,
-      name: 'Main Warehouse',
-      location: 'Central Location',
-      capacity: 1000
-    },
-    {
-      id: 2,
-      name: 'North Distribution Center',
-      location: 'North Region',
-      capacity: 500
-    },
-    {
-      id: 3,
-      name: 'South Storage Facility',
-      location: 'South Region',
-      capacity: 750
-    },
-    {
-      id: 4,
-      name: 'West Depot',
-      location: 'West Region',
-      capacity: 600
-    }
-  ];
-  localStorage.setItem('globalWarehouses', JSON.stringify(globalWarehouses));
-}
 
 // Global transfer history
 let globalTransferHistory = JSON.parse(localStorage.getItem('globalTransferHistory') || '[]');
@@ -184,131 +98,36 @@ export const loadTransactionsFromBackend = async () => {
 
 // Product management functions - centralized for webapp and mobile apps
 export const loadProductsWithFallback = async (token) => {
+  console.log('loadProductsWithFallback function called with token:', token ? 'Token exists' : 'No token');
   try {
-    const response = await fetch('http://localhost:2025/api/inventory/products/', {
+    const authToken = token || localStorage.getItem('token') || sessionStorage.getItem('token');
+    console.log('Using token for products:', authToken ? 'Token exists' : 'No token');
+    
+    const response = await fetch(`${API_BASE_URL}/inventory/products/`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
     });
+
+    console.log('Products API response status:', response.status);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const products = await response.json();
+    console.log(`✅ Loaded ${products.length} products from backend`);
+    console.log('Sample product:', products[0]);
     
-    const products = await response.data || await response.json();
-    
-    // Fetch prices for each product and merge the data
-    const productsWithPrices = await Promise.all(
-      products.map(async (product) => {
-        try {
-          // Fetch prices for this product
-          const priceResponse = await fetch(`http://localhost:2025/api/inventory/product-prices/?product=${product.id}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          let price = 0;
-          let prices = [];
-          
-          if (priceResponse.ok) {
-            prices = await priceResponse.json();
-            // Get USD price if available, otherwise first available price
-            const usdPrice = prices.find(p => p.currency === 'USD');
-            price = usdPrice ? parseFloat(usdPrice.price) : (prices.length > 0 ? parseFloat(prices[0].price) : 0);
-          }
-          
-          // Fetch category name if needed
-          let categoryName = product.category;
-          if (typeof product.category === 'number') {
-            try {
-              const categoryResponse = await fetch(`http://localhost:2025/api/inventory/categories/${product.category}/`, {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              });
-              if (categoryResponse.ok) {
-                const categoryData = await categoryResponse.json();
-                categoryName = categoryData.name;
-              }
-            } catch (categoryError) {
-              console.warn('Failed to fetch category name:', categoryError);
-            }
-          }
-          
-          return {
-            ...product,
-            price: price,
-            prices: prices,
-            category_name: categoryName,
-            // Calculate profit margin if cost is available
-            profit_margin: product.cost && price ? ((price - product.cost) / price * 100) : 0,
-            // Determine stock status
-            status: product.quantity === 0 ? 'out_of_stock' : 
-                   product.quantity <= (product.min_stock || 0) ? 'low_stock' : 'active'
-          };
-        } catch (error) {
-          console.warn(`Failed to fetch price for product ${product.id}:`, error);
-          return {
-            ...product,
-            price: 0,
-            prices: [],
-            category_name: typeof product.category === 'string' ? product.category : 'Unknown',
-            profit_margin: 0,
-            status: product.quantity === 0 ? 'out_of_stock' : 
-                   product.quantity <= (product.min_stock || 0) ? 'low_stock' : 'active'
-          };
-        }
-      })
-    );
-    
-    console.log('Products loaded with prices:', productsWithPrices);
-    return productsWithPrices;
+    // Cache the products
+    globalProducts.length = 0;
+    globalProducts.push(...products);
+    localStorage.setItem('globalProducts', JSON.stringify(products));
+    return products;
   } catch (error) {
-    console.error('Failed to load products from API:', error);
-    
-    // Fallback to sample data
-    return [
-      {
-        id: 1,
-        name: 'Sample Product 1',
-        sku: 'SAMPLE-001',
-        description: 'Sample product for testing',
-        category: 'Electronics',
-        category_name: 'Electronics',
-        price: 100.00,
-        cost: 60.00,
-        quantity: 50,
-        min_stock: 10,
-        max_stock: 100,
-        status: 'active',
-        profit_margin: 40.0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        prices: [{ currency: 'USD', price: 100.00 }]
-      },
-      {
-        id: 2,
-        name: 'Sample Product 2',
-        sku: 'SAMPLE-002',
-        description: 'Another sample product',
-        category: 'Office Supplies',
-        category_name: 'Office Supplies',
-        price: 25.00,
-        cost: 15.00,
-        quantity: 5,
-        min_stock: 10,
-        max_stock: 50,
-        status: 'low_stock',
-        profit_margin: 40.0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        prices: [{ currency: 'USD', price: 25.00 }]
-      }
-    ];
+    console.error('❌ Error loading products:', error);
+    return [];
   }
 };
 
@@ -316,40 +135,237 @@ export const getGlobalProducts = () => {
   return [...globalProducts];
 };
 
-export const updateGlobalProduct = (productId, updates) => {
-  const index = globalProducts.findIndex(p => p.id === productId);
-  if (index !== -1) {
-    globalProducts[index] = { ...globalProducts[index], ...updates };
+// Enhanced product update function with cross-module synchronization
+export const updateGlobalProduct = (updatedProduct) => {
+  try {
+    // Update global products array
+    const productIndex = globalProducts.findIndex(p => p.id === updatedProduct.id);
+    if (productIndex !== -1) {
+      globalProducts[productIndex] = { ...globalProducts[productIndex], ...updatedProduct };
+    } else {
+      globalProducts.push(updatedProduct);
+    }
+    
+    // Save to localStorage
     saveProductsToStorage();
+    
+    // Update window global state
+    if (window.globalProducts) {
+      window.globalProducts = [...globalProducts];
+    }
+    
+    // Dispatch event for all modules to sync
+    window.dispatchEvent(new CustomEvent('productsUpdated', { 
+      detail: { 
+        products: [...globalProducts], 
+        updatedProduct,
+        source: 'product_edit',
+        action: 'update'
+      } 
+    }));
+    
+    // Also dispatch specific product update event
+    window.dispatchEvent(new CustomEvent('productUpdated', { 
+      detail: { 
+        product: updatedProduct,
+        source: 'shared_data'
+      } 
+    }));
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating global product:', error);
+    return false;
+  }
+};
+
+// Enhanced product creation function
+export const createGlobalProduct = (newProduct) => {
+  try {
+    // Generate new ID if not provided
+    if (!newProduct.id) {
+      const maxId = Math.max(0, ...globalProducts.map(p => p.id || 0));
+      newProduct.id = maxId + 1;
+    }
+    
+    // Add to global products
+    globalProducts.push(newProduct);
+    
+    // Save to localStorage
+    saveProductsToStorage();
+    
+    // Update window global state
+    if (window.globalProducts) {
+      window.globalProducts = [...globalProducts];
+    }
+    
+    // Dispatch events for all modules
+    window.dispatchEvent(new CustomEvent('productsUpdated', { 
+      detail: { 
+        products: [...globalProducts], 
+        newProduct,
+        source: 'product_create',
+        action: 'create'
+      } 
+    }));
+    
+    window.dispatchEvent(new CustomEvent('productCreated', { 
+      detail: { 
+        product: newProduct,
+        source: 'shared_data'
+      } 
+    }));
+    
+    return newProduct;
+  } catch (error) {
+    console.error('Error creating global product:', error);
+    return null;
+  }
+};
+
+// Enhanced product deletion function
+export const deleteGlobalProduct = (productId) => {
+  try {
+    const productIndex = globalProducts.findIndex(p => p.id === productId);
+    if (productIndex === -1) {
+      return false;
+    }
+    
+    const deletedProduct = globalProducts[productIndex];
+    globalProducts.splice(productIndex, 1);
+    
+    // Save to localStorage
+    saveProductsToStorage();
+    
+    // Update window global state
+    if (window.globalProducts) {
+      window.globalProducts = [...globalProducts];
+    }
+    
+    // Dispatch events for all modules
+    window.dispatchEvent(new CustomEvent('productsUpdated', { 
+      detail: { 
+        products: [...globalProducts], 
+        deletedProduct,
+        source: 'product_delete',
+        action: 'delete'
+      } 
+    }));
+    
+    window.dispatchEvent(new CustomEvent('productDeleted', { 
+      detail: { 
+        product: deletedProduct,
+        source: 'shared_data'
+      } 
+    }));
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting global product:', error);
+    return false;
+  }
+};
+
+// Update warehouse stock with cross-module sync
+export const updateWarehouseStock = (warehouseId, productId, newQuantity, notes = '') => {
+  try {
+    // Find and update the product in the specific warehouse
+    const productIndex = globalProducts.findIndex(p => 
+      p.id === productId && p.warehouse_id === warehouseId
+    );
+    
+    if (productIndex !== -1) {
+      const oldQuantity = globalProducts[productIndex].quantity || 0;
+      globalProducts[productIndex].quantity = newQuantity;
+      globalProducts[productIndex].last_updated = new Date().toISOString();
+      
+      // Create stock movement record
+      const stockMovement = {
+        id: Date.now(),
+        product_id: productId,
+        product_name: globalProducts[productIndex].name,
+        product_sku: globalProducts[productIndex].sku,
+        warehouse_id: warehouseId,
+        warehouse_name: globalProducts[productIndex].warehouse_name,
+        movement_type: 'adjustment',
+        quantity_change: newQuantity - oldQuantity,
+        previous_stock: oldQuantity,
+        new_stock: newQuantity,
+        notes: notes,
+        created_at: new Date().toISOString(),
+        created_by: 'System'
+      };
+      
+      // Add to transfer history
+      addTransferToHistory(stockMovement);
+      
+      // Save to localStorage
+      saveProductsToStorage();
+      
+      // Update window global state
+      if (window.globalProducts) {
+        window.globalProducts = [...globalProducts];
+      }
+      
+      // Dispatch events for all modules
+      window.dispatchEvent(new CustomEvent('productsUpdated', { 
+        detail: { 
+          products: [...globalProducts], 
+          source: 'stock_update',
+          action: 'stock_adjustment'
+        } 
+      }));
+      
+      window.dispatchEvent(new CustomEvent('stockMovementAdded', { 
+        detail: { 
+          movement: stockMovement,
+          source: 'shared_data'
+        } 
+      }));
+      
+      return stockMovement;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error updating warehouse stock:', error);
+    return null;
   }
 };
 
 // Customer management functions
 export const loadCustomersWithFallback = async () => {
+  console.log('loadCustomersWithFallback function called');
   try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    console.log('Token for customers:', token ? 'Token exists' : 'No token');
+    
     const response = await fetch(`${API_BASE_URL}/sales/customers/`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
-    if (response.ok) {
-      const customers = await response.json();
-      sharedCustomers.length = 0;
-      sharedCustomers.push(...customers);
-      saveCustomersToStorage();
-      console.log(`Loaded ${customers.length} customers from backend`);
-      return customers;
-    } else {
-      console.warn(`Customers API returned ${response.status}: ${response.statusText}`);
+
+    console.log('Customers API response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const customers = await response.json();
+    console.log(`✅ Loaded ${customers.length} customers from backend`);
+    console.log('Sample customer:', customers[0]);
+    
+    // Cache the customers
+    sharedCustomers.length = 0;
+    sharedCustomers.push(...customers);
+    localStorage.setItem('sharedCustomers', JSON.stringify(customers));
+    return customers;
   } catch (error) {
-    console.warn('Failed to load customers from backend:', error);
+    console.error('❌ Error loading customers:', error);
+    return [];
   }
-  
-  // Always ensure we have customers data
-  console.log(`Using ${sharedCustomers.length} cached/sample customers`);
-  return [...sharedCustomers];
 };
 
 export const addCustomer = (customer) => {
@@ -376,6 +392,7 @@ export const addCustomer = (customer) => {
 
 // Warehouse management functions
 export const loadWarehousesWithFallback = async () => {
+  console.log('loadWarehousesWithFallback function called');
   try {
     const response = await fetch(`${API_BASE_URL}/warehouse/`, {
       headers: {
@@ -383,23 +400,27 @@ export const loadWarehousesWithFallback = async () => {
         'Content-Type': 'application/json',
       },
     });
-    if (response.ok) {
-      const warehouses = await response.json();
-      globalWarehouses.length = 0;
-      globalWarehouses.push(...warehouses);
-      saveWarehousesToStorage();
-      console.log(`Loaded ${warehouses.length} warehouses from backend`);
-      return warehouses;
-    } else {
-      console.warn(`Warehouses API returned ${response.status}: ${response.statusText}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const warehouses = await response.json();
+    console.log(`Loaded ${warehouses.length} warehouses from backend`);
+    
+    // Cache the warehouses
+    globalWarehouses = warehouses;
+    return warehouses;
   } catch (error) {
-    console.warn('Failed to load warehouses from backend:', error);
+    console.error('Error loading warehouses:', error);
+    return [];
   }
-  
-  // Always ensure we have warehouses data
-  console.log(`Using ${globalWarehouses.length} cached/sample warehouses`);
-  return [...globalWarehouses];
+};
+
+// Test function to verify module loading
+export const testWarehouseFunction = () => {
+  console.log('testWarehouseFunction is working - module loaded correctly');
+  return 'test-success';
 };
 
 // Transfer management functions
@@ -699,3 +720,145 @@ export const getAllDataSync = () => {
     warehouses: [...globalWarehouses]
   };
 };
+
+// Load warehouses with their stock data for proper synchronization
+export const loadWarehousesWithStock = async (token) => {
+  try {
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+    
+    if (!token) {
+      console.warn('No authentication token found');
+      return { warehouses: [], products: [] };
+    }
+
+    // Load warehouses
+    const warehouseResponse = await fetch(`${API_BASE_URL}/warehouse/`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!warehouseResponse.ok) {
+      throw new Error(`HTTP error! status: ${warehouseResponse.status}`);
+    }
+
+    const warehousesData = await warehouseResponse.json();
+    
+    // Load warehouse stock data
+    const stockResponse = await fetch(`${API_BASE_URL}/warehouse/stock/`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    let warehouseStocks = [];
+    if (stockResponse.ok) {
+      const stockData = await stockResponse.json();
+      warehouseStocks = stockData;
+    }
+
+    // Load all products
+    const productsResponse = await fetch(`${API_BASE_URL}/inventory/products/`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    let allProducts = [];
+    if (productsResponse.ok) {
+      allProducts = await productsResponse.json();
+    }
+
+    // Create warehouse-specific product data
+    const warehousesWithStock = warehousesData.map(warehouse => {
+      const warehouseStockItems = warehouseStocks.filter(stock => stock.warehouse === warehouse.id);
+      
+      // Create products with warehouse-specific quantities
+      const warehouseProducts = warehouseStockItems.map(stockItem => {
+        const baseProduct = allProducts.find(p => p.id === stockItem.product);
+        if (!baseProduct) return null;
+        
+        return {
+          ...baseProduct,
+          warehouse_id: warehouse.id,
+          warehouse_name: warehouse.name,
+          quantity: stockItem.quantity, // Use warehouse-specific quantity
+          reserved_quantity: stockItem.reserved_quantity || 0,
+          available_quantity: Math.max(0, stockItem.quantity - (stockItem.reserved_quantity || 0)),
+          min_stock: stockItem.min_stock_level || baseProduct.min_stock || 10,
+          max_stock: stockItem.max_stock_level || baseProduct.max_stock,
+          is_low_stock: stockItem.quantity <= (stockItem.min_stock_level || 10),
+          is_out_of_stock: stockItem.quantity === 0,
+          stock_location: stockItem.location,
+          last_updated: stockItem.last_updated
+        };
+      }).filter(Boolean);
+
+      return {
+        ...warehouse,
+        stock_items: warehouseStockItems,
+        products: warehouseProducts,
+        total_products: warehouseProducts.length,
+        total_stock: warehouseProducts.reduce((sum, item) => sum + (item.quantity || 0), 0),
+        low_stock_items: warehouseProducts.filter(item => item.is_low_stock).length,
+        out_of_stock_items: warehouseProducts.filter(item => item.is_out_of_stock).length,
+        stock_value: warehouseProducts.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unit_price || item.cost || 0)), 0)
+      };
+    });
+
+    // Create unified product list with warehouse information
+    const unifiedProducts = [];
+    warehousesWithStock.forEach(warehouse => {
+      warehouse.products.forEach(product => {
+        unifiedProducts.push(product);
+      });
+    });
+
+    return {
+      warehouses: warehousesWithStock,
+      products: unifiedProducts
+    };
+
+  } catch (error) {
+    console.error('Error loading warehouses with stock:', error);
+    return { warehouses: [], products: [] };
+  }
+};
+
+// Update existing loadProductsWithFallback to use warehouse-specific data
+export const loadProductsWithWarehouseStock = async (token) => {
+  try {
+    const { products } = await loadWarehousesWithStock(token);
+    
+    // Update global products state
+    if (window.globalProducts) {
+      window.globalProducts = products;
+    }
+    
+    // Dispatch event for other modules to update
+    window.dispatchEvent(new CustomEvent('productsUpdated', { 
+      detail: { products, source: 'warehouse_stock' } 
+    }));
+    
+    return products;
+  } catch (error) {
+    console.error('Error loading products with warehouse stock:', error);
+    return loadProductsWithFallback(token); // Fallback to original method
+  }
+};
+
+// Verify all exports are defined
+console.log('✅ sharedData.js exports verified:', {
+  loadWarehousesWithFallback: typeof loadWarehousesWithFallback,
+  loadProductsWithFallback: typeof loadProductsWithFallback,
+  loadCustomersWithFallback: typeof loadCustomersWithFallback,
+  testWarehouseFunction: typeof testWarehouseFunction
+});

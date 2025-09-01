@@ -507,7 +507,8 @@ const FinanceDashboard = () => {
           const newPaymentStatus = remainingBalance <= 0.01 ? 'paid' : 'partial';
           
           await api.patch(`/sales/sales-orders/${payment.sales_order}/`, {
-            payment_status: newPaymentStatus
+            payment_status: newPaymentStatus,
+            status: newPaymentStatus === 'paid' ? 'confirmed' : 'pending'
           });
           
           console.log(`Sales order ${salesOrder.order_number} payment status updated to: ${newPaymentStatus}`);
@@ -2272,7 +2273,22 @@ const FinanceDashboard = () => {
                         <TableCell>{invoice.customer}</TableCell>
                         <TableCell>{formatCurrency(invoice.amount)}</TableCell>
                         <TableCell>{invoice.dueDate}</TableCell>
-                        <TableCell>{invoice.daysOverdue || '-'}</TableCell>
+                        <TableCell>
+                          {invoice.dueDate ? (() => {
+                            const today = new Date();
+                            const dueDate = new Date(invoice.dueDate);
+                            const diffTime = today - dueDate;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            if (diffDays > 0) {
+                              return `${diffDays} days`;
+                            } else if (diffDays === 0) {
+                              return 'Due today';
+                            } else {
+                              return `${Math.abs(diffDays)} days remaining`;
+                            }
+                          })() : '-'}
+                        </TableCell>
                         <TableCell>
                           <Chip 
                             label={invoice.status} 
@@ -2324,7 +2340,22 @@ const FinanceDashboard = () => {
                       <TableCell>{invoice.customer}</TableCell>
                       <TableCell>${invoice.amount.toLocaleString()}</TableCell>
                       <TableCell>{invoice.dueDate}</TableCell>
-                      <TableCell>{invoice.daysOverdue || '-'}</TableCell>
+                      <TableCell>
+                        {invoice.dueDate ? (() => {
+                          const today = new Date();
+                          const dueDate = new Date(invoice.dueDate);
+                          const diffTime = today - dueDate;
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                          
+                          if (diffDays > 0) {
+                            return `${diffDays} days`;
+                          } else if (diffDays === 0) {
+                            return 'Due today';
+                          } else {
+                            return `${Math.abs(diffDays)} days remaining`;
+                          }
+                        })() : '-'}
+                      </TableCell>
                       <TableCell>
                         <Chip 
                           label={invoice.status} 
@@ -2373,7 +2404,22 @@ const FinanceDashboard = () => {
                         <TableCell>{invoice.customer}</TableCell>
                         <TableCell>{formatCurrency(invoice.amount)}</TableCell>
                         <TableCell>{invoice.dueDate}</TableCell>
-                        <TableCell>{invoice.daysOverdue || '-'}</TableCell>
+                        <TableCell>
+                          {invoice.dueDate ? (() => {
+                            const today = new Date();
+                            const dueDate = new Date(invoice.dueDate);
+                            const diffTime = today - dueDate;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            if (diffDays > 0) {
+                              return `${diffDays} days`;
+                            } else if (diffDays === 0) {
+                              return 'Due today';
+                            } else {
+                              return `${Math.abs(diffDays)} days remaining`;
+                            }
+                          })() : '-'}
+                        </TableCell>
                         <TableCell>
                           <Chip 
                             label={invoice.status} 

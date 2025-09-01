@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import api from './api';
+import { getApiBaseUrl } from './api';
 import { AuthContext } from './AuthContext';
 import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, IconButton, Chip, Select } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -119,7 +120,7 @@ const Users = () => {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:2025/api/users/', {
+      const response = await fetch(`${getApiBaseUrl()}/users/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

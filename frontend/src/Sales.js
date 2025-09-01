@@ -21,7 +21,7 @@ const Sales = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await api.get('/products/', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.get('/inventory/products/', { headers: { Authorization: `Bearer ${token}` } });
       setProducts(res.data);
     } catch {}
   };

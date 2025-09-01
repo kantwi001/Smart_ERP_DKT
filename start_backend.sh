@@ -47,6 +47,15 @@ else:
     print('Admin user already exists')
 "
 
-# Start the Django server
-echo "============================================"
-python manage.py runserver 0.0.0.0:2025
+# Check for Python command availability
+if command -v python3 &> /dev/null; then
+    echo "Using python3 command"
+    python3 manage.py runserver 0.0.0.0:2025
+elif command -v python &> /dev/null; then
+    echo "Using python command"
+    python manage.py runserver 0.0.0.0:2025
+else
+    echo "Error: Neither python nor python3 command found"
+    echo "Please install Python or check your PATH"
+    exit 1
+fi

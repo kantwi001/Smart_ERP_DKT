@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
           
           // Validate token with server
           try {
-            const userRes = await api.get('/users/me/', {   
+            const userRes = await api.get('/api/users/me/', {   
               headers: { Authorization: `Bearer ${storedToken}` } 
             });
             setUser(userRes.data);
@@ -129,6 +129,9 @@ export const AuthProvider = ({ children }) => {
               await secureStorage.clearAuthData();
               setToken(null);
               setUser(null);
+            } else {
+              console.log('Token validation error (non-401):', err.message);
+              setError('Failed to validate user session');
             }
           }
         }
@@ -144,8 +147,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (token && !user) {
-      api.get('/users/me/', { headers: { Authorization: `Bearer ${token}` } })
+      api.get('/api/users/me/', { headers: { Authorization: `Bearer ${token}` } })
         .then(res => {
+          console.log('[AuthContext] Fetching user profile with token');
+          console.log('[AuthContext] User profile request headers:', res.config.headers);
+          console.log('[AuthContext] User profile request URL:', res.config.url);
+          console.log('[AuthContext] User profile response status:', res.status);
+          console.log('[AuthContext] User profile response:', res.data);
           setUser(res.data);
           // Load system settings if user is superuser
           if (res.data?.is_superuser) {
@@ -160,6 +168,10 @@ export const AuthProvider = ({ children }) => {
             setToken(null);
             setUser(null);
             secureStorage.clearAuthData();
+          } else {
+            // For other errors, don't clear the token - just log the error
+            console.log('Token validation error (non-401):', err.message);
+            setError('Failed to validate user session');
           }
         });
     }
@@ -217,32 +229,45 @@ export const AuthProvider = ({ children }) => {
     console.log('[AuthContext] API Base URL:', api.defaults.baseURL);
     
     try {
-      console.log('[AuthContext] Sending login request to /token/');
-      const res = await api.post('/token/', { username, password });
-      console.log('[AuthContext] Login response:', res.data);
+      console.log('[AuthContext] Sending login request to /api/token/');
+      const response = await api.post('/api/token/', { username, password });
+      console.log('[AuthContext] Login response:', response.data);
       
-      setToken(res.data.access);
+      const token = response.data.access;
+      setToken(token);
       
+      // Store token immediately so API client can access it
+      localStorage.setItem('token', token);
+      
+      // Wait for token to be set, then fetch user profile
       console.log('[AuthContext] Fetching user profile with token');
-      const userRes = await api.get('/users/me/', { headers: { Authorization: `Bearer ${res.data.access}` } });
-      console.log('[AuthContext] User profile response:', userRes.data);
-      
-      setUser(userRes.data);
-      
-      // Load system settings if user is superuser
-      if (userRes.data?.is_superuser) {
-        await fetchSystemSettings();
+      try {
+        const userRes = await api.get('/api/users/me/', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log('[AuthContext] User profile response:', userRes.data);
+        
+        setUser(userRes.data);
+        
+        // Load system settings if user is superuser
+        if (userRes.data?.is_superuser) {
+          await fetchSystemSettings();
+        }
+        
+        // Store authentication data securely
+        await secureStorage.setAuthToken(token);
+        await secureStorage.setUserData(userRes.data);
+        await secureStorage.setRememberLogin(rememberMe);
+        
+        console.log('[AuthContext] Login successful');
+      } catch (userErr) {
+        console.error('[AuthContext] User profile fetch failed:', userErr);
+        console.error('[AuthContext] User error response:', userErr.response?.data);
+        console.error('[AuthContext] User error status:', userErr.response?.status);
+        
+        // Still set the token but show error
+        setError('Failed to load user profile');
       }
-      
-      // Store authentication data securely
-      await secureStorage.setAuthToken(res.data.access);
-      await secureStorage.setUserData(userRes.data);
-      await secureStorage.setRememberLogin(rememberMe);
-      
-      // Keep localStorage for backward compatibility on web
-      localStorage.setItem('token', res.data.access);
-      
-      console.log('[AuthContext] Login successful');
     } catch (err) {
       console.error('[AuthContext] Login error:', err);
       console.error('[AuthContext] Error response:', err.response?.data);

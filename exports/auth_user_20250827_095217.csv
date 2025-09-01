@@ -1,0 +1,2 @@
+id,password,last_login,is_superuser,username,first_name,last_name,email,is_staff,is_active,date_joined,role,phone,department_id,accessible_modules,is_module_restricted,last_module_update,assigned_warehouse_id,address,bio,date_of_birth,emergency_contact_name,emergency_contact_phone,employee_id,hire_date,profile_picture
+1,pbkdf2_sha256$1000000$tQeLIPjU72yuruulD0EyIf$yXa6Okbhviv616RaDQqI8+59p7TvQHPGWoMLaAllKCo=,,t,arkucollins,Collins,Arku,arkucollins@gmail.com,t,t,2025-08-26 20:55:35.873778+00,employee,"",,[],f,2025-08-26 22:15:26.053622+00,,"","",,"","",,,""

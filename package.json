@@ -21,6 +21,10 @@
   "author": "Anonymous",
   "license": "MIT",
   "devDependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/cli": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/ios": "^7.4.3",
     "concurrently": "^9.2.0"
   }
 }

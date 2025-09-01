@@ -9,8 +9,7 @@ import NetworkSync from './components/NetworkSync';
 import { 
   loadTransactionsFromBackend, 
   loadProductsWithFallback, 
-  loadCustomersWithFallback, 
-  loadWarehousesWithFallback 
+  loadCustomersWithFallback 
 } from './sharedData';
 
 const MainDashboard = () => {
@@ -26,8 +25,7 @@ const MainDashboard = () => {
       await Promise.all([
         loadTransactionsFromBackend(),
         loadProductsWithFallback(),
-        loadCustomersWithFallback(),
-        loadWarehousesWithFallback()
+        loadCustomersWithFallback()
       ]);
       
       console.log('Dashboard data loaded successfully');

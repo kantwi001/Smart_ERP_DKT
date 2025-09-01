@@ -22,6 +22,7 @@ import WorkflowIcon from '@mui/icons-material/AccountTree';
 import api from './api';
 import { AuthContext } from './AuthContext';
 import WorkflowApprovalProcess from './components/workflows/WorkflowApprovalProcess';
+import { getApiBaseUrl } from './api';
 
 // Styled components
 const StyledTabs = styled(Tabs)(({ theme }) => ({
@@ -260,7 +261,7 @@ const SystemSettingsDashboard = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:2025/api/users/system/smtp/test/', {
+      const response = await fetch(`${getApiBaseUrl()}/users/system/smtp/test/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

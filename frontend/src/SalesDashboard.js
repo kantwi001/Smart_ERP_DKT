@@ -55,10 +55,24 @@ import CustomerCreationForm from './components/CustomerCreationForm';
 import CustomerHeatMap from './components/CustomerHeatMap';
 import L from 'leaflet';
 import offlineStorage from './utils/offlineStorage';
-import { getGlobalProducts, loadProductsWithFallback, loadCustomersWithFallback, sharedCustomers, updateGlobalProduct } from './sharedData';
+import { getGlobalProducts, loadProductsWithFallback, loadCustomersWithFallback, sharedCustomers, updateGlobalProduct, testWarehouseFunction } from './sharedData';
 import QuickActionDialogs from './QuickActionDialogs';
 import SalesOrdersManagement from './components/SalesOrdersManagement';
 import WarehouseTransferModule from './WarehouseTransferModule';
+import SalesReports from './SalesReports';
+
+// Temporary workaround for loadWarehousesWithFallback import issue
+const loadWarehousesWithFallbackLocal = async () => {
+  try {
+    const response = await api.get('/warehouse/');
+    const warehouses = response.data;
+    console.log(`Loaded ${warehouses.length} warehouses from backend`);
+    return warehouses;
+  } catch (error) {
+    console.warn('Failed to load warehouses from backend:', error);
+    return [];
+  }
+};
 
 // Styled components for modern design
 const StyledTabs = styled(Tabs)(({ theme }) => ({
@@ -179,7 +193,7 @@ const SalesDashboard = () => {
   const [transactionsDialogOpen, setTransactionsDialogOpen] = useState(false);
   const [customerHeatMapDialogOpen, setCustomerHeatMapDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedAgent, setSelectedAgent] = useState('agent1');
+  const [selectedAgent, setSelectedAgent] = useState(1);
 
   // Sales Order State
   const [orderProducts, setOrderProducts] = useState([{ product: null, quantity: 1 }]);
@@ -223,16 +237,103 @@ const SalesDashboard = () => {
   };
 
   const loadProducts = async () => {
-    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Loading products with token:', token ? 'Token exists' : 'No token found');
+      
+      // Load products and warehouses separately
+      console.log('Calling loadProductsWithFallback...');
+      const warehouseProducts = await loadProductsWithFallback(token);
+      console.log('Products loaded:', warehouseProducts?.length || 0);
+      
+      console.log('Calling loadWarehousesWithFallback...');
+      const warehousesData = await loadWarehousesWithFallbackLocal();
+      console.log('Warehouses loaded:', warehousesData?.length || 0);
+      
+      setProducts(warehouseProducts || []);
+      setWarehouses(warehousesData || []);
+      
+      // Update global state for synchronization
+      if (window.globalProducts) {
+        window.globalProducts = warehouseProducts;
+      }
+      if (window.globalWarehouses) {
+        window.globalWarehouses = warehousesData;
+      }
+      
+      // Dispatch events for other modules to sync
+      window.dispatchEvent(new CustomEvent('productsUpdated', { 
+        detail: { products: warehouseProducts, source: 'sales_dashboard' } 
+      }));
+      
+      setSnackbar({
+        open: true,
+        message: 'Stock data refreshed successfully',
+        severity: 'success'
+      });
+      
+    } catch (error) {
+      console.error('Error loading products:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Fallback to original method
+      try {
+        console.log('Attempting fallback loading...');
+        const fallbackProducts = await loadProductsWithFallback(localStorage.getItem('token'));
+        const fallbackWarehouses = await loadWarehousesWithFallbackLocal();
+        
+        setProducts(fallbackProducts || []);
+        setWarehouses(fallbackWarehouses || []);
+        
+        setSnackbar({
+          open: true,
+          message: 'Stock data loaded (fallback mode)',
+          severity: 'warning'
+        });
+      } catch (fallbackError) {
+        console.error('Fallback loading failed:', fallbackError);
+        console.error('Fallback error details:', {
+          message: fallbackError.message,
+          stack: fallbackError.stack,
+          name: fallbackError.name
+        });
+        setSnackbar({
+          open: true,
+          message: 'Failed to load inventory data. Please try again.',
+          severity: 'error'
+        });
+      }
+    }
+  };
+
+  const refreshProductData = async () => {
     try {
       const productsData = await loadProductsWithFallback(token);
-      setProducts(productsData);
-      console.log('Products loaded in SalesDashboard:', productsData);
+      setProducts(productsData || []);
+      console.log('Products refreshed after warehouse operation:', productsData?.length || 0, 'products');
+      
+      // Dispatch event to sync with other modules
+      window.dispatchEvent(new CustomEvent('productsUpdated', { 
+        detail: productsData || [] 
+      }));
+      
+      // Show success message
+      setSnackbar({ 
+        open: true, 
+        message: `Stock data refreshed - ${productsData?.length || 0} products loaded`, 
+        severity: 'success' 
+      });
     } catch (error) {
-      console.error('Failed to load products:', error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
+      console.error('Failed to refresh products:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Failed to refresh stock data', 
+        severity: 'error' 
+      });
     }
   };
 
@@ -280,16 +381,17 @@ const SalesDashboard = () => {
       const salesOrders = salesResponse.data || [];
       
       // Calculate sales metrics
-      const totalSales = salesOrders.reduce((sum, order) => sum + parseFloat(order.total || 0), 0);
-      const pendingSales = salesOrders.filter(order => order.status === 'pending').length;
-      const completedSales = salesOrders.filter(order => order.status === 'completed').length;
+      const totalSales = (salesOrders || []).reduce((sum, order) => sum + parseFloat(order.total || 0), 0);
+      const pendingSales = (salesOrders || []).filter(order => order.status === 'pending').length;
+      const completedSales = (salesOrders || []).filter(order => order.status === 'completed').length;
       
       setSalesData({
         totalOrders: salesOrders.length,
         totalValue: totalSales,
+        total_revenue: totalSales.toFixed(2), // Add total_revenue for display
         pendingOrders: pendingSales,
         completedOrders: completedSales,
-        recentOrders: salesOrders.slice(0, 5)
+        recentOrders: (salesOrders || []).slice(0, 5)
       });
       
       console.log('Sales data loaded:', { totalOrders: salesOrders.length, totalValue: totalSales });
@@ -298,6 +400,7 @@ const SalesDashboard = () => {
       setSalesData({
         totalOrders: 0,
         totalValue: 0,
+        total_revenue: 0, // Add total_revenue for display
         pendingOrders: 0,
         completedOrders: 0,
         recentOrders: []
@@ -306,12 +409,135 @@ const SalesDashboard = () => {
   };
 
   const loadAgentProducts = () => {
-    const currentAgent = salesAgents.find(agent => agent.id === selectedAgent);
+    const currentAgent = (salesAgents || []).find(agent => agent.id === selectedAgent);
     if (currentAgent) {
       const warehouseId = currentAgent.assigned_warehouse_id;
-      setAssignedWarehouse(warehouses.find(w => w.id === warehouseId));
+      setAssignedWarehouse((warehouses || []).find(w => w.id === warehouseId));
       const agentProds = getGlobalProducts();
       setAgentProducts(agentProds);
+    }
+  };
+
+  const loadAgentAnalytics = async () => {
+    try {
+      const currentAgent = (salesAgents || []).find(agent => agent.id === selectedAgent);
+      if (!currentAgent) return;
+
+      // Get sales orders for the current agent
+      const salesResponse = await api.get('/sales/sales-orders/');
+      const allSalesOrders = salesResponse.data || [];
+      
+      // Get payments data
+      const paymentsResponse = await api.get('/sales/payments/');
+      const allPayments = paymentsResponse.data || [];
+      
+      // Get finance transactions for aging analysis
+      const financeResponse = await api.get('/sales/finance-transactions/');
+      const allFinanceTransactions = financeResponse.data || [];
+      
+      // Filter sales orders by agent (assuming agent info is stored in sales orders)
+      // For now, we'll calculate based on assigned warehouse or use agent name matching
+      const agentSalesOrders = (allSalesOrders || []).filter(order => {
+        // Match by agent name, email, or assigned warehouse
+        return order.sales_agent === currentAgent.name || 
+               order.agent_email === currentAgent.email ||
+               order.warehouse_id === currentAgent.assigned_warehouse_id;
+      });
+
+      // Calculate agent-specific metrics
+      const totalRevenue = (agentSalesOrders || []).reduce((sum, order) => sum + parseFloat(order.total || 0), 0);
+      const totalOrders = agentSalesOrders.length;
+      const completedOrders = (agentSalesOrders || []).filter(order => order.status === 'completed').length;
+      const pendingOrders = (agentSalesOrders || []).filter(order => order.status === 'pending').length;
+      
+      // Calculate completed transactions with payments
+      const completedWithPayments = (agentSalesOrders || []).filter(order => {
+        const orderPayments = (allPayments || []).filter(payment => 
+          payment.sales_order === order.id && payment.status === 'completed'
+        );
+        const totalPaid = orderPayments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+        return totalPaid >= parseFloat(order.total || 0);
+      }).length;
+      
+      // Calculate aging balances
+      const agingBalances = {
+        current: 0,      // 0-30 days
+        thirtyDays: 0,   // 31-60 days  
+        sixtyDays: 0,    // 61-90 days
+        ninetyDays: 0,   // 91+ days
+        total: 0
+      };
+      
+      const today = new Date();
+      (agentSalesOrders || []).forEach(order => {
+        if (order.payment_method === 'credit' && order.status !== 'completed') {
+          const orderDate = new Date(order.created_at || order.date_created);
+          const daysDiff = Math.floor((today - orderDate) / (1000 * 60 * 60 * 24));
+          const orderPayments = (allPayments || []).filter(payment => 
+            payment.sales_order === order.id && payment.status === 'completed'
+          );
+          const totalPaid = orderPayments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+          const balance = parseFloat(order.total || 0) - totalPaid;
+          
+          if (balance > 0) {
+            agingBalances.total += balance;
+            if (daysDiff <= 30) {
+              agingBalances.current += balance;
+            } else if (daysDiff <= 60) {
+              agingBalances.thirtyDays += balance;
+            } else if (daysDiff <= 90) {
+              agingBalances.sixtyDays += balance;
+            } else {
+              agingBalances.ninetyDays += balance;
+            }
+          }
+        }
+      });
+
+      // Calculate monthly revenue trend (last 6 months)
+      const monthlyRevenue = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        
+        const monthOrders = (agentSalesOrders || []).filter(order => {
+          const orderDate = new Date(order.created_at || order.date_created);
+          return orderDate >= monthStart && orderDate <= monthEnd;
+        });
+        
+        const monthRevenue = monthOrders.reduce((sum, order) => sum + parseFloat(order.total || 0), 0);
+        monthlyRevenue.push({
+          month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          revenue: monthRevenue,
+          orders: monthOrders.length
+        });
+      }
+
+      setAgentAnalytics({
+        agent: currentAgent,
+        totalRevenue: totalRevenue.toFixed(2),
+        totalOrders,
+        completedOrders,
+        pendingOrders,
+        completedWithPayments,
+        agingBalances: {
+          current: agingBalances.current.toFixed(2),
+          thirtyDays: agingBalances.thirtyDays.toFixed(2),
+          sixtyDays: agingBalances.sixtyDays.toFixed(2),
+          ninetyDays: agingBalances.ninetyDays.toFixed(2),
+          total: agingBalances.total.toFixed(2)
+        },
+        conversionRate: totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : 0,
+        averageOrderValue: totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : 0,
+        monthlyTrend: monthlyRevenue,
+        recentOrders: (agentSalesOrders || []).slice(0, 5)
+      });
+
+    } catch (error) {
+      console.error('Error loading agent analytics:', error);
+      setAgentAnalytics(null);
     }
   };
 
@@ -322,6 +548,7 @@ const SalesDashboard = () => {
     loadAllTransactions();
     loadSalesData();
     loadAgentProducts();
+    loadAgentAnalytics();
     refreshData();
     setLoading(false);
   };
@@ -340,7 +567,7 @@ const SalesDashboard = () => {
   };
 
   const removeProductFromOrder = (index) => {
-    const newProducts = orderProducts.filter((_, i) => i !== index);
+    const newProducts = (orderProducts || []).filter((_, i) => i !== index);
     setOrderProducts(newProducts);
   };
 
@@ -351,7 +578,7 @@ const SalesDashboard = () => {
   };
 
   const calculateOrderTotal = () => {
-    const subtotal = orderProducts.reduce((total, item) => {
+    const subtotal = (orderProducts || []).reduce((total, item) => {
       if (item.product) {
         return total + (item.product.unit_price * item.quantity);
       }
@@ -362,7 +589,7 @@ const SalesDashboard = () => {
   };
 
   const handleCreateSalesOrder = async () => {
-    if (!selectedCustomer || orderProducts.length === 0) {
+    if (!selectedCustomer || (orderProducts || []).length === 0) {
       setSnackbar({ open: true, message: 'Please select a customer and add products', severity: 'error' });
       return;
     }
@@ -370,7 +597,7 @@ const SalesDashboard = () => {
     try {
       const orderData = {
         customer_id: selectedCustomer.id,
-        products: orderProducts.filter(item => item.product).map(item => ({
+        products: (orderProducts || []).filter(item => item.product).map(item => ({
           product_id: item.product.id,
           quantity: item.quantity,
           unit_price: item.product.unit_price
@@ -466,10 +693,10 @@ const SalesDashboard = () => {
         
         // Initialize sales agents
         const agents = [
-          { id: 'agent1', name: 'Collins Arku', email: 'collins@smarterp.com', territory: 'Accra', assigned_warehouse_id: 1 },
-          { id: 'agent2', name: 'Sarah Johnson', email: 'sarah@smarterp.com', territory: 'Kumasi', assigned_warehouse_id: 2 },
-          { id: 'agent3', name: 'Michael Brown', email: 'michael@smarterp.com', territory: 'Tema', assigned_warehouse_id: 3 },
-          { id: 'agent4', name: 'Emily Davis', email: 'emily@smarterp.com', territory: 'Cape Coast', assigned_warehouse_id: 4 }
+          { id: 1, name: 'Collins Arku', email: 'collins@smarterp.com', territory: 'Accra', assigned_warehouse_id: 1 },
+          { id: 2, name: 'Sarah Johnson', email: 'sarah@smarterp.com', territory: 'Kumasi', assigned_warehouse_id: 2 },
+          { id: 3, name: 'Michael Brown', email: 'michael@smarterp.com', territory: 'Tema', assigned_warehouse_id: 3 },
+          { id: 4, name: 'Emily Davis', email: 'emily@smarterp.com', territory: 'Cape Coast', assigned_warehouse_id: 4 }
         ];
         setSalesAgents(agents);
         
@@ -509,12 +736,27 @@ const SalesDashboard = () => {
   }, []);
 
   useEffect(() => {
+    if (token) {
+      setLoading(true);
+      loadCustomers();
+      loadWarehouses();
+      loadAllTransactions();
+      loadSalesData();
+      loadAgentAnalytics(); // Load agent analytics when component mounts
+    }
+  }, [token]);
+
+  useEffect(() => {
     loadProducts();
     loadCustomers();
     loadWarehouses();
     loadAllTransactions();
     loadSalesData();
   }, [token]);
+
+  useEffect(() => {
+    loadAgentAnalytics(); // Reload agent analytics when selected agent changes
+  }, [selectedAgent, salesAgents]);
 
   useEffect(() => {
     // Listen for product updates to refresh product list
@@ -542,6 +784,24 @@ const SalesDashboard = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleWarehouseTransferUpdate = () => {
+      console.log('Warehouse transfer detected, refreshing product data...');
+      refreshProductData();
+    };
+
+    // Listen for warehouse transfer events
+    window.addEventListener('warehouseTransferApproved', handleWarehouseTransferUpdate);
+    window.addEventListener('warehouseTransferCompleted', handleWarehouseTransferUpdate);
+    window.addEventListener('stockMovementCreated', handleWarehouseTransferUpdate);
+
+    return () => {
+      window.removeEventListener('warehouseTransferApproved', handleWarehouseTransferUpdate);
+      window.removeEventListener('warehouseTransferCompleted', handleWarehouseTransferUpdate);
+      window.removeEventListener('stockMovementCreated', handleWarehouseTransferUpdate);
+    };
+  }, [token]);
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
@@ -550,7 +810,7 @@ const SalesDashboard = () => {
     );
   }
 
-  const filteredProducts = products.filter(product => 
+  const filteredProducts = ((products || [])).filter(product => 
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     product.sku.toLowerCase().includes(searchTerm.toLowerCase()) || 
     product.category_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -613,7 +873,7 @@ const SalesDashboard = () => {
                 },
               }}
             >
-              {salesAgents.map((agent) => (
+              {(salesAgents || []).map((agent) => (
                 <MenuItem key={agent.id} value={agent.id}>
                   {agent.name}
                 </MenuItem>
@@ -680,20 +940,6 @@ const SalesDashboard = () => {
             <QuickActionButton
               fullWidth
               variant="contained"
-              startIcon={<DescriptionIcon />}
-              onClick={() => setQuoteDialogOpen(true)}
-              sx={{ 
-                background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
-                color: 'white'
-              }}
-            >
-              Generate Quote
-            </QuickActionButton>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <QuickActionButton
-              fullWidth
-              variant="contained"
               startIcon={<ContactsIcon />}
               onClick={() => setCustomerCreationDialogOpen(true)}
               sx={{ 
@@ -704,8 +950,6 @@ const SalesDashboard = () => {
               Create Customer
             </QuickActionButton>
           </Grid>
-          
-          {/* Row 2 */}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
@@ -720,6 +964,8 @@ const SalesDashboard = () => {
               Transfer Stock
             </QuickActionButton>
           </Grid>
+          
+          {/* Row 2 */}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
@@ -762,8 +1008,6 @@ const SalesDashboard = () => {
               Customer Heat Map
             </QuickActionButton>
           </Grid>
-          
-          {/* Row 3 */}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
@@ -778,6 +1022,8 @@ const SalesDashboard = () => {
               POS Transactions
             </QuickActionButton>
           </Grid>
+          
+          {/* Row 3 */}
           <Grid item xs={12} sm={6} md={3}>
             <QuickActionButton
               fullWidth
@@ -855,7 +1101,7 @@ const SalesDashboard = () => {
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
                       <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                        {customers.length}
+                        {(customers || []).length}
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.9 }}>
                         Total Customers
@@ -872,7 +1118,7 @@ const SalesDashboard = () => {
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
                       <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                        {allTransactions.length}
+                        {(allTransactions || []).length}
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.9 }}>
                         Total Orders
@@ -889,7 +1135,7 @@ const SalesDashboard = () => {
                   <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box>
                       <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                        {products.length}
+                        {(products || []).length}
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.9 }}>
                         Products Available
@@ -899,81 +1145,6 @@ const SalesDashboard = () => {
                   </Box>
                 </CardContent>
               </MetricCard>
-            </Grid>
-
-            {/* Transfer Status Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h4" fontWeight="bold">
-                          {transfers.filter(t => t.status === 'pending').length}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          Pending Transfers
-                        </Typography>
-                      </Box>
-                      <PendingIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h4" fontWeight="bold">
-                          {transfers.filter(t => t.status === 'approved').length}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          Approved Transfers
-                        </Typography>
-                      </Box>
-                      <CheckCircleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h4" fontWeight="bold">
-                          {transfers.filter(t => t.status === 'completed').length}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          Completed Transfers
-                        </Typography>
-                      </Box>
-                      <LocalShippingIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={3}>
-                <Card sx={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', color: 'white' }}>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h4" fontWeight="bold">
-                          {transfers.length}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          Total Transfers
-                        </Typography>
-                      </Box>
-                      <TransferWithinAStationIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
             </Grid>
 
             {/* Recent Transfers Table */}
@@ -1008,7 +1179,7 @@ const SalesDashboard = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {transfers.slice(0, 10).map((transfer) => (
+                      {(transfers || []).slice(0, 10).map((transfer) => (
                         <TableRow key={transfer.id} hover>
                           <TableCell>{transfer.transfer_number}</TableCell>
                           <TableCell>{transfer.product_name}</TableCell>
@@ -1048,7 +1219,7 @@ const SalesDashboard = () => {
                   </Table>
                 </TableContainer>
                 
-                {transfers.length === 0 && (
+                {(transfers || []).length === 0 && (
                   <Box textAlign="center" py={4}>
                     <Typography color="textSecondary">
                       No warehouse transfers found
@@ -1077,7 +1248,7 @@ const SalesDashboard = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {allTransactions.slice(0, 5).map((sale, index) => (
+                        {(allTransactions || []).slice(0, 5).map((sale, index) => (
                           <TableRow key={index}>
                             <TableCell>#{sale.id || `ORD-${index + 1}`}</TableCell>
                             <TableCell>{sale.customer || 'N/A'}</TableCell>
@@ -1107,7 +1278,7 @@ const SalesDashboard = () => {
                     Top Products
                   </Typography>
                   <List>
-                    {products.slice(0, 5).map((product, index) => (
+                    {(products || []).slice(0, 5).map((product, index) => (
                       <ListItem key={index} sx={{ px: 0 }}>
                         <ListItemText 
                           primary={product.name || `Product ${index + 1}`}
@@ -1158,7 +1329,7 @@ const SalesDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {customers.map((customer) => (
+                {(customers || []).map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell>{customer.name}</TableCell>
                     <TableCell>{customer.email}</TableCell>
@@ -1180,36 +1351,63 @@ const SalesDashboard = () => {
 
         <TabPanel value={tabValue} index={4}>
           {/* Stock Management Tab */}
-          <Typography variant="h6" sx={{ mb: 2 }}>Stock Management</Typography>
-          <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-            <TextField
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ minWidth: 300 }}
-            />
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setQuickActionDialog({ open: true, type: 'stock_adjustment' })}
-              sx={{
-                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #1976D2 30%, #0288D1 90%)',
-                }
-              }}
-            >
-              Stock Adjustment
-            </Button>
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <Avatar sx={{ bgcolor: '#2196F3', width: 40, height: 40 }}>
+                <InventoryIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#333' }}>
+                  Stock Management
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#666', fontWeight: 500 }}>
+                  {(warehouses || []).length > 0 ? (warehouses || [])[0].name : 'Main Warehouse'} - Inventory Overview
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <TextField
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ minWidth: 300 }}
+              />
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setQuickActionDialog({ open: true, type: 'stock_adjustment' })}
+                sx={{
+                  background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #1976D2 30%, #0288D1 90%)',
+                  }
+                }}
+              >
+                Stock Adjustment
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<RefreshIcon />}
+                onClick={loadProducts}
+                sx={{
+                  background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)',
+                  }
+                }}
+              >
+                Refresh Stock
+              </Button>
+            </Box>
           </Box>
-
           <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
             <Table>
               <TableHead>
@@ -1226,7 +1424,7 @@ const SalesDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredProducts.map((product) => {
+                {(filteredProducts || []).map((product) => {
                   const stockStatus = product.quantity <= (product.min_stock || 0) ? 'low' : 
                                     product.quantity === 0 ? 'out' : 'good';
                   const statusColor = stockStatus === 'out' ? 'error' : 
@@ -1304,8 +1502,7 @@ const SalesDashboard = () => {
 
         <TabPanel value={tabValue} index={5}>
           {/* Reports Tab */}
-          <Typography variant="h6" sx={{ mb: 2 }}>Sales Reports</Typography>
-          <Typography variant="body1">Reports functionality will be implemented here.</Typography>
+          <SalesReports />
         </TabPanel>
 
         <TabPanel value={tabValue} index={6}>
@@ -1317,7 +1514,7 @@ const SalesDashboard = () => {
         <TabPanel value={tabValue} index={7}>
           {/* Heat Map Tab */}
           <Typography variant="h6" sx={{ mb: 2 }}>Customer Heat Map</Typography>
-          <CustomerHeatMap />
+          <CustomerHeatMap customers={customers} />
         </TabPanel>
 
         <TabPanel value={tabValue} index={8}>
@@ -1349,7 +1546,7 @@ const SalesDashboard = () => {
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>Customer</Typography>
             <Autocomplete
-              options={customers}
+              options={customers || []}
               getOptionLabel={(option) => option.name || ''}
               value={selectedCustomer}
               onChange={(event, newValue) => setSelectedCustomer(newValue)}
@@ -1366,7 +1563,7 @@ const SalesDashboard = () => {
           {/* Products Section */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>Products</Typography>
-            {orderProducts.map((item, index) => (
+            {(orderProducts || []).map((item, index) => (
               <Box key={index} sx={{ 
                 display: 'flex', 
                 gap: 2, 
@@ -1379,7 +1576,7 @@ const SalesDashboard = () => {
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" sx={{ mb: 1 }}>Product</Typography>
                   <Autocomplete
-                    options={products}
+                    options={products || []}
                     getOptionLabel={(option) => `${option.sku} - ${option.name} - $${option.unit_price}`}
                     value={item.product}
                     onChange={(event, newValue) => updateOrderProduct(index, 'product', newValue)}
@@ -1405,7 +1602,7 @@ const SalesDashboard = () => {
                 <IconButton 
                   onClick={() => removeProductFromOrder(index)}
                   color="error"
-                  disabled={orderProducts.length === 1}
+                  disabled={(orderProducts || []).length === 1}
                 >
                   <DeleteIcon />
                 </IconButton>

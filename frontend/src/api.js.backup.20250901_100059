@@ -1,0 +1,111 @@
+import { Capacitor } from '@capacitor/core';
+import { CapacitorHttp } from '@capacitor/core';
+
+// Production Fly.dev backend URL
+const API_BASE_URL = 'https://backend-shy-sun-4450.fly.dev/api';
+
+console.log('API Configuration:');
+console.log('- Platform:', Capacitor.getPlatform());
+console.log('- Native Platform:', Capacitor.isNativePlatform());
+console.log('- API Base URL:', API_BASE_URL);
+
+// Enhanced HTTP client with better error handling for mobile
+const httpClient = {
+  async request(config) {
+    try {
+      console.log('Making HTTP request:', {
+        url: config.url,
+        method: config.method,
+        headers: config.headers
+      });
+
+      let response;
+      
+      if (Capacitor.isNativePlatform()) {
+        // Use CapacitorHttp for native platforms
+        response = await CapacitorHttp.request({
+          url: config.url,
+          method: config.method,
+          headers: config.headers || {},
+          data: config.data,
+          connectTimeout: 30000,
+          readTimeout: 30000
+        });
+        
+        console.log('CapacitorHttp response:', {
+          status: response.status,
+          headers: response.headers,
+          url: response.url
+        });
+        
+        // Transform CapacitorHttp response to match axios format
+        return {
+          data: response.data,
+          status: response.status,
+          statusText: response.status >= 200 && response.status < 300 ? 'OK' : 'Error',
+          headers: response.headers,
+          config: config
+        };
+      } else {
+        // Use fetch for web platform
+        const fetchConfig = {
+          method: config.method,
+          headers: {
+            'Content-Type': 'application/json',
+            ...config.headers
+          }
+        };
+        
+        if (config.data) {
+          fetchConfig.body = JSON.stringify(config.data);
+        }
+        
+        response = await fetch(config.url, fetchConfig);
+        const data = await response.json();
+        
+        console.log('Fetch response:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+        
+        return {
+          data: data,
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          config: config
+        };
+      }
+    } catch (error) {
+      console.error('HTTP request failed:', error);
+      
+      // Enhanced error handling for network issues
+      if (error.message && error.message.includes('ERR_NETWORK')) {
+        throw new Error('Network connection failed. Please check your internet connection and try again.');
+      } else if (error.message && error.message.includes('timeout')) {
+        throw new Error('Request timeout. Please check your connection and try again.');
+      } else {
+        throw error;
+      }
+    }
+  },
+
+  get(url, config = {}) {
+    return this.request({ ...config, method: 'GET', url });
+  },
+
+  post(url, data, config = {}) {
+    return this.request({ ...config, method: 'POST', url, data });
+  },
+
+  put(url, data, config = {}) {
+    return this.request({ ...config, method: 'PUT', url, data });
+  },
+
+  delete(url, config = {}) {
+    return this.request({ ...config, method: 'DELETE', url });
+  }
+};
+
+export { API_BASE_URL, httpClient as default };

@@ -461,17 +461,164 @@ class PromotionProductViewSet(viewsets.ModelViewSet):
         return queryset
 
 class SalesOrderViewSet(viewsets.ModelViewSet):
-    queryset = SalesOrder.objects.all()
+    queryset = SalesOrder.objects.select_related('customer', 'sales_agent').prefetch_related('items__product').all()
     serializer_class = SalesOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        """Create sales order and automatically deduct inventory for cash/mobile money/credit payments"""
+        from inventory.models import Product
+        from warehouse.models import StockMovement, Warehouse
+        
+        # Create the sales order first
+        response = super().create(request, *args, **kwargs)
+        
+        if response.status_code == 201:
+            sales_order = SalesOrder.objects.get(id=response.data['id'])
+            
+            # Deduct inventory for cash, mobile money, and credit payments
+            if sales_order.payment_method in ['cash', 'momo', 'credit']:
+                try:
+                    # Check inventory availability first
+                    for item in sales_order.items.all():
+                        product = item.product
+                        if product.quantity < item.quantity:
+                            # Rollback the sales order creation
+                            sales_order.delete()
+                            return Response({
+                                'error': f'Insufficient stock for {product.name}. Available: {product.quantity}, Required: {item.quantity}'
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    # If all items have sufficient stock, proceed with deduction
+                    for item in sales_order.items.all():
+                        product = item.product
+                        
+                        # Deduct inventory
+                        product.quantity -= item.quantity
+                        product.save()
+                        
+                        # Create stock movement record
+                        try:
+                            warehouse = Warehouse.objects.first()  # Use first available warehouse
+                            if warehouse:
+                                StockMovement.objects.create(
+                                    warehouse=warehouse,
+                                    product=product,
+                                    movement_type='out',
+                                    quantity=-item.quantity,
+                                    reference=f'Sales Order {sales_order.order_number}',
+                                    notes=f'Sale to {sales_order.customer.name if sales_order.customer else "Customer"}',
+                                    created_by=request.user
+                                )
+                        except Exception as e:
+                            print(f"Warning: Could not create stock movement record: {e}")
+                    
+                    # Set status based on payment method
+                    if sales_order.payment_method in ['cash', 'momo']:
+                        # Auto-approve cash/mobile money orders
+                        sales_order.status = 'confirmed'
+                        sales_order.payment_status = 'paid'
+                        response.data['message'] = 'Sales order created and inventory automatically updated'
+                    else:
+                        # Credit sales: deduct inventory but keep pending for finance approval
+                        sales_order.status = 'pending'
+                        sales_order.payment_status = 'pending'
+                        response.data['message'] = 'Credit sale created. Inventory deducted. Awaiting finance approval for payment processing.'
+                    
+                    sales_order.save()
+                    
+                    # Update response data
+                    response.data['status'] = sales_order.status
+                    response.data['payment_status'] = sales_order.payment_status
+                    
+                except Exception as e:
+                    # Rollback the sales order creation if inventory deduction fails
+                    sales_order.delete()
+                    return Response({
+                        'error': f'Failed to process inventory: {str(e)}'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            else:
+                # For cheque payments, keep as pending for approval workflow (no inventory deduction)
+                sales_order.status = 'pending'
+                sales_order.payment_status = 'pending'
+                sales_order.save()
+                
+                # Update response data
+                response.data['status'] = sales_order.status
+                response.data['payment_status'] = sales_order.payment_status
+                response.data['message'] = 'Cheque sale created. Awaiting finance approval before inventory deduction.'
+        
+        return response
+
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
-        """Approve a sales order"""
+        """Approve a sales order and deduct inventory"""
+        from inventory.models import Product
+        from warehouse.models import StockMovement, Warehouse
+        
         sales_order = self.get_object()
-        sales_order.status = 'approved'
-        sales_order.save()
-        return Response({'message': 'Sales order approved', 'status': sales_order.status})
+        
+        if sales_order.status != 'pending':
+            return Response({
+                'error': f'Sales order is already {sales_order.status}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Check inventory availability and deduct stock for each item
+            for item in sales_order.items.all():
+                product = item.product
+                
+                # Check if sufficient stock is available
+                if product.quantity < item.quantity:
+                    return Response({
+                        'error': f'Insufficient stock for {product.name}. Available: {product.quantity}, Required: {item.quantity}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # If all items have sufficient stock, proceed with deduction
+            for item in sales_order.items.all():
+                product = item.product
+                
+                # Deduct inventory
+                product.quantity -= item.quantity
+                product.save()
+                
+                # Create stock movement record
+                try:
+                    # Try to get the default warehouse or use the first available warehouse
+                    warehouse = None
+                    if hasattr(sales_order, 'warehouse') and sales_order.warehouse:
+                        warehouse = sales_order.warehouse
+                    else:
+                        warehouse = Warehouse.objects.first()  # Use first available warehouse as fallback
+                    
+                    if warehouse:
+                        StockMovement.objects.create(
+                            warehouse=warehouse,
+                            product=product,
+                            movement_type='out',
+                            quantity=-item.quantity,
+                            reference=f'Sales Order {sales_order.order_number}',
+                            notes=f'Sale to {sales_order.customer.name if sales_order.customer else "Customer"}',
+                            created_by=request.user
+                        )
+                except Exception as e:
+                    # Log the error but don't fail the sale
+                    print(f"Warning: Could not create stock movement record: {e}")
+            
+            # Update sales order status
+            sales_order.status = 'approved'
+            sales_order.save()
+            
+            return Response({
+                'message': 'Sales order approved and inventory updated',
+                'status': sales_order.status
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to process sales order: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
@@ -497,7 +644,34 @@ class FinanceTransactionViewSet(viewsets.ModelViewSet):
         finance_transaction = self.get_object()
         finance_transaction.status = 'approved'
         finance_transaction.save()
-        return Response({'message': 'Cheque payment approved', 'status': finance_transaction.status})
+        
+        # Update the sales order status to confirmed when cheque is approved
+        if finance_transaction.sales_order:
+            sales_order = finance_transaction.sales_order
+            sales_order.status = 'confirmed'
+            sales_order.payment_status = 'paid'
+            sales_order.save()
+            
+            # Create a payment record for the approved cheque
+            from .models import Payment
+            Payment.objects.create(
+                sales_order=sales_order,
+                payment_number=f"PAY-{timezone.now().strftime('%Y%m%d')}-{sales_order.id}",
+                amount=finance_transaction.amount,
+                payment_method='cheque',
+                payment_date=timezone.now().date(),
+                reference=finance_transaction.reference,
+                status='completed',
+                approved_by=request.user,
+                approved_at=timezone.now(),
+                notes=f"Cheque payment approved for {sales_order.order_number}"
+            )
+        
+        return Response({
+            'message': 'Cheque payment approved and sales order confirmed', 
+            'status': finance_transaction.status,
+            'sales_order_status': sales_order.status if finance_transaction.sales_order else None
+        })
 
     @action(detail=True, methods=['post'])
     def reject_cheque(self, request, pk=None):
@@ -505,7 +679,19 @@ class FinanceTransactionViewSet(viewsets.ModelViewSet):
         finance_transaction = self.get_object()
         finance_transaction.status = 'rejected'
         finance_transaction.save()
-        return Response({'message': 'Cheque payment rejected', 'status': finance_transaction.status})
+        
+        # Update the sales order status when cheque is rejected
+        if finance_transaction.sales_order:
+            sales_order = finance_transaction.sales_order
+            sales_order.status = 'pending'  # Keep as pending for resubmission
+            sales_order.payment_status = 'pending'
+            sales_order.save()
+        
+        return Response({
+            'message': 'Cheque payment rejected', 
+            'status': finance_transaction.status,
+            'sales_order_status': sales_order.status if finance_transaction.sales_order else None
+        })
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
@@ -527,16 +713,19 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        payment.status = 'approved'
+        payment.status = 'completed'
         payment.approved_by = request.user
         payment.approved_at = timezone.now()
         payment.save()
         
-        # For approved payments, mark as completed and update receivables
-        if payment.payment_method in ['cash', 'mobile_money']:
-            payment.status = 'completed'
-            payment.save()
-            self.update_customer_receivables(payment)
+        # Update the sales order status to confirmed when payment is approved
+        sales_order = payment.sales_order
+        if sales_order:
+            sales_order.status = 'confirmed'
+            sales_order.save()
+        
+        # Update customer receivables
+        self.update_customer_receivables(payment)
         
         return Response({
             'message': 'Payment approved successfully',
@@ -561,6 +750,13 @@ class PaymentViewSet(viewsets.ModelViewSet):
         payment.approved_at = timezone.now()
         payment.notes = f"Rejected: {rejection_reason}"
         payment.save()
+        
+        # When payment is rejected, reset both sales order status and payment status to pending
+        sales_order = payment.sales_order
+        if sales_order:
+            sales_order.status = 'pending'
+            sales_order.payment_status = 'pending'
+            sales_order.save()
         
         return Response({
             'message': 'Payment rejected',

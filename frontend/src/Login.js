@@ -45,7 +45,10 @@ import api from './api';
 import './mobile.css'; // Import mobile styles
 
 const Login = () => {
-  const { login } = useContext(AuthContext);
+  // Safe destructuring with fallback values
+  const authContext = useContext(AuthContext);
+  const login = authContext?.login || (() => {});
+  
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -85,14 +88,25 @@ const Login = () => {
     setLoading(true);
     setError('');
 
+    console.log('[Login] Form submitted - starting login process');
+    console.log('[Login] Email:', email);
+    console.log('[Login] Password length:', password.length);
+
     try {
       // Extract username from email if it contains @
       const username = email.includes('@') ? email.split('@')[0] : email;
+      console.log('[Login] Extracted username:', username);
+      console.log('[Login] Calling login function...');
+      
       await login(username, password, rememberMe);
+      console.log('[Login] Login successful, navigating to home');
       navigate('/');
     } catch (error) {
+      console.error('[Login] Login failed:', error);
+      console.error('[Login] Error response:', error.response?.data);
       setError(error.response?.data?.error || 'Invalid credentials');
     } finally {
+      console.log('[Login] Setting loading to false');
       setLoading(false);
     }
   };

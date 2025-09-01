@@ -1,226 +1,217 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   Box,
-  Typography,
   Card,
   CardContent,
+  Typography,
   Button,
+  Grid,
   LinearProgress,
+  Chip,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Chip,
-  Alert,
-  Grid,
   IconButton,
-  Divider
+  Alert,
+  Divider,
+  CircularProgress
 } from '@mui/material';
-import SyncIcon from '@mui/icons-material/Sync';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import WifiIcon from '@mui/icons-material/Wifi';
-import WifiOffIcon from '@mui/icons-material/WifiOff';
-import StorageIcon from '@mui/icons-material/Storage';
-import api from './api';
+import {
+  Sync as SyncIcon,
+  CloudSync as CloudSyncIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Warning as WarningIcon,
+  Refresh as RefreshIcon,
+  Storage as StorageIcon,
+  NetworkCheck as NetworkCheckIcon,
+  Schedule as ScheduleIcon
+} from '@mui/icons-material';
+import { AuthContext } from './AuthContext';
+import { MOBILE_CONFIG } from './mobile_app_config';
 
 const SyncDashboard = () => {
+  const { token } = useContext(AuthContext);
   const [syncStatus, setSyncStatus] = useState({
     isOnline: navigator.onLine,
-    lastSync: null,
+    lastSync: localStorage.getItem('lastSync'),
     syncing: false,
-    progress: 0
+    autoSync: true,
+    syncQueue: [],
+    errors: []
   });
   
-  const [syncHistory, setSyncHistory] = useState([]);
-  const [pendingChanges, setPendingChanges] = useState({
-    salesOrders: 0,
-    customers: 0,
-    payments: 0
+  const [syncStats, setSyncStats] = useState({
+    totalSyncs: 0,
+    successfulSyncs: 0,
+    failedSyncs: 0,
+    dataSize: 0
   });
 
+  const [modules, setModules] = useState([
+    { name: 'Users', endpoint: '/users/', lastSync: null, status: 'pending', records: 0 },
+    { name: 'Sales Orders', endpoint: '/sales/sales-orders/', lastSync: null, status: 'pending', records: 0 },
+    { name: 'Customers', endpoint: '/sales/customers/', lastSync: null, status: 'pending', records: 0 },
+    { name: 'Products', endpoint: '/inventory/products/', lastSync: null, status: 'pending', records: 0 },
+    { name: 'Warehouses', endpoint: '/warehouse/', lastSync: null, status: 'pending', records: 0 }
+  ]);
+
   useEffect(() => {
-    checkNetworkStatus();
-    loadSyncHistory();
-    loadPendingChanges();
-
-    // Listen for network changes
-    const updateOnlineStatus = () => {
-      setSyncStatus(prev => ({ ...prev, isOnline: navigator.onLine }));
-    };
-
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-
-    // Listen for mobile sync events
-    const handleMobileSync = (event) => {
-      handleAutoSync();
-    };
-
-    window.addEventListener('mobileSync', handleMobileSync);
+    // Network status monitoring
+    const handleOnline = () => setSyncStatus(prev => ({ ...prev, isOnline: true }));
+    const handleOffline = () => setSyncStatus(prev => ({ ...prev, isOnline: false }));
     
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Listen for sync events
+    const handleSyncEvent = (event) => {
+      console.log('Sync event received:', event.detail);
+      if (event.detail.status === 'success') {
+        setSyncStatus(prev => ({
+          ...prev,
+          lastSync: event.detail.timestamp,
+          syncing: false
+        }));
+      }
+    };
+
+    const handleSyncError = (event) => {
+      console.log('Sync error:', event.detail);
+      setSyncStatus(prev => ({
+        ...prev,
+        syncing: false,
+        errors: [...prev.errors, event.detail]
+      }));
+    };
+
+    window.addEventListener('mobileSync', handleSyncEvent);
+    window.addEventListener('mobileSyncError', handleSyncError);
+
+    // Load sync stats from localStorage
+    loadSyncStats();
+
     return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
-      window.removeEventListener('mobileSync', handleMobileSync);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('mobileSync', handleSyncEvent);
+      window.removeEventListener('mobileSyncError', handleSyncError);
     };
   }, []);
 
-  const checkNetworkStatus = () => {
-    setSyncStatus(prev => ({ ...prev, isOnline: navigator.onLine }));
+  const loadSyncStats = () => {
+    const stats = localStorage.getItem('syncStats');
+    if (stats) {
+      setSyncStats(JSON.parse(stats));
+    }
   };
 
-  const loadSyncHistory = () => {
-    const history = JSON.parse(localStorage.getItem('syncHistory') || '[]');
-    setSyncHistory(history.slice(0, 10)); // Show last 10 syncs
+  const saveSyncStats = (newStats) => {
+    localStorage.setItem('syncStats', JSON.stringify(newStats));
+    setSyncStats(newStats);
   };
 
-  const loadPendingChanges = () => {
-    const pending = {
-      salesOrders: JSON.parse(localStorage.getItem('pendingSalesOrders') || '[]').length,
-      customers: JSON.parse(localStorage.getItem('pendingCustomers') || '[]').length,
-      payments: JSON.parse(localStorage.getItem('pendingPayments') || '[]').length
-    };
-    setPendingChanges(pending);
+  const syncModule = async (module) => {
+    try {
+      const response = await fetch(`${MOBILE_CONFIG.API_BASE_URL}${module.endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const records = Array.isArray(data) ? data.length : (data.results ? data.results.length : 0);
+        
+        // Store data locally
+        localStorage.setItem(`offline_${module.name.toLowerCase()}`, JSON.stringify(data));
+        
+        // Update module status
+        setModules(prev => prev.map(m => 
+          m.name === module.name 
+            ? { ...m, status: 'success', lastSync: new Date().toISOString(), records }
+            : m
+        ));
+
+        return { success: true, records };
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      setModules(prev => prev.map(m => 
+        m.name === module.name 
+          ? { ...m, status: 'error', lastSync: new Date().toISOString() }
+          : m
+      ));
+      
+      return { success: false, error: error.message };
+    }
   };
 
-  const addSyncRecord = (type, status, details = '') => {
-    const record = {
-      id: Date.now(),
-      type,
-      status,
-      details,
-      timestamp: new Date().toISOString()
-    };
-
-    const history = JSON.parse(localStorage.getItem('syncHistory') || '[]');
-    history.unshift(record);
-    localStorage.setItem('syncHistory', JSON.stringify(history.slice(0, 50)));
-    loadSyncHistory();
-  };
-
-  const handleManualSync = async () => {
+  const syncAllModules = async () => {
     if (!syncStatus.isOnline) {
-      addSyncRecord('manual', 'failed', 'No internet connection');
+      alert('Cannot sync while offline');
       return;
     }
 
-    setSyncStatus(prev => ({ ...prev, syncing: true, progress: 0 }));
-
-    try {
-      // Sync sales orders
-      setSyncStatus(prev => ({ ...prev, progress: 25 }));
-      await syncSalesOrders();
-
-      // Sync customers
-      setSyncStatus(prev => ({ ...prev, progress: 50 }));
-      await syncCustomers();
-
-      // Sync payments
-      setSyncStatus(prev => ({ ...prev, progress: 75 }));
-      await syncPayments();
-
-      // Complete sync
-      setSyncStatus(prev => ({ 
-        ...prev, 
-        progress: 100,
-        lastSync: new Date().toISOString(),
-        syncing: false 
-      }));
-
-      addSyncRecord('manual', 'success', 'All data synchronized successfully');
-      loadPendingChanges();
-
-      // Emit sync completion event
-      window.dispatchEvent(new CustomEvent('syncCompleted', {
-        detail: { timestamp: new Date().toISOString() }
-      }));
-
-    } catch (error) {
-      console.error('Sync failed:', error);
-      setSyncStatus(prev => ({ ...prev, syncing: false, progress: 0 }));
-      addSyncRecord('manual', 'failed', error.message);
-    }
-  };
-
-  const handleAutoSync = async () => {
-    if (!syncStatus.isOnline || syncStatus.syncing) return;
-
     setSyncStatus(prev => ({ ...prev, syncing: true }));
-
-    try {
-      await syncSalesOrders();
-      await syncCustomers();
-      await syncPayments();
-
-      setSyncStatus(prev => ({ 
-        ...prev, 
-        lastSync: new Date().toISOString(),
-        syncing: false 
-      }));
-
-      addSyncRecord('auto', 'success', 'Background sync completed');
-      loadPendingChanges();
-
-    } catch (error) {
-      console.error('Auto-sync failed:', error);
-      setSyncStatus(prev => ({ ...prev, syncing: false }));
-      addSyncRecord('auto', 'failed', error.message);
-    }
-  };
-
-  const syncSalesOrders = async () => {
-    const pendingOrders = JSON.parse(localStorage.getItem('pendingSalesOrders') || '[]');
     
-    for (const order of pendingOrders) {
-      try {
-        await api.post('/sales/sales-orders/', order);
-      } catch (error) {
-        console.error('Failed to sync sales order:', error);
-        throw error;
+    let successCount = 0;
+    let totalRecords = 0;
+
+    for (const module of modules) {
+      const result = await syncModule(module);
+      if (result.success) {
+        successCount++;
+        totalRecords += result.records || 0;
       }
     }
 
-    // Clear pending orders after successful sync
-    localStorage.setItem('pendingSalesOrders', '[]');
+    // Update sync stats
+    const newStats = {
+      ...syncStats,
+      totalSyncs: syncStats.totalSyncs + 1,
+      successfulSyncs: syncStats.successfulSyncs + (successCount === modules.length ? 1 : 0),
+      failedSyncs: syncStats.failedSyncs + (successCount < modules.length ? 1 : 0),
+      dataSize: totalRecords
+    };
+    
+    saveSyncStats(newStats);
+    
+    setSyncStatus(prev => ({
+      ...prev,
+      syncing: false,
+      lastSync: new Date().toISOString()
+    }));
+
+    localStorage.setItem('lastSync', new Date().toISOString());
   };
 
-  const syncCustomers = async () => {
-    const pendingCustomers = JSON.parse(localStorage.getItem('pendingCustomers') || '[]');
+  const clearOfflineData = () => {
+    modules.forEach(module => {
+      localStorage.removeItem(`offline_${module.name.toLowerCase()}`);
+    });
     
-    for (const customer of pendingCustomers) {
-      try {
-        await api.post('/sales/customers/', customer);
-      } catch (error) {
-        console.error('Failed to sync customer:', error);
-        throw error;
-      }
-    }
-
-    localStorage.setItem('pendingCustomers', '[]');
-  };
-
-  const syncPayments = async () => {
-    const pendingPayments = JSON.parse(localStorage.getItem('pendingPayments') || '[]');
+    setModules(prev => prev.map(m => ({ ...m, status: 'pending', records: 0 })));
     
-    for (const payment of pendingPayments) {
-      try {
-        await api.post('/sales/payments/', payment);
-      } catch (error) {
-        console.error('Failed to sync payment:', error);
-        throw error;
-      }
-    }
-
-    localStorage.setItem('pendingPayments', '[]');
+    // Reset sync stats
+    saveSyncStats({
+      totalSyncs: 0,
+      successfulSyncs: 0,
+      failedSyncs: 0,
+      dataSize: 0
+    });
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'success': return 'success';
-      case 'failed': return 'error';
+      case 'error': return 'error';
+      case 'syncing': return 'warning';
       default: return 'default';
     }
   };
@@ -228,196 +219,186 @@ const SyncDashboard = () => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'success': return <CheckCircleIcon />;
-      case 'failed': return <ErrorIcon />;
-      default: return <SyncIcon />;
+      case 'error': return <ErrorIcon />;
+      case 'syncing': return <CircularProgress size={20} />;
+      default: return <ScheduleIcon />;
     }
   };
 
-  const totalPendingChanges = pendingChanges.salesOrders + pendingChanges.customers + pendingChanges.payments;
-
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#FF9800' }}>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
         Data Synchronization
       </Typography>
 
       {/* Connection Status */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            {syncStatus.isOnline ? (
-              <WifiIcon sx={{ color: 'green', mr: 1 }} />
-            ) : (
-              <WifiOffIcon sx={{ color: 'red', mr: 1 }} />
-            )}
-            <Typography variant="h6">
-              {syncStatus.isOnline ? 'Online' : 'Offline'}
-            </Typography>
-          </Box>
-
-          {syncStatus.lastSync && (
-            <Typography variant="body2" color="textSecondary">
-              Last sync: {new Date(syncStatus.lastSync).toLocaleString()}
-            </Typography>
-          )}
-
-          {syncStatus.syncing && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" gutterBottom>
-                Synchronizing data...
-              </Typography>
-              <LinearProgress 
-                variant="determinate" 
-                value={syncStatus.progress} 
-                sx={{ height: 8, borderRadius: 4 }}
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <NetworkCheckIcon 
+                sx={{ 
+                  mr: 2, 
+                  color: syncStatus.isOnline ? '#4CAF50' : '#f44336',
+                  fontSize: 32
+                }} 
               />
+              <Box>
+                <Typography variant="h6">
+                  {syncStatus.isOnline ? 'Online' : 'Offline'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {syncStatus.lastSync 
+                    ? `Last sync: ${new Date(syncStatus.lastSync).toLocaleString()}`
+                    : 'Never synced'
+                  }
+                </Typography>
+              </Box>
             </Box>
-          )}
+            
+            <Button
+              variant="contained"
+              startIcon={syncStatus.syncing ? <CircularProgress size={20} /> : <SyncIcon />}
+              onClick={syncAllModules}
+              disabled={syncStatus.syncing || !syncStatus.isOnline}
+              sx={{ minWidth: 140 }}
+            >
+              {syncStatus.syncing ? 'Syncing...' : 'Sync All'}
+            </Button>
+          </Box>
         </CardContent>
       </Card>
 
-      {/* Sync Actions */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6}>
+      <Grid container spacing={3}>
+        {/* Sync Statistics */}
+        <Grid item xs={12} md={4}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <CloudUploadIcon sx={{ fontSize: 48, color: '#FF9800', mb: 1 }} />
-              <Typography variant="h6" gutterBottom>
-                Manual Sync
-              </Typography>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                Sync all pending changes to server
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<SyncIcon />}
-                onClick={handleManualSync}
-                disabled={!syncStatus.isOnline || syncStatus.syncing}
-                sx={{ bgcolor: '#FF9800', '&:hover': { bgcolor: '#F57C00' } }}
-              >
-                Sync Now
-              </Button>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Sync Statistics</Typography>
+              <Box display="flex" flexDirection="column" gap={2}>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2">Total Syncs</Typography>
+                  <Typography variant="h6" color="primary">
+                    {syncStats.totalSyncs}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2">Successful</Typography>
+                  <Typography variant="h6" sx={{ color: '#4CAF50' }}>
+                    {syncStats.successfulSyncs}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2">Failed</Typography>
+                  <Typography variant="h6" sx={{ color: '#f44336' }}>
+                    {syncStats.failedSyncs}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2">Records Synced</Typography>
+                  <Typography variant="h6" color="primary">
+                    {syncStats.dataSize}
+                  </Typography>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6}>
+        {/* Module Sync Status */}
+        <Grid item xs={12} md={8}>
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <StorageIcon sx={{ fontSize: 48, color: '#2196F3', mb: 1 }} />
-              <Typography variant="h6" gutterBottom>
-                Pending Changes
-              </Typography>
-              <Typography variant="h4" color="primary" sx={{ mb: 1 }}>
-                {totalPendingChanges}
-              </Typography>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">Module Status</Typography>
+                <IconButton onClick={() => window.location.reload()}>
+                  <RefreshIcon />
+                </IconButton>
+              </Box>
+              
+              <List>
+                {modules.map((module, index) => (
+                  <React.Fragment key={module.name}>
+                    <ListItem>
+                      <ListItemIcon>
+                        {getStatusIcon(module.status)}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={module.name}
+                        secondary={
+                          <Box>
+                            <Typography variant="caption" display="block">
+                              {module.records > 0 ? `${module.records} records` : 'No data'}
+                            </Typography>
+                            {module.lastSync && (
+                              <Typography variant="caption" color="textSecondary">
+                                Last: {new Date(module.lastSync).toLocaleTimeString()}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                      />
+                      <Chip 
+                        label={module.status} 
+                        color={getStatusColor(module.status)}
+                        size="small"
+                      />
+                    </ListItem>
+                    {index < modules.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Offline Storage */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center">
+                  <StorageIcon sx={{ mr: 1 }} />
+                  <Typography variant="h6">Offline Storage</Typography>
+                </Box>
+                <Button 
+                  variant="outlined" 
+                  color="error"
+                  onClick={clearOfflineData}
+                  size="small"
+                >
+                  Clear Data
+                </Button>
+              </Box>
+              
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Data is stored locally for offline access. Clear storage to free up space.
+              </Alert>
+              
               <Typography variant="body2" color="textSecondary">
-                Items waiting to sync
+                Storage used: ~{Math.round(JSON.stringify(localStorage).length / 1024)} KB
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Pending Changes Details */}
-      {totalPendingChanges > 0 && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Pending Changes
-            </Typography>
-            <List>
-              {pendingChanges.salesOrders > 0 && (
-                <ListItem>
-                  <ListItemIcon>
-                    <CloudUploadIcon />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Sales Orders"
-                    secondary={`${pendingChanges.salesOrders} orders waiting to sync`}
-                  />
-                  <Chip label={pendingChanges.salesOrders} color="warning" />
-                </ListItem>
-              )}
-              {pendingChanges.customers > 0 && (
-                <ListItem>
-                  <ListItemIcon>
-                    <CloudUploadIcon />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Customers"
-                    secondary={`${pendingChanges.customers} customers waiting to sync`}
-                  />
-                  <Chip label={pendingChanges.customers} color="warning" />
-                </ListItem>
-              )}
-              {pendingChanges.payments > 0 && (
-                <ListItem>
-                  <ListItemIcon>
-                    <CloudUploadIcon />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Payments"
-                    secondary={`${pendingChanges.payments} payments waiting to sync`}
-                  />
-                  <Chip label={pendingChanges.payments} color="warning" />
-                </ListItem>
-              )}
-            </List>
-          </CardContent>
-        </Card>
+      {/* Sync Progress */}
+      {syncStatus.syncing && (
+        <Box sx={{ position: 'fixed', bottom: 20, left: 20, right: 20, zIndex: 1000 }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={2}>
+                <CircularProgress size={24} />
+                <Box flexGrow={1}>
+                  <Typography variant="body2">Synchronizing data...</Typography>
+                  <LinearProgress sx={{ mt: 1 }} />
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       )}
-
-      {/* Sync History */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Sync History
-          </Typography>
-          {syncHistory.length === 0 ? (
-            <Alert severity="info">No sync history available</Alert>
-          ) : (
-            <List>
-              {syncHistory.map((record, index) => (
-                <React.Fragment key={record.id}>
-                  <ListItem>
-                    <ListItemIcon>
-                      {getStatusIcon(record.status)}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body1">
-                            {record.type === 'manual' ? 'Manual Sync' : 'Auto Sync'}
-                          </Typography>
-                          <Chip 
-                            label={record.status} 
-                            size="small" 
-                            color={getStatusColor(record.status)}
-                          />
-                        </Box>
-                      }
-                      secondary={
-                        <Box>
-                          <Typography variant="body2" color="textSecondary">
-                            {new Date(record.timestamp).toLocaleString()}
-                          </Typography>
-                          {record.details && (
-                            <Typography variant="body2" color="textSecondary">
-                              {record.details}
-                            </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                  {index < syncHistory.length - 1 && <Divider />}
-                </React.Fragment>
-              ))}
-            </List>
-          )}
-        </CardContent>
-      </Card>
     </Box>
   );
 };

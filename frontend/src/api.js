@@ -1,183 +1,172 @@
-import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
+import { CapacitorHttp } from '@capacitor/core';
 
-// Determine if we're running on mobile or web
-const isMobile = typeof window !== 'undefined' && window.Capacitor;
-
-// API Base URL - prioritize the new backend IP
-const API_BASE_URL = isMobile 
-  ? 'http://192.168.2.185:2025/api'  // Mobile apps connect to backend IP
-  : 'http://192.168.2.185:2025/api'; // Web app also connects to backend IP
-
-console.log('[API] Using backend URL:', API_BASE_URL);
-
-// Enable API calls for mobile sync
-const DISABLE_API_CALLS = false;
-
-const createMockResponse = (data = []) => {
-  return Promise.resolve({
-    data: data,
-    status: 200,
-    statusText: 'OK',
-    headers: {},
-    config: {}
-  });
+// Enhanced platform detection for proper backend routing
+export const getApiBaseUrl = () => {
+  // More precise mobile detection - only use Fly.dev for actual native apps
+  const isNativePlatform = Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+  const platform = Capacitor.getPlatform();
+  const isActualMobile = platform === 'ios' || platform === 'android';
+  
+  // Force Fly.dev ONLY for actual native mobile platforms
+  if (isNativePlatform && isActualMobile) {
+    console.log('🚀 NATIVE MOBILE DETECTED - Using Fly.dev backend');
+    console.log('- Platform:', platform);
+    return 'https://backend-shy-sun-4450.fly.dev';
+  }
+  
+  // Web app (including web with Capacitor) uses localhost for development
+  console.log('🌐 WEB DETECTED - Using localhost backend');
+  console.log('- Platform:', platform);
+  return 'http://localhost:2025';
 };
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
+const API_BASE_URL = getApiBaseUrl();
 
-// Override axios methods to return mock data when API is disabled
-if (DISABLE_API_CALLS) {
-  console.log('[API] API calls disabled - using mock responses to prevent 404 errors');
-  
-  // List of authentication endpoints that should work normally
-  const authEndpoints = ['/token/', '/users/me/', '/users/create/', '/users/system/settings/', '/users/system/smtp/', '/users/system/'];
-  
-  const isAuthEndpoint = (url) => {
-    return authEndpoints.some(endpoint => url.includes(endpoint));
-  };
-  
-  const originalGet = api.get.bind(api);
-  const originalPost = api.post.bind(api);
-  const originalPut = api.put.bind(api);
-  const originalDelete = api.delete.bind(api);
-  
-  api.get = (url, config) => {
-    if (isAuthEndpoint(url)) {
-      console.log(`[API AUTH] GET ${url} - allowing real request`);
-      return originalGet(url, config);
-    }
-    console.log(`[API MOCK] GET ${url} - returning empty array`);
-    return createMockResponse([]);
-  };
-  
-  api.post = (url, data, config) => {
-    if (isAuthEndpoint(url)) {
-      console.log(`[API AUTH] POST ${url} - allowing real request`);
-      return originalPost(url, data, config);
-    }
-    console.log(`[API MOCK] POST ${url} - returning success response`);
-    return createMockResponse({ success: true, message: 'Mock response' });
-  };
-  
-  api.put = (url, data, config) => {
-    if (isAuthEndpoint(url)) {
-      console.log(`[API AUTH] PUT ${url} - allowing real request`);
-      return originalPut(url, data, config);
-    }
-    console.log(`[API MOCK] PUT ${url} - returning success response`);
-    return createMockResponse({ success: true, message: 'Mock response' });
-  };
-  
-  api.delete = (url, config) => {
-    if (isAuthEndpoint(url)) {
-      console.log(`[API AUTH] DELETE ${url} - allowing real request`);
-      return originalDelete(url, config);
-    }
-    console.log(`[API MOCK] DELETE ${url} - returning success response`);
-    return createMockResponse({ success: true, message: 'Mock response' });
-  };
-  
-  // Add interceptors for auth endpoints only
-  api.interceptors.request.use(
-    config => {
-      const token = localStorage.getItem('token');
+console.log('🔧 API Configuration:');
+console.log('- Platform:', Capacitor.getPlatform());
+console.log('- Native Platform:', Capacitor.isNativePlatform());
+console.log('- Window Capacitor:', window.Capacitor !== undefined);
+console.log('- FINAL API BASE URL:', API_BASE_URL);
+
+// Enhanced HTTP client with better error handling for mobile
+const httpClient = {
+  defaults: {
+    baseURL: API_BASE_URL
+  },
+
+  // Get token from storage for authentication
+  getAuthToken() {
+    return localStorage.getItem('token') || sessionStorage.getItem('token');
+  },
+
+  async request(config) {
+    try {
+      // Construct full URL by combining base URL with relative path
+      const fullUrl = config.url.startsWith('http') ? config.url : `${API_BASE_URL}${config.url}`;
+      
+      // Add authentication header if token exists
+      const token = this.getAuthToken();
+      const headers = {
+        ...config.headers
+      };
+      
       if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
-      } else if (isAuthEndpoint(config.url)) {
-        console.warn('⚠️ Auth API Request without token:', config.url);
+        headers['Authorization'] = `Bearer ${token}`;
       }
-      return config;
-    },
-    error => Promise.reject(error)
-  );
 
-  api.interceptors.response.use(
-    response => response,
-    error => {
-      if (error.response && isAuthEndpoint(error.config?.url)) {
-        console.error('[API AUTH ERROR]', {
-          url: error.config && error.config.url,
-          method: error.config && error.config.method,
-          status: error.response.status,
-          response: error.response.data
+      console.log('🌐 Making HTTP request:', {
+        url: fullUrl,
+        method: config.method,
+        headers: headers,
+        hasToken: !!token
+      });
+
+      let response;
+      
+      // Use CapacitorHttp for mobile platforms
+      if (Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+        response = await CapacitorHttp.request({
+          url: fullUrl,
+          method: config.method,
+          headers: headers,
+          data: config.data,
+          connectTimeout: 30000,
+          readTimeout: 30000
         });
         
-        if (error.response.status === 401) {
-          console.log('🔒 401 Unauthorized - token may be expired');
-          localStorage.removeItem('token');
-          window.dispatchEvent(new CustomEvent('authTokenExpired', {
-            detail: { message: 'Token expired, please login again' }
-          }));
-          
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-        }
-      }
-      
-      return Promise.reject(error);
-    }
-  );
-} else {
-  // Attach token to every request if present
-  api.interceptors.request.use(
-    config => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
+        console.log('✅ CapacitorHttp response:', {
+          status: response.status,
+          headers: response.headers,
+          url: response.url
+        });
+        
+        return {
+          data: response.data,
+          status: response.status,
+          statusText: response.status >= 200 && response.status < 300 ? 'OK' : 'Error',
+          headers: response.headers,
+          config: { ...config, url: fullUrl }
+        };
       } else {
-        // Temporary debug: log requests without token
-        console.warn('⚠️ API Request without token:', config.url);
-      }
-      return config;
-    },
-    error => Promise.reject(error)
-  );
+        // Use fetch for web platforms
+        const fetchConfig = {
+          method: config.method,
+          headers: headers
+        };
 
-  // Add a response interceptor to log all failed requests and handle token expiration
-  api.interceptors.response.use(
-    response => response,
-    error => {
-      if (error.response) {
-        // Log failing request details
-        console.error('[API ERROR]', {
-          url: error.config && error.config.url,
-          method: error.config && error.config.method,
-          status: error.response.status,
-          response: error.response.data
-        });
-        
-        // Handle token expiration
-        if (error.response.status === 401) {
-          console.log(' 401 Unauthorized - token may be expired');
+        if (config.data) {
+          console.log('🔍 Checking URL for Content-Type:', config.url);
+          console.log('🔍 URL includes /token:', config.url.includes('/token'));
           
-          // Clear expired token immediately
-          localStorage.removeItem('token');
-          
-          // Dispatch custom event to notify AuthContext
-          window.dispatchEvent(new CustomEvent('authTokenExpired', {
-            detail: { message: 'Token expired, please login again' }
-          }));
-          
-          // Redirect to login if not already there
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
+          if (config.url.includes('/token')) {
+            console.log('📝 Using form data for token endpoint');
+            fetchConfig.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            fetchConfig.body = new URLSearchParams(config.data).toString();
+            console.log('📝 Form body:', fetchConfig.body);
+          } else {
+            console.log('📝 Using JSON for regular endpoint');
+            fetchConfig.headers['Content-Type'] = 'application/json';
+            fetchConfig.body = JSON.stringify(config.data);
           }
         }
-      } else if (error.request) {
-        console.error('[API NETWORK ERROR]', {
-          message: 'No response received from server',
-          url: error.config && error.config.url,
-          method: error.config && error.config.method
-        });
-      }
-      
-      return Promise.reject(error);
-    }
-  );
-}
 
-export default api;
+        response = await fetch(fullUrl, fetchConfig);
+        
+        console.log('✅ Fetch response:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+
+        let data;
+        try {
+          const responseClone = response.clone();
+          data = await responseClone.json();
+        } catch (e) {
+          data = await response.text();
+        }
+
+        if (!response.ok) {
+          const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+          error.response = {
+            data,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+          };
+          throw error;
+        }
+
+        return {
+          data,
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          config: { ...config, url: fullUrl }
+        };
+      }
+    } catch (error) {
+      console.error('❌ HTTP request failed:', error);
+      throw error;
+    }
+  },
+
+  get(url, config = {}) {
+    return this.request({ ...config, method: 'GET', url });
+  },
+
+  post(url, data, config = {}) {
+    return this.request({ ...config, method: 'POST', url, data });
+  },
+
+  put(url, data, config = {}) {
+    return this.request({ ...config, method: 'PUT', url, data });
+  },
+
+  delete(url, config = {}) {
+    return this.request({ ...config, method: 'DELETE', url });
+  }
+};
+
+export { API_BASE_URL, httpClient as default };

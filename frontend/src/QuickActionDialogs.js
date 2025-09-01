@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, 
   Grid, FormControl, InputLabel, Select, MenuItem, Autocomplete, Typography,
   Box, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, IconButton, Card, CardContent, Avatar, Divider
+  Paper, IconButton, Card, CardContent, Avatar, Divider, CircularProgress
 } from '@mui/material';
 import {
   Add as AddIcon, Delete as DeleteIcon, Send as SendIcon,
@@ -18,6 +18,7 @@ import {
   Sell as SellIcon
 } from '@mui/icons-material';
 import api from './api';
+import CustomerHeatMap from './components/CustomerHeatMap';
 
 const QuickActionDialogs = ({
   // Dialog states
@@ -118,7 +119,9 @@ const QuickActionDialogs = ({
 
   const [heatMapData, setHeatMapData] = useState({
     timePeriod: '30days',
-    region: 'all'
+    region: 'all',
+    isLoading: false,
+    showMap: false
   });
 
   // API call handlers
@@ -317,29 +320,52 @@ const QuickActionDialogs = ({
                 font-weight: bold;
                 color: #9C27B0;
               }
-              .total-section {
-                background-color: #f8f9fa;
-                padding: 20px;
-                border-radius: 8px;
-                margin-top: 20px;
+              .product-table tr:nth-child(even) {
+                background-color: #f9f9f9;
               }
-              .total-amount {
-                font-size: 20px;
+              .product-table tr:hover {
+                background-color: #f0f8ff;
+              }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+              .summary-section {
+                display: flex;
+                justify-content: flex-end;
+                margin-bottom: 40px;
+              }
+              .summary-table {
+                width: 300px;
+                border-collapse: collapse;
+              }
+              .summary-table td {
+                padding: 8px 15px;
+                border-bottom: 1px solid #eee;
+                font-size: 14px;
+              }
+              .summary-table .total-row {
+                background: linear-gradient(135deg, #2196F3, #1976D2);
+                color: white;
                 font-weight: bold;
-                color: #9C27B0;
-                text-align: right;
-                border-top: 2px solid #9C27B0;
-                padding-top: 10px;
-                margin-top: 10px;
+                font-size: 16px;
               }
               .terms-section {
-                background-color: #fff9c4;
-                padding: 15px;
-                border-left: 4px solid #ff9800;
-                margin-top: 20px;
+                margin-top: 40px;
+                padding: 20px;
+                background-color: #f8f9fa;
+                border-left: 4px solid #2196F3;
+              }
+              .terms-title {
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #2196F3;
+              }
+              .terms-content {
+                font-size: 12px;
+                line-height: 1.5;
+                color: #666;
               }
               .footer {
-                margin-top: 40px;
+                margin-top: 50px;
                 text-align: center;
                 font-size: 12px;
                 color: #666;
@@ -481,31 +507,73 @@ const QuickActionDialogs = ({
 
   const handleTransferStock = async () => {
     try {
-      await api.post('/api/inventory/transfers/', {
+      // Comprehensive validation
+      const errors = [];
+      
+      if (!transferData.product) {
+        errors.push('Product is required');
+      }
+      if (!transferData.from_warehouse) {
+        errors.push('Source warehouse is required');
+      }
+      if (!transferData.to_warehouse) {
+        errors.push('Destination warehouse is required');
+      }
+      if (transferData.from_warehouse?.id === transferData.to_warehouse?.id) {
+        errors.push('Source and destination warehouses must be different');
+      }
+      if (!transferData.quantity || transferData.quantity <= 0) {
+        errors.push('Quantity must be greater than 0');
+      }
+      
+      if (errors.length > 0) {
+        onSnackbar(`Validation errors: ${errors.join(', ')}`, 'error');
+        return;
+      }
+
+      console.log('🔄 [Stock Transfer] Starting transfer:', {
+        product: transferData.product?.name,
+        from: transferData.from_warehouse?.name,
+        to: transferData.to_warehouse?.name,
+        quantity: transferData.quantity,
+        reason: transferData.reason
+      });
+
+      // Create inventory transfer
+      const transferResponse = await api.post('/warehouse/transfers/create/', {
         product: transferData.product?.id,
         from_warehouse: transferData.from_warehouse?.id,
         to_warehouse: transferData.to_warehouse?.id,
         quantity: transferData.quantity,
-        reason: transferData.reason,
-        notes: transferData.notes
+        priority: 'medium',
+        request_notes: transferData.notes || `Transfer requested: ${transferData.reason}`,
+        expected_delivery_date: null
       });
 
+      console.log('✅ [Stock Transfer] Transfer created:', transferResponse.data);
+
       // Create accounting entry for inventory movement
-      await api.post('/api/accounting/journal-entries/', {
-        description: `Stock Transfer: ${transferData.product?.name}`,
-        entries: [
-          {
-            account: `Inventory - ${transferData.to_warehouse?.name}`,
-            debit: transferData.quantity * (transferData.product?.cost || 0),
-            credit: 0
-          },
-          {
-            account: `Inventory - ${transferData.from_warehouse?.name}`,
-            debit: 0,
-            credit: transferData.quantity * (transferData.product?.cost || 0)
-          }
-        ]
-      });
+      try {
+        await api.post('/accounting/journal-entries/', {
+          description: `Stock Transfer: ${transferData.product?.name}`,
+          entries: [
+            {
+              account: `Inventory - ${transferData.to_warehouse?.name}`,
+              debit: transferData.quantity * (transferData.product?.cost || 0),
+              credit: 0
+            },
+            {
+              account: `Inventory - ${transferData.from_warehouse?.name}`,
+              debit: 0,
+              credit: transferData.quantity * (transferData.product?.cost || 0)
+            }
+          ]
+        });
+        console.log('✅ [Stock Transfer] Accounting entry created');
+      } catch (accountingError) {
+        console.warn('⚠️ [Stock Transfer] Accounting entry failed:', accountingError);
+        // Continue with transfer completion even if accounting fails
+      }
 
       onSnackbar('Stock transferred successfully!', 'success');
       setTransferStockDialogOpen(false);
@@ -518,142 +586,19 @@ const QuickActionDialogs = ({
         notes: ''
       });
     } catch (error) {
-      onSnackbar('Error transferring stock', 'error');
-    }
-  };
-
-  const handleCreateCustomer = async () => {
-    try {
-      // Comprehensive form validation
-      const errors = [];
-      
-      if (!customerData.name?.trim()) {
-        errors.push('Customer name is required');
-      }
-      
-      if (!customerData.email?.trim()) {
-        errors.push('Email address is required');
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerData.email)) {
-        errors.push('Please enter a valid email address');
-      }
-      
-      if (!customerData.phone?.trim()) {
-        errors.push('Phone number is required');
-      }
-      
-      if (!customerData.address?.trim()) {
-        errors.push('Address is required');
-      }
-      
-      if (errors.length > 0) {
-        onSnackbar(`Validation errors: ${errors.join(', ')}`, 'error');
-        return;
-      }
-
-      // Prepare customer data with proper field mapping
-      const customerPayload = {
-        name: customerData.name.trim(),
-        email: customerData.email.trim().toLowerCase(),
-        phone: customerData.phone.trim(),
-        address: customerData.address.trim(),
-        customer_type: customerData.customer_type || 'retailer',
-        payment_terms: customerData.payment_terms || 30,
-        latitude: customerData.latitude,
-        longitude: customerData.longitude,
-        location_accuracy: customerData.location_accuracy,
-        location_timestamp: customerData.location_timestamp,
-        // Add optional fields if they exist
-        ...(customerData.priority && { priority: customerData.priority }),
-        ...(customerData.estimated_value && { estimated_value: parseFloat(customerData.estimated_value) }),
-        ...(customerData.notes && { notes: customerData.notes.trim() })
-      };
-
-      const response = await api.post('/sales/customers/', customerPayload);
-      console.log('Customer creation response:', response.data);
-      
-      // Update shared customer data immediately
-      if (response.data) {
-        // Add to shared customers array
-        const { sharedCustomers, addCustomer } = await import('./sharedData');
-        addCustomer(response.data);
-      }
-      
-      // Create accounts receivable account
-      try {
-        await api.post('/api/accounting/chart-of-accounts/', {
-          name: `Accounts Receivable - ${customerData.name}`,
-          account_type: 'asset',
-          parent_account: 'Accounts Receivable'
-        });
-      } catch (accountingError) {
-        console.warn('Failed to create accounting entry:', accountingError);
-        // Don't fail customer creation if accounting fails
-      }
-
-      onSnackbar('Customer created successfully!', 'success');
-      setCustomerCreationDialogOpen(false);
-      
-      // Force refresh customers list with a small delay to ensure backend consistency
-      setTimeout(() => {
-        refreshCustomers();
-      }, 500);
-      
-      // Reset form with all fields
-      setCustomerData({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        customer_type: 'retailer',
-        payment_terms: 30,
-        latitude: null,
-        longitude: null,
-        location_accuracy: null,
-        location_timestamp: null,
-        priority: 'medium',
-        estimated_value: '',
-        notes: ''
+      console.error('❌ [Stock Transfer] Error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        stack: error.stack
       });
-    } catch (error) {
-      console.error('Customer creation error:', error);
       
-      // Enhanced error handling
-      let errorMessage = 'Error creating customer';
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Unknown error occurred';
       
-      if (error.response?.data) {
-        const errorData = error.response.data;
-        
-        if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        } else if (errorData.detail) {
-          errorMessage = errorData.detail;
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.email && Array.isArray(errorData.email)) {
-          errorMessage = `Email error: ${errorData.email.join(', ')}`;
-        } else if (errorData.latitude && Array.isArray(errorData.latitude)) {
-          errorMessage = `GPS Latitude error: ${errorData.latitude.join(', ')}`;
-        } else if (errorData.longitude && Array.isArray(errorData.longitude)) {
-          errorMessage = `GPS Longitude error: ${errorData.longitude.join(', ')}`;
-        } else if (errorData.non_field_errors) {
-          errorMessage = errorData.non_field_errors.join(', ');
-        } else {
-          // Handle field-specific errors
-          const fieldErrors = [];
-          Object.keys(errorData).forEach(field => {
-            if (Array.isArray(errorData[field])) {
-              fieldErrors.push(`${field}: ${errorData[field].join(', ')}`);
-            }
-          });
-          if (fieldErrors.length > 0) {
-            errorMessage = fieldErrors.join('; ');
-          }
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      onSnackbar(errorMessage, 'error');
+      onSnackbar(`Error transferring stock: ${errorMessage}`, 'error');
     }
   };
 
@@ -683,9 +628,16 @@ const QuickActionDialogs = ({
 
   const handleGenerateHeatMap = async () => {
     try {
-      // Generate heat map data based on customer locations and activity
-      onSnackbar('Heat map generated successfully!', 'success');
+      // Set loading state and generate heat map
+      setHeatMapData({...heatMapData, isLoading: true, showMap: false});
+      
+      // Simulate processing time
+      setTimeout(() => {
+        setHeatMapData({...heatMapData, isLoading: false, showMap: true});
+        onSnackbar('Heat map generated successfully!', 'success');
+      }, 1500);
     } catch (error) {
+      setHeatMapData({...heatMapData, isLoading: false, showMap: false});
       onSnackbar('Error generating heat map', 'error');
     }
   };
@@ -722,18 +674,18 @@ const QuickActionDialogs = ({
       
       const discountAmount = (subtotal * salesOrderData.discount_percentage) / 100;
       const finalTotal = subtotal - discountAmount;
-      
+
       // Set due date for credit sales
       let dueDate = null;
       if (salesOrderData.payment_method === 'credit') {
         const today = new Date();
-        dueDate = new Date(today.getTime() + (salesOrderData.payment_terms * 24 * 60 * 60 * 1000));
+        dueDate = new Date(today.getTime() + (salesOrderData.customer?.payment_terms || salesOrderData.payment_terms) * 24 * 60 * 60 * 1000);
       }
 
       // Format data for backend API - match SalesOrder model exactly
       const orderData = {
-        customer: 1, // Use customer ID 1 which exists in backend instead of non-existent ID 12
-        sales_agent: 1, // Use current user ID (arkucollins@gmail.com is user ID 1)
+        customer: validCustomerId, // Use the selected customer ID
+        sales_agent: salesAgents[0]?.id || 1, // Use current user ID or fallback to 1
         subtotal: parseFloat(subtotal.toFixed(2)),
         discount_percentage: parseFloat(salesOrderData.discount_percentage || 0),
         discount_amount: parseFloat(discountAmount.toFixed(2)),
@@ -863,7 +815,6 @@ const QuickActionDialogs = ({
       
       if (error.response?.status === 400 && error.response?.data) {
         const errorData = error.response.data;
-        console.log('400 Error details:', errorData); // Debug logging
         
         if (typeof errorData === 'string') {
           errorMessage = errorData;
@@ -920,192 +871,280 @@ const QuickActionDialogs = ({
   // Print receipt function
   const printReceipt = (salesOrder, receiptData) => {
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        onSnackbar('Pop-up blocked. Please allow pop-ups to print receipts.', 'warning');
-        return;
+      // Create a temporary div to hold the receipt content
+      const receiptContent = createReceiptHTML(salesOrder, receiptData);
+      
+      // Try to open print window first (user-initiated)
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      if (printWindow) {
+        // Pop-up allowed - use normal print window
+        printWindow.document.write(receiptContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 250);
+      } else {
+        // Pop-up blocked - use alternative approach
+        showPrintableReceipt(receiptContent, receiptData.receipt_number);
       }
-
-      const currentDate = new Date().toLocaleDateString();
-      const currentTime = new Date().toLocaleTimeString();
-      
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Receipt ${receiptData.receipt_number}</title>
-            <style>
-              body { 
-                font-family: 'Courier New', monospace; 
-                margin: 20px; 
-                line-height: 1.4;
-                font-size: 12px;
-              }
-              .header { 
-                text-align: center; 
-                margin-bottom: 30px; 
-                border-bottom: 2px solid #333; 
-                padding-bottom: 15px; 
-              }
-              .company-name {
-                font-size: 18px;
-                font-weight: bold;
-                margin-bottom: 5px;
-              }
-              .details { 
-                margin-bottom: 20px; 
-                border-bottom: 1px dashed #666;
-                padding-bottom: 15px;
-              }
-              .detail-row {
-                display: flex;
-                justify-content: space-between;
-                margin: 3px 0;
-                padding: 5px 0;
-              }
-              .total { 
-                font-weight: bold; 
-                font-size: 16px; 
-                border-top: 2px solid #333; 
-                padding-top: 15px;
-                margin-top: 20px;
-              }
-              .items { 
-                margin: 20px 0; 
-                border-bottom: 1px dashed #666;
-                padding-bottom: 15px;
-              }
-              .item { 
-                display: flex; 
-                justify-content: space-between; 
-                margin: 8px 0;
-                padding: 3px 0;
-              }
-              .item-name {
-                flex: 1;
-                margin-right: 10px;
-              }
-              .item-qty {
-                width: 60px;
-                text-align: center;
-              }
-              .item-price {
-                width: 80px;
-                text-align: right;
-              }
-              .footer {
-                margin-top: 30px;
-                text-align: center;
-                font-size: 11px;
-                color: #666;
-                border-top: 1px solid #eee;
-                padding-top: 20px;
-              }
-              @media print {
-                body { margin: 0; }
-                .no-print { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div class="company-name">SmartERP Software</div>
-              <div>SALES RECEIPT</div>
-              <div>Receipt #${receiptData.receipt_number}</div>
-              <div>${currentDate} ${currentTime}</div>
-            </div>
-            
-            <div class="details">
-              <div class="detail-row">
-                <span><strong>Customer:</strong></span>
-                <span>${salesOrder.customer_name || salesOrderData.customer?.name || 'Walk-in Customer'}</span>
-              </div>
-              <div class="detail-row">
-                <span><strong>Order #:</strong></span>
-                <span>${salesOrder.order_number || 'N/A'}</span>
-              </div>
-              <div class="detail-row">
-                <span><strong>Payment Method:</strong></span>
-                <span>${(salesOrder.payment_method || receiptData.payment_method || 'Cash').toUpperCase()}</span>
-              </div>
-              <div class="detail-row">
-                <span><strong>Payment Status:</strong></span>
-                <span>${(receiptData.payment_status || 'Paid').toUpperCase()}</span>
-              </div>
-              ${salesOrder.due_date ? `
-              <div class="detail-row">
-                <span><strong>Due Date:</strong></span>
-                <span>${new Date(salesOrder.due_date).toLocaleDateString()}</span>
-              </div>
-              ` : ''}
-            </div>
-            
-            <div class="items">
-              <div style="font-weight: bold; margin-bottom: 10px;">ITEMS:</div>
-              <div class="item" style="font-weight: bold; border-bottom: 1px solid #333;">
-                <div class="item-name">Product</div>
-                <div class="item-qty">Qty</div>
-                <div class="item-price">Amount</div>
-              </div>
-              ${salesOrder.items?.map(item => `
-                <div class="item">
-                  <div class="item-name">${item.product_name || 'Product'}</div>
-                  <div class="item-qty">${item.quantity}</div>
-                  <div class="item-price">$${(item.quantity * parseFloat(item.unit_price || 0)).toFixed(2)}</div>
-                </div>
-              `).join('') || 
-              salesOrderData.products?.filter(p => p.product && p.quantity > 0).map(product => `
-                <div class="item">
-                  <div class="item-name">${product.product?.name || 'Product'}</div>
-                  <div class="item-qty">${product.quantity}</div>
-                  <div class="item-price">$${(product.quantity * parseFloat(product.unit_price || 0)).toFixed(2)}</div>
-                </div>
-              `).join('') || 
-              '<div class="item"><div class="item-name" colspan="3">Items details not available</div></div>'}
-            </div>
-            
-            <div class="total">
-              <div class="detail-row">
-                <span>Subtotal:</span>
-                <span>$${(salesOrder.subtotal || subtotal || 0).toFixed(2)}</span>
-              </div>
-              ${(salesOrder.discount_amount || discountAmount || 0) > 0 ? `
-              <div class="detail-row">
-                <span>Discount (${salesOrder.discount_percentage || salesOrderData.discount_percentage || 0}%):</span>
-                <span>-$${(salesOrder.discount_amount || discountAmount || 0).toFixed(2)}</span>
-              </div>
-              ` : ''}
-              <div class="detail-row" style="font-size: 18px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-                <span><strong>TOTAL AMOUNT:</strong></span>
-                <span><strong>$${(salesOrder.total || receiptData.amount || finalTotal || 0).toFixed(2)}</strong></span>
-              </div>
-            </div>
-            
-            <div class="footer">
-              <p>Thank you for your business!</p>
-              <p>Please keep this receipt for your records</p>
-              ${salesOrder.notes || salesOrderData.notes ? `<p>Notes: ${salesOrder.notes || salesOrderData.notes}</p>` : ''}
-            </div>
-            
-            <div class="no-print" style="margin-top: 30px; text-align: center;">
-              <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px;">Print Receipt</button>
-              <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; margin-left: 10px;">Close</button>
-            </div>
-          </body>
-        </html>
-      `);
-      
-      printWindow.document.close();
-      
-      // Auto-focus and print
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
       
     } catch (error) {
       console.error('Print receipt error:', error);
-      onSnackbar('Failed to open print window. Please try again.', 'error');
+      onSnackbar('Print failed. Please try again or check browser settings.', 'error');
     }
+  };
+
+  // Create receipt HTML content
+  const createReceiptHTML = (salesOrder, receiptData) => {
+    const currentDate = new Date().toLocaleDateString();
+    const currentTime = new Date().toLocaleTimeString();
+    
+    return `
+      <html>
+        <head>
+          <title>Receipt ${receiptData.receipt_number}</title>
+          <style>
+            body { 
+              font-family: 'Courier New', monospace; 
+              margin: 20px; 
+              line-height: 1.4;
+              font-size: 12px;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              border-bottom: 2px solid #333; 
+              padding-bottom: 15px; 
+            }
+            .company-name {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .details { 
+              margin-bottom: 20px; 
+              border-bottom: 1px dashed #666;
+              padding-bottom: 15px;
+            }
+            .detail-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 3px 0;
+              padding: 5px 0;
+            }
+            .detail-label {
+              font-weight: bold;
+              color: #555;
+            }
+            .product-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 30px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .product-table th {
+              background: linear-gradient(135deg, #2196F3, #1976D2);
+              color: white;
+              padding: 15px 10px;
+              text-align: left;
+              font-weight: bold;
+              font-size: 14px;
+            }
+            .product-table td {
+              padding: 12px 10px;
+              border-bottom: 1px solid #ddd;
+              font-size: 14px;
+            }
+            .product-table tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .product-table tr:hover {
+              background-color: #f0f8ff;
+            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .summary-section {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 40px;
+            }
+            .summary-table {
+              width: 300px;
+              border-collapse: collapse;
+            }
+            .summary-table td {
+              padding: 8px 15px;
+              border-bottom: 1px solid #eee;
+              font-size: 14px;
+            }
+            .summary-table .total-row {
+              background: linear-gradient(135deg, #2196F3, #1976D2);
+              color: white;
+              font-weight: bold;
+              font-size: 16px;
+            }
+            .terms-section {
+              margin-top: 40px;
+              padding: 20px;
+              background-color: #f8f9fa;
+              border-left: 4px solid #2196F3;
+            }
+            .terms-title {
+              font-weight: bold;
+              margin-bottom: 10px;
+              color: #2196F3;
+            }
+            .terms-content {
+              font-size: 12px;
+              line-height: 1.5;
+              color: #666;
+            }
+            .footer {
+              margin-top: 50px;
+              text-align: center;
+              font-size: 12px;
+              color: #666;
+              border-top: 1px solid #eee;
+              padding-top: 20px;
+            }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">SmartERP Software</div>
+            <div class="details">
+              <div class="detail-row">
+                <span>Receipt #:</span>
+                <span>${receiptData.receipt_number}</span>
+              </div>
+              <div class="detail-row">
+                <span>Date:</span>
+                <span>${currentDate}</span>
+              </div>
+              <div class="detail-row">
+                <span>Time:</span>
+                <span>${currentTime}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="details">
+            <div class="detail-row">
+              <span>Customer:</span>
+              <span>${salesOrder.customer_name || 'Customer Name'}</span>
+            </div>
+            <div class="detail-row">
+              <span>Order #:</span>
+              <span>${salesOrder.order_number || salesOrder.id}</span>
+            </div>
+            <div class="detail-row">
+              <span>Payment Method:</span>
+              <span>${receiptData.payment_method?.toUpperCase() || 'N/A'}</span>
+            </div>
+            <div class="detail-row">
+              <span>Payment Status:</span>
+              <span>${receiptData.payment_status?.toUpperCase() || 'N/A'}</span>
+            </div>
+          </div>
+          
+          <div class="items-section">
+            <h4>Items Purchased:</h4>
+            ${salesOrder.items && salesOrder.items.length > 0 ? `
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${salesOrder.items.map(item => `
+                    <tr>
+                      <td>${item.product_name || 'Product'}</td>
+                      <td>${item.product_sku || 'N/A'}</td>
+                      <td>${item.quantity || 0}</td>
+                      <td>$${parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                      <td>$${parseFloat(item.line_total || (item.quantity * item.unit_price) || 0).toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : `<div>No items available</div>`}
+          </div>
+          
+          <div class="total-section">
+            <div class="total">
+              <div class="detail-row">
+                <span>TOTAL PAID:</span>
+                <span>$${parseFloat(receiptData.amount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="terms-section">
+            <div class="terms-title">Payment Terms & Conditions:</div>
+            <div class="terms-content">
+              • Payment Method: ${(salesOrder.payment_method || 'Cash').toUpperCase()}<br>
+              • Payment Terms: ${salesOrder.payment_terms || 30} days<br>
+              ${salesOrder.payment_method === 'credit' ? '• Late payments may incur additional charges<br>' : ''}
+              • All sales are final unless otherwise specified<br>
+              • Please retain this receipt for your records<br>
+              ${salesOrder.notes || salesOrderData.notes ? `• Notes: ${salesOrder.notes || salesOrderData.notes}<br>` : ''}
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p><strong>Thank you for your business!</strong></p>
+            <p>This is a computer-generated receipt and does not require a signature.</p>
+            <p>For inquiries, please contact us at info@smarterpsoftware.com</p>
+          </div>
+          
+          <div class="no-print" style="margin-top: 30px; text-align: center;">
+            <button onclick="window.print()" style="padding: 12px 24px; font-size: 14px;">Print Receipt</button>
+            <button onclick="window.close()" style="padding: 12px 24px; font-size: 14px; margin-left: 10px;">Close</button>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  // Show printable receipt in current window (fallback for pop-up blockers)
+  const showPrintableReceipt = (receiptHTML, receiptNumber) => {
+    // Create a temporary container
+    const printContainer = document.createElement('div');
+    printContainer.innerHTML = receiptHTML;
+    printContainer.style.position = 'fixed';
+    printContainer.style.top = '0';
+    printContainer.style.left = '0';
+    printContainer.style.width = '100%';
+    printContainer.style.height = '100%';
+    printContainer.style.backgroundColor = 'white';
+    printContainer.style.zIndex = '10000';
+    printContainer.style.overflow = 'auto';
+    
+    // Add close button functionality
+    const closeButton = printContainer.querySelector('button[onclick="window.close()"]');
+    if (closeButton) {
+      closeButton.onclick = () => {
+        document.body.removeChild(printContainer);
+      };
+    }
+    
+    // Add to document
+    document.body.appendChild(printContainer);
+    
+    // Show notification
+    onSnackbar(`Receipt ready for printing. Click "Print Receipt" button or use Ctrl+P`, 'info');
   };
 
   const updateProduct = (index, field, value) => {
@@ -1150,6 +1189,434 @@ const QuickActionDialogs = ({
     window.addEventListener('productUpdated', handleProductUpdate);
     return () => window.removeEventListener('productUpdated', handleProductUpdate);
   }, [onRefreshProducts]);
+
+  // Generate invoice function - called immediately after sales order creation
+  const generateInvoice = (salesOrder, orderItems) => {
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        onSnackbar('Pop-up blocked. Please allow pop-ups to print invoices.', 'warning');
+        return;
+      }
+
+      const currentDate = new Date().toLocaleDateString();
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      
+      // Use the order items from the form data since backend might not return items
+      const itemsToDisplay = orderItems || salesOrderData.products?.filter(p => p.product && p.quantity > 0) || [];
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice ${invoiceNumber}</title>
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                margin: 20px; 
+                line-height: 1.6;
+                color: #333;
+              }
+              .invoice-header { 
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 40px; 
+                border-bottom: 3px solid #2196F3; 
+                padding-bottom: 20px; 
+              }
+              .company-info {
+                flex: 1;
+              }
+              .company-name {
+                font-size: 28px;
+                font-weight: bold;
+                color: #2196F3;
+                margin-bottom: 5px;
+              }
+              .company-details {
+                font-size: 14px;
+                color: #666;
+                line-height: 1.4;
+              }
+              .invoice-info {
+                text-align: right;
+                flex: 1;
+              }
+              .invoice-title {
+                font-size: 36px;
+                font-weight: bold;
+                color: #2196F3;
+                margin-bottom: 10px;
+              }
+              .invoice-details {
+                font-size: 14px;
+                line-height: 1.8;
+              }
+              .billing-section {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 40px;
+              }
+              .billing-info {
+                flex: 1;
+                margin-right: 40px;
+              }
+              .billing-title {
+                font-size: 16px;
+                font-weight: bold;
+                color: #2196F3;
+                margin-bottom: 15px;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 5px;
+              }
+              .billing-details {
+                font-size: 14px;
+                line-height: 1.6;
+              }
+              .items-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 30px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              }
+              .items-table th {
+                background: linear-gradient(135deg, #2196F3, #1976D2);
+                color: white;
+                padding: 15px 10px;
+                text-align: left;
+                font-weight: bold;
+                font-size: 14px;
+              }
+              .items-table td {
+                padding: 12px 10px;
+                border-bottom: 1px solid #ddd;
+                font-size: 14px;
+              }
+              .items-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+              }
+              .items-table tr:hover {
+                background-color: #f0f8ff;
+              }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+              .summary-section {
+                display: flex;
+                justify-content: flex-end;
+                margin-bottom: 40px;
+              }
+              .summary-table {
+                width: 300px;
+                border-collapse: collapse;
+              }
+              .summary-table td {
+                padding: 8px 15px;
+                border-bottom: 1px solid #eee;
+                font-size: 14px;
+              }
+              .summary-table .total-row {
+                background: linear-gradient(135deg, #2196F3, #1976D2);
+                color: white;
+                font-weight: bold;
+                font-size: 16px;
+              }
+              .terms-section {
+                margin-top: 40px;
+                padding: 20px;
+                background-color: #f8f9fa;
+                border-left: 4px solid #2196F3;
+              }
+              .terms-title {
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #2196F3;
+              }
+              .terms-content {
+                font-size: 12px;
+                line-height: 1.5;
+                color: #666;
+              }
+              .footer {
+                margin-top: 50px;
+                text-align: center;
+                font-size: 12px;
+                color: #666;
+                border-top: 1px solid #eee;
+                padding-top: 20px;
+              }
+              @media print {
+                body { margin: 0; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="invoice-header">
+              <div class="company-info">
+                <div class="company-name">SmartERP Software</div>
+                <div class="company-details">
+                  Enterprise Resource Planning System<br>
+                  123 Business Street<br>
+                  Accra, Ghana<br>
+                  Phone: +233 20 123 4567<br>
+                  Email: info@smarterpsoftware.com
+                </div>
+              </div>
+              <div class="invoice-info">
+                <div class="invoice-title">INVOICE</div>
+                <div class="invoice-details">
+                  <strong>Invoice #:</strong> ${invoiceNumber}<br>
+                  <strong>Date:</strong> ${currentDate}<br>
+                  <strong>Order #:</strong> ${salesOrder.order_number || 'N/A'}<br>
+                  ${salesOrder.due_date ? `<strong>Due Date:</strong> ${new Date(salesOrder.due_date).toLocaleDateString()}<br>` : ''}
+                </div>
+              </div>
+            </div>
+            
+            <div class="billing-section">
+              <div class="billing-info">
+                <div class="billing-title">Bill To:</div>
+                <div class="billing-details">
+                  <strong>${salesOrderData.customer?.name || 'Customer Name'}</strong><br>
+                  ${salesOrderData.customer?.email || ''}<br>
+                  ${salesOrderData.customer?.phone || ''}<br>
+                  ${salesOrderData.customer?.address || ''}
+                </div>
+              </div>
+              <div class="billing-info">
+                <div class="billing-title">Sales Agent:</div>
+                <div class="billing-details">
+                  <strong>${salesAgents[0]?.name || 'Sales Agent'}</strong><br>
+                  ${salesAgents[0]?.email || ''}<br>
+                  Department: Sales
+                </div>
+              </div>
+            </div>
+            
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th style="width: 40%">Product Description</th>
+                  <th style="width: 15%" class="text-center">SKU</th>
+                  <th style="width: 10%" class="text-center">Qty</th>
+                  <th style="width: 15%" class="text-right">Unit Price</th>
+                  <th style="width: 20%" class="text-right">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsToDisplay.map(product => {
+                  const quantity = parseInt(product.quantity || 0);
+                  const unitPrice = parseFloat(product.unit_price || product.product?.unit_price || product.product?.price || 0);
+                  const lineTotal = quantity * unitPrice;
+                  
+                  return `
+                    <tr>
+                      <td><strong>${product.product?.name || 'Product'}</strong></td>
+                      <td class="text-center">${product.product?.sku || 'N/A'}</td>
+                      <td class="text-center">${quantity}</td>
+                      <td class="text-right">$${unitPrice.toFixed(2)}</td>
+                      <td class="text-right">$${lineTotal.toFixed(2)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            
+            <div class="summary-section">
+              <table class="summary-table">
+                <tr>
+                  <td><strong>Subtotal:</strong></td>
+                  <td class="text-right">$${(salesOrder.subtotal || 0).toFixed(2)}</td>
+                </tr>
+                ${(salesOrder.discount_amount || 0) > 0 ? `
+                <tr>
+                  <td><strong>Discount (${salesOrder.discount_percentage || 0}%):</strong></td>
+                  <td class="text-right">-$${(salesOrder.discount_amount || 0).toFixed(2)}</td>
+                </tr>
+                ` : ''}
+                <tr class="total-row">
+                  <td><strong>TOTAL AMOUNT:</strong></td>
+                  <td class="text-right"><strong>$${(salesOrder.total || 0).toFixed(2)}</strong></td>
+                </tr>
+              </table>
+            </div>
+            
+            <div class="terms-section">
+              <div class="terms-title">Payment Terms & Conditions:</div>
+              <div class="terms-content">
+                • Payment Method: ${(salesOrder.payment_method || 'Cash').toUpperCase()}<br>
+                • Payment Terms: ${salesOrder.payment_terms || 30} days<br>
+                ${salesOrder.payment_method === 'credit' ? '• Late payments may incur additional charges<br>' : ''}
+                • All sales are final unless otherwise specified<br>
+                • Please retain this invoice for your records<br>
+                ${salesOrder.notes || salesOrderData.notes ? `• Notes: ${salesOrder.notes || salesOrderData.notes}<br>` : ''}
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p><strong>Thank you for your business!</strong></p>
+              <p>This is a computer-generated invoice and does not require a signature.</p>
+              <p>For inquiries, please contact us at info@smarterpsoftware.com</p>
+            </div>
+            
+            <div class="no-print" style="margin-top: 30px; text-align: center;">
+              <button onclick="window.print()" style="padding: 12px 24px; font-size: 14px;">Print Invoice</button>
+              <button onclick="window.close()" style="padding: 12px 24px; font-size: 14px; margin-left: 10px;">Close</button>
+            </div>
+          </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      
+      // Auto-focus and print
+      setTimeout(() => {
+        printWindow.focus();
+        if (window.confirm('Invoice generated successfully! Would you like to print it now?')) {
+          printWindow.print();
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('Invoice generation error:', error);
+      onSnackbar('Failed to generate invoice', 'error');
+    }
+  };
+
+  const handleCreateCustomer = async () => {
+    try {
+      // Comprehensive form validation
+      const errors = [];
+      
+      if (!customerData.name?.trim()) {
+        errors.push('Customer name is required');
+      }
+      
+      if (!customerData.email?.trim()) {
+        errors.push('Email address is required');
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerData.email)) {
+        errors.push('Please enter a valid email address');
+      }
+      
+      if (!customerData.phone?.trim()) {
+        errors.push('Phone number is required');
+      }
+      
+      if (!customerData.address?.trim()) {
+        errors.push('Address is required');
+      }
+      
+      if (errors.length > 0) {
+        onSnackbar(`Validation errors: ${errors.join(', ')}`, 'error');
+        return;
+      }
+
+      // Prepare customer data with proper field mapping
+      const customerPayload = {
+        name: customerData.name.trim(),
+        email: customerData.email.trim().toLowerCase(),
+        phone: customerData.phone.trim(),
+        address: customerData.address.trim(),
+        customer_type: customerData.customer_type || 'retailer',
+        payment_terms: customerData.payment_terms || 30,
+        latitude: customerData.latitude,
+        longitude: customerData.longitude,
+        location_accuracy: customerData.location_accuracy,
+        location_timestamp: customerData.location_timestamp,
+        // Add optional fields if they exist
+        ...(customerData.priority && { priority: customerData.priority }),
+        ...(customerData.estimated_value && { estimated_value: parseFloat(customerData.estimated_value) }),
+        ...(customerData.notes && { notes: customerData.notes.trim() })
+      };
+
+      const response = await api.post('/sales/customers/', customerPayload);
+      console.log('Customer creation response:', response.data);
+      
+      // Update shared customer data immediately
+      if (response.data) {
+        // Add to shared customers array
+        const { sharedCustomers, addCustomer } = await import('./sharedData');
+        addCustomer(response.data);
+      }
+      
+      // Create accounts receivable account
+      try {
+        await api.post('/accounting/chart-of-accounts/', {
+          name: `Accounts Receivable - ${customerData.name}`,
+          account_type: 'asset',
+          parent_account: 'Accounts Receivable'
+        });
+      } catch (accountingError) {
+        console.warn('Failed to create accounting entry:', accountingError);
+        // Don't fail customer creation if accounting fails
+      }
+
+      onSnackbar('Customer created successfully!', 'success');
+      setCustomerCreationDialogOpen(false);
+      
+      // Force refresh customers list with a small delay to ensure backend consistency
+      setTimeout(() => {
+        refreshCustomers();
+      }, 500);
+      
+      // Reset form with all fields
+      setCustomerData({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        customer_type: 'retailer',
+        payment_terms: 30,
+        latitude: null,
+        longitude: null,
+        location_accuracy: null,
+        location_timestamp: null,
+        priority: 'medium',
+        estimated_value: '',
+        notes: ''
+      });
+    } catch (error) {
+      console.error('Customer creation error:', error);
+      
+      // Enhanced error handling
+      let errorMessage = 'Error creating customer';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.email && Array.isArray(errorData.email)) {
+          errorMessage = `Email error: ${errorData.email.join(', ')}`;
+        } else if (errorData.latitude && Array.isArray(errorData.latitude)) {
+          errorMessage = `GPS Latitude error: ${errorData.latitude.join(', ')}`;
+        } else if (errorData.longitude && Array.isArray(errorData.longitude)) {
+          errorMessage = `GPS Longitude error: ${errorData.longitude.join(', ')}`;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors.join(', ');
+        } else {
+          // Handle field-specific errors
+          const fieldErrors = [];
+          Object.keys(errorData).forEach(field => {
+            if (Array.isArray(errorData[field])) {
+              fieldErrors.push(`${field}: ${errorData[field].join(', ')}`);
+            }
+          });
+          if (fieldErrors.length > 0) {
+            errorMessage = fieldErrors.join('; ');
+          }
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      onSnackbar(errorMessage, 'error');
+    }
+  };
 
   return (
     <>
@@ -1388,9 +1855,9 @@ const QuickActionDialogs = ({
                       onChange={(e) => setCustomerData({...customerData, name: e.target.value})}
                       required
                       sx={{ 
-                        '& .MuiOutlinedInput-root': {
+                        '& .MuiOutlinedInput-root': { 
                           pl: 5,
-                          borderRadius: 2
+                          borderRadius: 2 
                         }
                       }}
                     />
@@ -1414,9 +1881,9 @@ const QuickActionDialogs = ({
                       onChange={(e) => setCustomerData({...customerData, email: e.target.value})}
                       required
                       sx={{ 
-                        '& .MuiOutlinedInput-root': {
+                        '& .MuiOutlinedInput-root': { 
                           pl: 5,
-                          borderRadius: 2
+                          borderRadius: 2 
                         }
                       }}
                     />
@@ -1438,9 +1905,9 @@ const QuickActionDialogs = ({
                       value={customerData.phone}
                       onChange={(e) => setCustomerData({...customerData, phone: e.target.value})}
                       sx={{ 
-                        '& .MuiOutlinedInput-root': {
+                        '& .MuiOutlinedInput-root': { 
                           pl: 5,
-                          borderRadius: 2
+                          borderRadius: 2 
                         }
                       }}
                     />
@@ -2515,24 +2982,39 @@ const QuickActionDialogs = ({
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <Box sx={{ 
-                height: 400, 
-                bgcolor: 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)', 
-                borderRadius: 2, 
-                display: 'flex', 
-                flexDirection: 'column',
-                alignItems: 'center', 
-                justifyContent: 'center',
-                border: '2px dashed #2196F3'
-              }}>
-                <MapIcon sx={{ fontSize: 60, color: '#2196F3', mb: 2 }} />
-                <Typography variant="h6" color="primary" textAlign="center">
-                  Interactive Customer Heat Map
-                </Typography>
-                <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: 1 }}>
-                  Visualization will load here showing customer density and activity
-                </Typography>
-              </Box>
+              {heatMapData.showMap ? (
+                <CustomerHeatMap customers={customers} />
+              ) : (
+                <Box sx={{ 
+                  height: 400, 
+                  bgcolor: 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)', 
+                  borderRadius: 2, 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  border: '2px dashed #2196F3'
+                }}>
+                  {heatMapData.isLoading ? (
+                    <>
+                      <CircularProgress sx={{ mb: 2 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        Generating heat map...
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <MapIcon sx={{ fontSize: 60, color: '#2196F3', mb: 2 }} />
+                      <Typography variant="h6" color="primary" textAlign="center">
+                        Interactive Customer Heat Map
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: 1 }}>
+                        Visualization will load here showing customer density and activity
+                      </Typography>
+                    </>
+                  )}
+                </Box>
+              )}
             </Grid>
           </Grid>
         </DialogContent>
@@ -2755,7 +3237,7 @@ const QuickActionDialogs = ({
               {/* Payment Terms for Credit Sales */}
               {salesOrderData.payment_method === 'credit' && (
                 <Box sx={{ mt: 3, p: 2, bgcolor: '#E3F2FD', borderRadius: 2 }}>
-                  <Typography variant="body2" color="primary" fontWeight="bold">
+                  <Typography variant="body2">
                     Credit Terms: {salesOrderData.customer?.payment_terms || salesOrderData.payment_terms} days
                   </Typography>
                   <Typography variant="body2" color="text.secondary">

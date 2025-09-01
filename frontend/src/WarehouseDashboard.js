@@ -4,7 +4,7 @@ import {
   TextField, Select, MenuItem, FormControl, InputLabel, Chip, IconButton, Tooltip, Switch,
   LinearProgress, CircularProgress, Snackbar, Alert, Avatar, Divider, List, ListItem, ListItemText,
   ListItemIcon, Badge, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Accordion, AccordionSummary, AccordionDetails, Tabs, Tab, AppBar, Fade, Grow
+  Accordion, AccordionSummary, AccordionDetails, Tabs, Tab, AppBar, Fade, Grow, Autocomplete
 } from '@mui/material';
 import {
   Warehouse as WarehouseIcon, Add as AddIcon, TrendingUp as TrendingUpIcon,
@@ -25,7 +25,9 @@ import {
   updateGlobalProduct,
   getGlobalTransferHistory,
   addTransferToHistory,
-  updateTransferStatus
+  updateTransferStatus,
+  loadWarehousesWithStock,
+  API_BASE_URL
 } from './sharedData';
 
 const StyledTabs = styled(Tabs)(() => ({
@@ -231,6 +233,8 @@ function WarehouseDashboard() {
   const [userWarehouse, setUserWarehouse] = useState(null);
   const [products, setProducts] = useState([]);
   const [transfers, setTransfers] = useState([]);
+  const [salesUsers, setSalesUsers] = useState([]); // Add sales users state
+  const [warehouseStock, setWarehouseStock] = useState([]); // Add warehouse stock state
   
   // Smart filtering and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -244,6 +248,8 @@ function WarehouseDashboard() {
   const [analyticsDialog, setAnalyticsDialog] = useState(false);
   const [addWarehouseDialog, setAddWarehouseDialog] = useState(false);
   const [addStockDialog, setAddStockDialog] = useState(false);
+  const [quickActionOpen, setQuickActionOpen] = useState(false);
+  const [warehouseDetailsOpen, setWarehouseDetailsOpen] = useState(false);
   
   // Form states
   const [transferForm, setTransferForm] = useState({
@@ -262,44 +268,189 @@ function WarehouseDashboard() {
     product: '', warehouse: '', quantity: '', notes: ''
   });
 
+  // Utility functions
+  const getWarehouseStockSummary = (warehouse) => {
+    // Get warehouse stock data from API or state
+    const warehouseStocks = warehouseStock || [];
+    const warehouseProducts = warehouseStocks.filter(stock => stock.warehouse === warehouse.id || stock.warehouse_id === warehouse.id);
+    
+    const totalProducts = warehouseProducts.length;
+    const totalStock = warehouseProducts.reduce((sum, stock) => sum + (stock.quantity || 0), 0);
+    const lowStockItems = warehouseProducts.filter(stock => (stock.quantity || 0) < (stock.min_stock || 10)).length;
+    const outOfStockItems = warehouseProducts.filter(stock => (stock.quantity || 0) === 0).length;
+    const capacity = warehouse.capacity || 10000;
+    const utilizationPercent = Math.min((totalStock / capacity) * 100, 100);
+    
+    return {
+      totalProducts,
+      totalStock,
+      lowStockItems,
+      outOfStockItems,
+      averageStock: totalProducts > 0 ? Math.round(totalStock / totalProducts) : 0,
+      stockHealth: totalProducts > 0 ? Math.round(((totalProducts - lowStockItems) / totalProducts) * 100) : 100,
+      capacity,
+      utilizationPercent
+    };
+  };
+
+  const getStatusColor = (warehouse) => {
+    const summary = getWarehouseStockSummary(warehouse);
+    if (summary.lowStockItems > summary.totalProducts * 0.3) return '#f44336'; // Red for critical
+    if (summary.lowStockItems > 0) return '#ff9800'; // Orange for warning
+    return '#4caf50'; // Green for good
+  };
+
+  // Handler functions
+  const handleQuickAction = (actionType) => {
+    setQuickActionOpen(false);
+    switch (actionType) {
+      case 'add_stock':
+        setAddStockDialog(true);
+        break;
+      case 'transfer':
+        setStockTransferDialog(true);
+        break;
+      case 'reports':
+        setAnalyticsDialog(true);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleViewWarehouseDetails = async (warehouse) => {
+    setSelectedWarehouse(warehouse);
+    setWarehouseDetailsOpen(true);
+    
+    // Load warehouse-specific stock data
+    await fetchWarehouseDetails(warehouse.id);
+  };
+
+  const refreshWarehouses = async () => {
+    await fetchWarehouseData();
+  };
+
   // Enhanced data fetching with comprehensive analytics
   const fetchWarehouseData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Load warehouses and products using shared data fallback
-      const [warehousesData, productsData] = await Promise.all([
-        loadWarehousesWithFallback(api),
-        loadProductsWithFallback(api)
-      ]);
-
-      // Use global products to ensure sync across modules
-      setWarehouses(warehousesData);
-      setProducts(getGlobalProducts());
+      const token = localStorage.getItem('token');
       
-      // Load transfers
-      await loadTransfers();
-
-      // Mock analytics data
-      const mockAnalytics = {
-        totalCapacity: warehousesData.reduce((sum, w) => sum + (w.capacity || 0), 0),
-        utilizationRate: Math.floor(Math.random() * 40) + 60, // 60-100%
-        activeTransfers: transfers.filter(t => t.status === 'in_transit' || t.status === 'pending').length,
-        lowStockAlerts: Math.floor(Math.random() * 8) + 2
-      };
+      console.log('📦 [WarehouseDashboard] Loading warehouse data...');
       
-      setAnalytics(mockAnalytics);
+      // Load warehouses directly from API
+      const warehousesResponse = await api.get('/warehouse/');
+      const warehouses = warehousesResponse.data;
+      setWarehouses(warehouses);
+      
+      // Load products from inventory API
+      const productsResponse = await api.get('/inventory/products/');
+      const products = productsResponse.data;
+      setProducts(products);
+      
+      // Load warehouse stock data
+      const warehouseStockResponse = await api.get('/warehouse/stock/');
+      const warehouseStockData = warehouseStockResponse.data;
+      setWarehouseStock(warehouseStockData);
+      
+      console.log('✅ [WarehouseDashboard] Data loaded successfully:');
+      console.log('   - Warehouses count:', warehouses?.length || 0);
+      console.log('   - Products count:', products?.length || 0);
+      console.log('   - Warehouse stock records:', warehouseStockData?.length || 0);
+      
+      // Update global state for cross-module synchronization
+      if (window.globalWarehouses) {
+        window.globalWarehouses = warehouses;
+      }
+      if (window.globalProducts) {
+        window.globalProducts = products;
+      }
+      
+      // Dispatch events for other modules to sync
+      window.dispatchEvent(new CustomEvent('warehousesUpdated', { 
+        detail: { warehouses: warehouses, source: 'warehouse_dashboard' } 
+      }));
+      window.dispatchEvent(new CustomEvent('productsUpdated', { 
+        detail: { products: products, source: 'warehouse_dashboard' } 
+      }));
+      
+      // Load additional data
+      const transfersData = await getGlobalTransferHistory();
+      setTransfers(transfersData);
       
     } catch (error) {
-      console.error('[Warehouse Dashboard] Error loading data:', error);
-      setError('Failed to load warehouse data');
+      console.error('❌ [WarehouseDashboard] Error fetching warehouse data:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      setError('Failed to load warehouse data. Please try again.');
+      
       // Fallback to shared data
-      setWarehouses([]);
-      setProducts(getGlobalProducts());
+      console.log('🔄 [WarehouseDashboard] Attempting fallback data loading...');
+      const fallbackProducts = getGlobalProducts();
+      console.log('📦 [WarehouseDashboard] Fallback products count:', fallbackProducts?.length || 0);
+      
+      // Direct API call instead of loadWarehousesWithFallback
+      let fallbackWarehouses = [];
+      try {
+        console.log('🏭 [WarehouseDashboard] Making direct warehouse API call...');
+        const response = await fetch(`${API_BASE_URL}/api/warehouse/`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('🌐 [WarehouseDashboard] Warehouse API response status:', response.status);
+        if (response.ok) {
+          fallbackWarehouses = await response.json();
+          console.log('✅ [WarehouseDashboard] Fallback warehouses loaded:', fallbackWarehouses?.length || 0);
+        } else {
+          console.warn('⚠️ [WarehouseDashboard] Warehouse API failed:', response.statusText);
+        }
+      } catch (fallbackError) {
+        console.error('❌ [WarehouseDashboard] Fallback warehouse loading failed:', fallbackError);
+      }
+      
+      setProducts(fallbackProducts || []);
+      setWarehouses(fallbackWarehouses || []);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Listen for product updates from other modules
+  useEffect(() => {
+    const handleProductUpdate = (event) => {
+      const { products: updatedProducts, source } = event.detail;
+      if (source !== 'warehouse_dashboard') {
+        setProducts(updatedProducts);
+        // Update global state
+        if (window.globalProducts) {
+          window.globalProducts = updatedProducts;
+        }
+      }
+    };
+
+    const handleWarehouseUpdate = (event) => {
+      const { warehouses: updatedWarehouses, source } = event.detail;
+      if (source !== 'warehouse_dashboard') {
+        setWarehouses(updatedWarehouses);
+        // Update global state
+        if (window.globalWarehouses) {
+          window.globalWarehouses = updatedWarehouses;
+        }
+      }
+    };
+
+    window.addEventListener('productsUpdated', handleProductUpdate);
+    window.addEventListener('warehousesUpdated', handleWarehouseUpdate);
+
+    return () => {
+      window.removeEventListener('productsUpdated', handleProductUpdate);
+      window.removeEventListener('warehousesUpdated', handleWarehouseUpdate);
+    };
   }, []);
 
   const loadTransfers = async () => {
@@ -325,12 +476,42 @@ function WarehouseDashboard() {
 
   const fetchWarehouseDetails = async (warehouseId) => {
     try {
-      // Comprehensive data fetching for advanced analytics
-      const [movementsRes, salesRes, locationsRes, inventoryRes, customersRes] = await Promise.allSettled([
+      console.log(`🔍 [Warehouse Details] Loading data for warehouse ${warehouseId}`);
+      
+      // Try to load warehouse-specific stock data first
+      let warehouseInventory = [];
+      try {
+        const warehouseStockRes = await api.get(`/warehouse/stock/?warehouse=${warehouseId}`);
+        warehouseInventory = warehouseStockRes.data.results || warehouseStockRes.data || [];
+        console.log(`📦 [Warehouse Stock] Loaded ${warehouseInventory.length} stock records from API`);
+      } catch (stockError) {
+        console.warn(`⚠️ [Warehouse Stock] API failed, trying fallback:`, stockError.message);
+        
+        // Fallback: Filter global products by warehouse or show all products
+        const allProducts = getGlobalProducts() || products || [];
+        warehouseInventory = allProducts.map(product => ({
+          id: `${product.id}-${warehouseId}`,
+          product_id: product.id,
+          product_name: product.name,
+          product_sku: product.sku,
+          product: product,
+          warehouse: warehouseId,
+          quantity: product.quantity || 0,
+          min_stock: product.min_stock || product.reorder_level || 10,
+          unit_price: product.unit_price || 0,
+          created_at: product.created_at,
+          updated_at: product.updated_at
+        }));
+        console.log(`📦 [Warehouse Stock] Using fallback with ${warehouseInventory.length} products`);
+      }
+      
+      setInventory(warehouseInventory);
+      
+      // Load other warehouse details
+      const [movementsRes, salesRes, locationsRes, customersRes] = await Promise.allSettled([
         api.get(`/warehouse/movements/?warehouse=${warehouseId}`),
         api.get(`/sales/?staff__managed_warehouse=${warehouseId}`).catch(() => ({ data: { results: [] } })),
         api.get(`/warehouse/locations/?warehouse=${warehouseId}`),
-        api.get(`/inventory/?warehouse=${warehouseId}`).catch(() => ({ data: { results: [] } })),
         api.get(`/customers/?warehouse=${warehouseId}`).catch(() => ({ data: { results: [] } }))
       ]);
       
@@ -348,10 +529,6 @@ function WarehouseDashboard() {
         setLocations(locationsRes.value.data.results || locationsRes.value.data);
       }
       
-      if (inventoryRes.status === 'fulfilled') {
-        setInventory(inventoryRes.value.data.results || inventoryRes.value.data);
-      }
-      
       if (customersRes.status === 'fulfilled') {
         setCustomers(customersRes.value.data.results || customersRes.value.data);
       }
@@ -360,10 +537,29 @@ function WarehouseDashboard() {
       await generateAnalytics(warehouseId);
       
     } catch (error) {
-      console.error('Error fetching warehouse details:', error);
+      console.error('❌ [Warehouse Details] Error fetching warehouse details:', error);
+      
+      // Final fallback: Use global products
+      const fallbackProducts = getGlobalProducts() || products || [];
+      const fallbackInventory = fallbackProducts.map(product => ({
+        id: `${product.id}-${warehouseId}`,
+        product_id: product.id,
+        product_name: product.name,
+        product_sku: product.sku,
+        product: product,
+        warehouse: warehouseId,
+        quantity: product.quantity || 0,
+        min_stock: product.min_stock || product.reorder_level || 10,
+        unit_price: product.unit_price || 0,
+        created_at: product.created_at,
+        updated_at: product.updated_at
+      }));
+      
+      setInventory(fallbackInventory);
+      console.log(`📦 [Warehouse Details] Using final fallback with ${fallbackInventory.length} products`);
     }
   };
-  
+
   const generateAnalytics = async (warehouseId) => {
     try {
       const analyticsData = {
@@ -477,6 +673,39 @@ function WarehouseDashboard() {
   const getWarehouseInventoryCount = (warehouse) => {
     // Return mock inventory count based on warehouse ID
     return Math.floor(Math.random() * 100) + 10;
+  };
+
+  const getWarehouseProducts = (warehouse) => {
+    // Return real products filtered by warehouse or use global products as fallback
+    if (products && products.length > 0) {
+      // Filter products that might be associated with this warehouse
+      // For now, return all products as each warehouse can potentially have any product
+      return products.map(product => ({
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        quantity: product.quantity || 0
+      }));
+    }
+    
+    // Fallback to mock data if no real products available
+    const mockProducts = [];
+    for (let i = 0; i < getWarehouseProductCount(warehouse); i++) {
+      mockProducts.push({
+        id: i,
+        name: `Product ${i}`,
+        quantity: Math.floor(Math.random() * 100) + 1
+      });
+    }
+    return mockProducts;
+  };
+
+  const getWarehouseProductCount = (warehouse) => {
+    // Return real product count or mock count
+    if (products && products.length > 0) {
+      return products.length;
+    }
+    return Math.floor(Math.random() * 50) + 5;
   };
 
   useEffect(() => {
@@ -773,110 +1002,178 @@ function WarehouseDashboard() {
 
   return (
     <DashboardContainer>
-      {/* Advanced Header with Real-time Controls */}
       <HeaderCard>
         <CardContent sx={{ p: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Box>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: '#2c3e50', mb: 1, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                🏢 Smart Warehouse Management
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <Typography variant="h6" sx={{ color: '#7f8c8d' }}>
-                  {userRole === 'sales_manager' ? (user?.is_superuser ? '👑 Admin Dashboard - All Warehouses' : '👨‍💼 Sales Manager Dashboard - All Warehouses') : `👤 Sales Rep Dashboard - ${userWarehouse?.name || 'Your Warehouse'}`}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: '#667eea', width: 56, height: 56 }}>
+                <WarehouseIcon sx={{ fontSize: 28 }} />
+              </Avatar>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: '#333', mb: 1 }}>
+                  Warehouse Management
                 </Typography>
-                <Chip 
-                  icon={userRole === 'sales_manager' ? <SupervisorAccountIcon /> : <PersonIcon />}
-                  label={userRole === 'sales_manager' ? (user?.is_superuser ? 'Admin Access' : 'Manager Access') : 'Rep Access'}
-                  color={userRole === 'sales_manager' ? 'primary' : 'secondary'}
-                  size="medium"
-                  sx={{ fontWeight: 600 }}
-                />
-                <Chip 
-                  icon={<ScheduleIcon />}
-                  label={realTimeMode ? 'Real-time' : 'Static'}
-                  color={realTimeMode ? 'success' : 'default'}
-                  size="small"
-                />
+                <Typography variant="body1" sx={{ color: '#666' }}>
+                  Manage inventory across all warehouse locations
+                </Typography>
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Tooltip title="Toggle Real-time Updates">
-                <Switch 
-                  checked={realTimeMode}
-                  onChange={(e) => setRealTimeMode(e.target.checked)}
-                  color="primary"
-                />
-              </Tooltip>
-              <Tooltip title="Refresh Data">
-                <IconButton 
-                  onClick={fetchWarehouseData} 
-                  sx={{ 
-                    bgcolor: 'rgba(102, 126, 234, 0.1)', 
-                    '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.2)' },
-                    border: '2px solid rgba(102, 126, 234, 0.3)'
-                  }}
-                >
-                  <RefreshIcon sx={{ color: '#667eea' }} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Advanced Analytics">
-                <IconButton 
-                  onClick={() => setAnalyticsDialog(true)}
-                  sx={{ 
-                    bgcolor: 'rgba(102, 126, 234, 0.1)', 
-                    '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.2)' },
-                    border: '2px solid rgba(102, 126, 234, 0.3)'
-                  }}
-                >
-                  <AssessmentIcon sx={{ color: '#667eea' }} />
-                </IconButton>
-              </Tooltip>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setQuickActionOpen(true)}
+                sx={{
+                  background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
+                  borderRadius: 3,
+                  px: 3,
+                  py: 1.5,
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #5a6fd8 30%, #6a4190 90%)',
+                  }
+                }}
+              >
+                Quick Actions
+              </Button>
+              <IconButton
+                onClick={fetchWarehouseData}
+                disabled={loading}
+                sx={{
+                  bgcolor: 'rgba(102, 126, 234, 0.1)',
+                  color: '#667eea',
+                  '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.2)' }
+                }}
+              >
+                <RefreshIcon />
+              </IconButton>
             </Box>
           </Box>
-          
-          {/* Smart Search and Filter Bar */}
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-            <TextField
-              placeholder="🔍 Search warehouses, locations, or inventory..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              variant="outlined"
-              size="small"
-              sx={{ 
-                flexGrow: 1,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 3,
-                  bgcolor: 'rgba(255, 255, 255, 0.8)',
-                }
-              }}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ color: '#667eea', mr: 1 }} />
-              }}
-            />
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <Select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                sx={{ borderRadius: 3, bgcolor: 'rgba(255, 255, 255, 0.8)' }}
-              >
-                <MenuItem value="all">All Status</MenuItem>
-                <MenuItem value="high">High Performance</MenuItem>
-                <MenuItem value="medium">Medium Performance</MenuItem>
-                <MenuItem value="low">Low Performance</MenuItem>
-              </Select>
-            </FormControl>
-            <IconButton 
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              sx={{ 
-                bgcolor: 'rgba(255, 255, 255, 0.8)',
-                border: '1px solid rgba(102, 126, 234, 0.3)',
-                borderRadius: 2
-              }}
-            >
-              {viewMode === 'grid' ? <FilterListIcon /> : <BarChartIcon />}
-            </IconButton>
-          </Box>
+
+          {/* Warehouse Selection Cards */}
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+            Select Warehouse Location
+          </Typography>
+          <Grid container spacing={3}>
+            {warehouses.map((warehouse) => {
+              const stockSummary = getWarehouseStockSummary(warehouse);
+              const isSelected = selectedWarehouse?.id === warehouse.id;
+              
+              return (
+                <Grid item xs={12} sm={6} md={4} key={warehouse.id}>
+                  <WarehouseCard
+                    selected={isSelected}
+                    status={stockSummary.utilizationPercent > 80 ? 'high' : stockSummary.utilizationPercent > 50 ? 'medium' : 'low'}
+                    onClick={() => handleWarehouseSelect(warehouse)}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar sx={{ 
+                            bgcolor: isSelected ? 'rgba(255,255,255,0.2)' : '#667eea', 
+                            color: isSelected ? 'white' : 'white' 
+                          }}>
+                            <WarehouseIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                              {warehouse.name}
+                            </Typography>
+                            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                              {warehouse.location || warehouse.address}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Button
+                          size="small"
+                          variant={isSelected ? "outlined" : "contained"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewWarehouseDetails(warehouse);
+                          }}
+                          sx={{
+                            color: isSelected ? 'white' : '#667eea',
+                            borderColor: isSelected ? 'rgba(255,255,255,0.5)' : '#667eea',
+                            bgcolor: isSelected ? 'transparent' : 'rgba(255, 255, 255, 0.9)',
+                            '&:hover': {
+                              bgcolor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(102, 126, 234, 0.1)',
+                            }
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </Box>
+
+                      <Divider sx={{ my: 2, opacity: 0.3 }} />
+
+                      {/* Stock Summary */}
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                              {stockSummary.totalProducts}
+                            </Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                              Products
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                              {stockSummary.totalStock}
+                            </Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                              Total Stock
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5, color: stockSummary.lowStockItems > 0 ? '#ff9800' : 'inherit' }}>
+                              {stockSummary.lowStockItems}
+                            </Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                              Low Stock
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                              {stockSummary.utilizationPercent.toFixed(0)}%
+                            </Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                              Capacity
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      {/* Capacity Bar */}
+                      <Box sx={{ mt: 2 }}>
+                        <LinearProgress
+                          variant="determinate"
+                          value={stockSummary.utilizationPercent}
+                          sx={{
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(102, 126, 234, 0.1)',
+                            '& .MuiLinearProgress-bar': {
+                              borderRadius: 3,
+                              bgcolor: stockSummary.utilizationPercent > 80 ? '#ff5722' : stockSummary.utilizationPercent > 50 ? '#ff9800' : '#4caf50'
+                            }
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ opacity: 0.8, mt: 0.5, display: 'block' }}>
+                          {stockSummary.totalStock} / {stockSummary.capacity} units
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </WarehouseCard>
+                </Grid>
+              );
+            })}
+          </Grid>
         </CardContent>
       </HeaderCard>
 
@@ -896,142 +1193,6 @@ function WarehouseDashboard() {
           </Grid>
         </Grid>
       </Paper>
-
-      {/* Smart Warehouse Selector */}
-      {userRole === 'sales_manager' && warehouses.length > 1 && (
-        <SmartWarehouseSelector>
-          <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#2c3e50', mb: 1, display: 'flex', alignItems: 'center' }}>
-                🏭 Smart Warehouse Selector
-                <Badge badgeContent={warehouses.length} color="primary" sx={{ ml: 2 }} />
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Chip 
-                  label={`${warehouses.filter(w => w.is_active).length} Active`}
-                  color="success"
-                  size="small"
-                  icon={<WarehouseIcon />}
-                />
-                <Chip 
-                  label={viewMode === 'grid' ? 'Grid View' : 'List View'}
-                  color="info"
-                  size="small"
-                  icon={viewMode === 'grid' ? <BarChartIcon /> : <FilterListIcon />}
-                />
-              </Box>
-            </Box>
-            
-            <Fade in={true} timeout={800}>
-              <Grid container spacing={3}>
-                {warehouses
-                  .filter(warehouse => 
-                    warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    warehouse.code.toLowerCase().includes(searchTerm.toLowerCase())
-                  )
-                  .filter(warehouse => 
-                    filterStatus === 'all' || 
-                    getWarehouseStatus(warehouse) === filterStatus
-                  )
-                  .map((warehouse, index) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={warehouse.id}>
-                    <Grow in={true} timeout={500 + index * 100}>
-                      <WarehouseCard 
-                        selected={selectedWarehouse?.id === warehouse.id}
-                        status={getWarehouseStatus(warehouse)}
-                        onClick={() => handleWarehouseSelect(warehouse)}
-                      >
-                        <CardContent sx={{ p: 3 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                            <Avatar 
-                              sx={{ 
-                                bgcolor: selectedWarehouse?.id === warehouse.id ? 'rgba(255,255,255,0.2)' : 'rgba(102, 126, 234, 0.1)',
-                                color: selectedWarehouse?.id === warehouse.id ? 'white' : '#667eea',
-                                mr: 2,
-                                width: 48,
-                                height: 48
-                              }}
-                            >
-                              <WarehouseIcon fontSize="large" />
-                            </Avatar>
-                            <Box sx={{ flexGrow: 1 }}>
-                              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-                                {warehouse.name}
-                              </Typography>
-                              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                                {warehouse.code}
-                              </Typography>
-                            </Box>
-                            {selectedWarehouse?.id === warehouse.id && (
-                              <Chip 
-                                label="Active"
-                                color="success"
-                                size="small"
-                                sx={{ fontWeight: 600 }}
-                              />
-                            )}
-                          </Box>
-                          
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                              📍 {warehouse.address || 'Location not specified'}
-                            </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                              👤 Manager: {warehouse.manager_name || 'Unassigned'}
-                            </Typography>
-                          </Box>
-                          
-                          {/* Performance Indicators */}
-                          <Box sx={{ mb: 2 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                              <Typography variant="caption">Capacity Utilization</Typography>
-                              <Typography variant="caption">{getCapacityUtilization(warehouse)}%</Typography>
-                            </Box>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={getCapacityUtilization(warehouse)} 
-                              sx={{ 
-                                height: 6, 
-                                borderRadius: 3,
-                                bgcolor: 'rgba(0,0,0,0.1)',
-                                '& .MuiLinearProgress-bar': {
-                                  borderRadius: 3,
-                                  bgcolor: getCapacityUtilization(warehouse) > 80 ? '#f44336' : 
-                                          getCapacityUtilization(warehouse) > 60 ? '#ff9800' : '#4caf50'
-                                }
-                              }} 
-                            />
-                          </Box>
-                          
-                          {/* Quick Stats */}
-                          <Grid container spacing={1}>
-                            <Grid item xs={6}>
-                              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 2 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>
-                                  {warehouse.location_count || 0}
-                                </Typography>
-                                <Typography variant="caption">Locations</Typography>
-                              </Box>
-                            </Grid>
-                            <Grid item xs={6}>
-                              <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 2 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#2196f3' }}>
-                                  {getWarehouseInventoryCount(warehouse)}
-                                </Typography>
-                                <Typography variant="caption">Items</Typography>
-                              </Box>
-                            </Grid>
-                          </Grid>
-                        </CardContent>
-                      </WarehouseCard>
-                    </Grow>
-                  </Grid>
-                ))}
-              </Grid>
-            </Fade>
-          </CardContent>
-        </SmartWarehouseSelector>
-      )}
 
       {/* Enhanced Warehouse Overview with Smart Analytics */}
       {selectedWarehouse && (
@@ -1292,12 +1453,18 @@ function WarehouseDashboard() {
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Manager"
-                value={warehouseForm.manager}
-                onChange={(e) => setWarehouseForm({ ...warehouseForm, manager: e.target.value })}
-              />
+              <FormControl fullWidth>
+                <InputLabel>Manager</InputLabel>
+                <Select
+                  value={warehouseForm.manager}
+                  onChange={(e) => setWarehouseForm({ ...warehouseForm, manager: e.target.value })}
+                  label="Manager"
+                >
+                  {salesUsers.map((user) => (
+                    <MenuItem key={user.id} value={user.id}>{user.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
           </Grid>
         </DialogContent>
@@ -1312,20 +1479,32 @@ function WarehouseDashboard() {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Product</InputLabel>
-                <Select
-                  value={stockForm.product}
-                  onChange={(e) => setStockForm({ ...stockForm, product: e.target.value })}
-                  label="Product"
-                >
-                  {products.map((product) => (
-                    <MenuItem key={product.id} value={product.id}>
-                      {product.name} - {product.sku} (Current Stock: {product.quantity || 0})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={getGlobalProducts() || products}
+                getOptionLabel={(option) => `${option.sku || option.id} - ${option.name} - Stock: ${option.quantity || 0}`}
+                value={stockForm.product ? (getGlobalProducts() || products).find(p => p.id === stockForm.product) || null : null}
+                onChange={(event, newValue) => setStockForm({ ...stockForm, product: newValue?.id || '' })}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Product"
+                    placeholder="Select a product"
+                    fullWidth
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {option.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        SKU: {option.sku || option.id} | Current Stock: {option.quantity || 0} | Price: ${option.unit_price || 'N/A'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              />
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
@@ -1365,6 +1544,271 @@ function WarehouseDashboard() {
         <DialogActions>
           <Button onClick={() => setAddStockDialog(false)}>Cancel</Button>
           <Button onClick={handleAddStock} variant="contained">Add Stock</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={quickActionOpen} onClose={() => setQuickActionOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Warehouse Quick Actions
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => handleQuickAction('add_stock')}
+                sx={{ 
+                  p: 2, 
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.1)' }
+                }}
+              >
+                Add Stock
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<LocalShippingIcon />}
+                onClick={() => handleQuickAction('transfer')}
+                sx={{ 
+                  p: 2, 
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.1)' }
+                }}
+              >
+                Transfer Stock
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<AssessmentIcon />}
+                onClick={() => handleQuickAction('reports')}
+                sx={{ 
+                  p: 2, 
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.1)' }
+                }}
+              >
+                View Reports
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<InventoryIcon />}
+                onClick={() => setQuickActionOpen(false)}
+                sx={{ 
+                  p: 2, 
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.1)' }
+                }}
+              >
+                Inventory Audit
+              </Button>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQuickActionOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={warehouseDetailsOpen} onClose={() => setWarehouseDetailsOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ bgcolor: '#667eea' }}>
+              <WarehouseIcon />
+            </Avatar>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                {selectedWarehouse?.name} - Stock Details
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedWarehouse?.location || selectedWarehouse?.address}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedWarehouse && (
+            <Box>
+              {/* Warehouse Summary Cards */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={3}>
+                  <Card sx={{ p: 2, textAlign: 'center', bgcolor: '#e3f2fd' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#1976d2' }}>
+                      {Array.isArray(products) ? products.length : 0}
+                    </Typography>
+                    <Typography variant="caption">Total Products</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={3}>
+                  <Card sx={{ p: 2, textAlign: 'center', bgcolor: '#e8f5e8' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#388e3c' }}>
+                      {Array.isArray(products) ? products.reduce((sum, p) => sum + (p.quantity || 0), 0) : 0}
+                    </Typography>
+                    <Typography variant="caption">Total Stock</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={3}>
+                  <Card sx={{ p: 2, textAlign: 'center', bgcolor: '#fff3e0' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#f57c00' }}>
+                      {Array.isArray(products) ? products.filter(p => (p.quantity || 0) <= (p.reorder_level || 10)).length : 0}
+                    </Typography>
+                    <Typography variant="caption">Low Stock</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={3}>
+                  <Card sx={{ p: 2, textAlign: 'center', bgcolor: '#fce4ec' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#c2185b' }}>
+                      GHS {Array.isArray(products) ? products.reduce((sum, p) => sum + ((p.quantity || 0) * (p.unit_price || 0)), 0).toLocaleString() : '0'}
+                    </Typography>
+                    <Typography variant="caption">Stock Value</Typography>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* Enhanced Stock Management Section */}
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Avatar sx={{ bgcolor: '#2196F3', width: 40, height: 40 }}>
+                    <InventoryIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: '#333' }}>
+                      Stock Management - {selectedWarehouse?.name}
+                    </Typography>
+                    <Typography variant="h6" sx={{ color: '#666', fontWeight: 500 }}>
+                      Warehouse Inventory Overview & Control
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+                  <TextField
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <Box sx={{ mr: 1 }}>
+                          <SearchIcon />
+                        </Box>
+                      ),
+                    }}
+                    sx={{ minWidth: 300 }}
+                    size="small"
+                  />
+                </Box>
+              </Box>
+
+              {/* Enhanced Product Stock Table */}
+              <TableContainer component={Paper} sx={{ maxHeight: 500, borderRadius: 2 }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Product</TableCell>
+                      <TableCell>SKU</TableCell>
+                      <TableCell>Category</TableCell>
+                      <TableCell align="right">Current Stock</TableCell>
+                      <TableCell align="right">Min Stock</TableCell>
+                      <TableCell align="right">Max Stock</TableCell>
+                      <TableCell align="right">Unit Price</TableCell>
+                      <TableCell align="right">Stock Value</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Last Updated</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Array.isArray(inventory) ? inventory
+                      .filter(item => 
+                        (item.product?.name || item.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        (item.product?.sku || item.product_sku || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        (item.product?.category_name || item.product?.category || '').toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((item) => {
+                        const product = item.product || {};
+                        const productName = item.product_name || product.name || 'Unknown Product';
+                        const productSku = item.product_sku || product.sku || 'N/A';
+                        const productCategory = product.category_name || product.category || 'Uncategorized';
+                        const currentStock = item.quantity || 0;
+                        const minStock = item.min_stock || item.reorder_level || product.min_stock || 0;
+                        const unitPrice = item.unit_price || product.unit_price || 0;
+                        
+                        const stockStatus = currentStock <= minStock ? 'low' : 
+                                          currentStock === 0 ? 'out' : 'good';
+                        const statusColor = stockStatus === 'out' ? 'error' : 
+                                          stockStatus === 'low' ? 'warning' : 'success';
+                        
+                        return (
+                          <TableRow key={item.id || `${item.product_id}-${item.warehouse}`}>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Avatar sx={{ bgcolor: '#2196F3', width: 32, height: 32 }}>
+                                  <InventoryIcon sx={{ fontSize: 16 }} />
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="subtitle2">{productName}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {product.description || 'No description'}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                            <TableCell>{productSku}</TableCell>
+                            <TableCell>
+                              <Chip label={productCategory} size="small" />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="h6" color={statusColor === 'error' ? 'error' : statusColor === 'warning' ? 'warning.main' : 'success.main'}>
+                                {currentStock}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">{minStock}</TableCell>
+                            <TableCell align="right">{item.max_stock || product.max_stock || 'No limit'}</TableCell>
+                            <TableCell align="right">GHS {unitPrice.toLocaleString()}</TableCell>
+                            <TableCell align="right">GHS {(currentStock * unitPrice).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={stockStatus === 'out' ? 'Out of Stock' : stockStatus === 'low' ? 'Low Stock' : 'In Stock'} 
+                                color={statusColor}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="caption">
+                                {new Date(item.updated_at || item.created_at || product.updated_at || product.created_at).toLocaleDateString()}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }) : []}
+                    {(!Array.isArray(inventory) || inventory.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={10} align="center">
+                          <Typography variant="body2" color="text.secondary" sx={{ py: 4 }}>
+                            No stock data available for this warehouse
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWarehouseDetailsOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 

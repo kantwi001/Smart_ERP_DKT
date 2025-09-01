@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
+import { getApiBaseUrl } from './api';
 
 const WelcomeCard = styled(Card)(({ theme }) => ({
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -165,7 +166,7 @@ const EmployeeDashboard = () => {
       console.log('Token preview:', token.substring(0, 20) + '...');
 
       // Check if we can reach the backend first
-      const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:2025';
+      const baseURL = process.env.REACT_APP_API_URL || getApiBaseUrl().replace('/api', '');
       console.log('Using API base URL:', baseURL);
 
       // Test basic connectivity first

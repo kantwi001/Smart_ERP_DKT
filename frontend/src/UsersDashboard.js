@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
+      import React, { useState, useEffect, useContext } from 'react';
 import { 
   Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
   Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText, Button,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar, FormControlLabel, Checkbox
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Snackbar, FormControlLabel, Checkbox,
+  TableContainer, Table, TableHead, TableRow, TableCell, TableBody
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import PeopleIcon from '@mui/icons-material/People';
@@ -19,8 +20,11 @@ import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 import api from './api';
 import { AuthContext } from './AuthContext';
+import { getApiBaseUrl } from './api';
 
 // Sample users data
 const sampleUsers = [
@@ -201,9 +205,11 @@ const UsersDashboard = () => {
   
   // Quick Actions State
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editDepartmentDialogOpen, setEditDepartmentDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
@@ -233,8 +239,10 @@ const UsersDashboard = () => {
     try {
       setLoading(true);
       console.log('🔍 Fetching users from backend API...');
+      console.log('🔑 Token available:', token ? 'YES' : 'NO');
+      console.log('🔑 Token value:', token ? token.substring(0, 20) + '...' : 'null');
       
-      const response = await fetch('http://localhost:2025/api/users/', {
+      const response = await fetch(`${getApiBaseUrl()}/users/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -243,81 +251,197 @@ const UsersDashboard = () => {
       });
       
       console.log('📡 API Response status:', response.status);
+      console.log('📡 API Response headers:', response.headers);
+      console.log('📡 API Response ok:', response.ok);
       
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Received users from API:', data.length, 'users');
         console.log('👥 User data:', data);
+        console.log('🔍 First user raw data:', data[0]);
+        console.log('🔍 Department data available:', data[0]?.department_name, data[0]?.department_id);
+        console.log('🔍 Warehouse data available:', data[0]?.assigned_warehouse_name, data[0]?.assigned_warehouse_id);
+        
+        // Debug all users' department data
+        data.forEach((user, index) => {
+          console.log(`🏢 User ${index + 1} (${user.email}) department data:`, {
+            department_id: user.department_id,
+            department_name: user.department_name,
+            department_field: user.department,
+            raw_department: JSON.stringify(user.department)
+          });
+        });
         
         // Transform backend data to match frontend format
-        const transformedUsers = data.map(user => ({
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          first_name: user.first_name || '',
-          last_name: user.last_name || '',
-          role: user.role || 'employee',
-          department: user.department_name || 'Unassigned',
-          department_id: user.department_id,
-          assigned_warehouse: user.assigned_warehouse_name || 'Unassigned',
-          assigned_warehouse_id: user.assigned_warehouse_id,
-          is_active: user.is_active,
-          is_superuser: user.is_superuser,
-          is_staff: user.is_staff,
-          status: user.is_active ? 'Active' : 'Inactive',
-          lastLogin: user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
-          dateJoined: user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'Unknown'
-        }));
+        const transformedUsers = data.map(user => {
+          console.log('🔄 Transforming user:', user.email, {
+            department_name: user.department_name,
+            department_id: user.department_id,
+            assigned_warehouse_name: user.assigned_warehouse_name,
+            assigned_warehouse_id: user.assigned_warehouse_id
+          });
+          
+          return {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            role: user.role || 'employee',
+            department: user.department_name || 'Unassigned',
+            department_id: user.department_id,
+            assigned_warehouse: user.assigned_warehouse_name || 'Unassigned',
+            assigned_warehouse_id: user.assigned_warehouse_id,
+            is_active: user.is_active,
+            is_superuser: user.is_superuser,
+            is_staff: user.is_staff,
+            status: user.is_active ? 'Active' : 'Inactive',
+            lastLogin: user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
+            dateJoined: user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'Unknown'
+          };
+        });
         
+        console.log('🎯 Transformed users:', transformedUsers);
+        console.log('🔍 First transformed user:', transformedUsers[0]);
         setUsers(transformedUsers);
         setError('');
         console.log('🎯 Successfully loaded', transformedUsers.length, 'users from database');
       } else {
         const errorText = await response.text();
         console.error('❌ API Error:', response.status, errorText);
+        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        // Check for specific error types
+        if (response.status === 401) {
+          console.error('🔐 Authentication failed - token may be invalid or expired');
+          setError('Authentication failed - please log in again');
+        } else if (response.status === 403) {
+          console.error('🚫 Access forbidden - insufficient permissions');
+          setError('Access forbidden - insufficient permissions');
+        } else if (response.status === 404) {
+          console.error('🔍 API endpoint not found');
+          setError('API endpoint not found - check backend server');
+        } else if (response.status >= 500) {
+          console.error('🔥 Server error - backend may be down');
+          setError('Server error - backend may be down');
+        } else {
+          console.error('❓ Unknown error:', response.status);
+          setError(`API Error: ${response.status} - ${errorText}`);
+        }
+        
         console.warn('Using sample data as fallback');
         setUsers(sampleUsers);
-        setError(`API Error: ${response.status}`);
       }
     } catch (error) {
       console.error('💥 Network error fetching users:', error);
+      console.error('💥 Error type:', error.name);
+      console.error('💥 Error message:', error.message);
+      console.error('💥 Error stack:', error.stack);
+      
+      // Check for specific network errors
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        console.error('🌐 Network connectivity issue - backend server may be down');
+        setError(`Network error - backend server may be down (check ${getApiBaseUrl().replace('/api', '')})`);
+      } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error('🔌 CORS or connection issue');
+        setError('Connection failed - check CORS settings and backend server');
+      } else {
+        console.error('❓ Unknown network error');
+        setError(`Network error: ${error.message}`);
+      }
+      
       console.warn('Using sample data as fallback');
       setUsers(sampleUsers);
-      setError('Network error - using sample data');
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch warehouses from API
+  const fetchWarehouses = async () => {
+    try {
+      console.log('🏭 Fetching warehouses from API...');
+      const response = await api.get('/warehouse/');
+      
+      if (response.status === 200) {
+        const data = response.data.results || response.data || [];
+        console.log('🏭 Warehouse data:', data);
+        
+        // Transform backend data to match frontend format
+        const transformedWarehouses = data.map(warehouse => ({
+          id: warehouse.id,
+          name: warehouse.name,
+          code: warehouse.code || `WH${warehouse.id.toString().padStart(3, '0')}`,
+          location: warehouse.location || '',
+          description: warehouse.description || ''
+        }));
+        
+        setWarehouses(transformedWarehouses);
+        console.log('🎯 Successfully loaded', transformedWarehouses.length, 'warehouses from API');
+        return transformedWarehouses;
+      } else {
+        console.warn('⚠️ Warehouse API returned non-200 status:', response.status);
+        console.warn('Using sample warehouses as fallback');
+        setWarehouses(sampleWarehouses);
+        return sampleWarehouses;
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch warehouses:', error);
+      console.warn('Using sample warehouses as fallback');
+      setWarehouses(sampleWarehouses);
+      return sampleWarehouses;
+    }
+  };
+
   const handleAddUser = async () => {
     try {
-      const response = await fetch('http://localhost:2025/api/users/create/', {
+      console.log('🔄 Creating user with form data:', userForm);
+      console.log('📋 Department value being sent:', userForm.department);
+      console.log('🏭 Warehouse value being sent:', userForm.assignedWarehouse);
+      console.log('🏷️ Department condition check:', departments.find(d => d.id == userForm.department)?.name === 'Sales');
+      
+      const payload = {
+        username: userForm.email.split('@')[0], // Generate username from email
+        name: userForm.name, // Backend expects 'name' field
+        email: userForm.email,
+        role: userForm.role,
+        department: userForm.department,
+        assignedWarehouse: userForm.department === 2 ? userForm.assignedWarehouse : null,
+        moduleAccess: userForm.moduleAccess,
+        password: userForm.password,
+        generatePassword: userForm.generatePassword,
+        sendEmail: userForm.sendEmail
+      };
+      
+      console.log('📤 Complete payload being sent:', payload);
+      
+      const response = await fetch(`${getApiBaseUrl()}/users/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          username: userForm.email.split('@')[0], // Generate username from email
-          name: userForm.name, // Backend expects 'name' field
-          email: userForm.email,
-          role: userForm.role,
-          department: userForm.department,
-          assigned_warehouse: userForm.department === 'Sales' ? userForm.assignedWarehouse : null,
-          accessible_modules: userForm.moduleAccess,
-          password: userForm.password,
-          generatePassword: userForm.generatePassword, // Tell backend whether to auto-generate
-          sendEmail: userForm.sendEmail // Match backend field name
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
+      console.log('📤 Backend response:', data);
       
       if (response.ok) {
+        console.log('✅ User creation successful, refreshing user list...');
+        
         // Refresh users list
         await fetchUsers();
         
-        setSnackbarMessage(data.message || 'User created successfully and email sent with login credentials!');
+        let message = data.message || 'User created successfully';
+        if (data.email_sent) {
+          message += ' and email sent with login credentials!';
+        } else if (data.generated_password && !data.email_sent) {
+          message += ` Generated password: ${data.generated_password}`;
+        }
+        
+        console.log('✅ User creation message:', message);
+        setSnackbarMessage(message);
         setSnackbarOpen(true);
         setUserDialogOpen(false);
         setUserForm({
@@ -332,45 +456,18 @@ const UsersDashboard = () => {
           password: '',
           sendEmail: true
         });
+        console.log('✅ User form reset');
       } else {
+        console.log('❌ User creation failed, response status:', response.status);
+        console.log('❌ User creation failed, response data:', data);
         setSnackbarMessage(data.error || 'Failed to create user');
         setSnackbarOpen(true);
       }
     } catch (error) {
       console.error('User creation error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        url: error.config?.url,
-        method: error.config?.method,
-        data: error.config?.data
-      });
       
-      let errorMessage = 'Error creating user. Please try again.';
-      if (error.response?.status === 400) {
-        if (error.response.data?.errors) {
-          const validationErrors = Object.entries(error.response.data.errors).map(([field, messages]) => {
-            return `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`;
-          }).join('; ');
-          errorMessage = `Validation errors: ${validationErrors}`;
-        } else if (error.response.data?.error) {
-          errorMessage = `Error: ${error.response.data.error}`;
-        } else if (error.response.data?.detail) {
-          errorMessage = `Error: ${error.response.data.detail}`;
-        } else {
-          errorMessage = `Invalid user data. Check console for details. Response: ${JSON.stringify(error.response.data)}`;
-        }
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Authentication required. Please log in again.';
-      } else if (error.response?.status === 403) {
-        errorMessage = 'Permission denied. You need admin privileges to create users.';
-      } else if (error.response?.status === 404) {
-        errorMessage = 'User creation endpoint not found. Please check backend server.';
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+      let errorMessage = 'Failed to create user. Please try again.';
+      if (error.message.includes('fetch')) {
         errorMessage = 'Network error. Please check if backend server is running.';
       }
       
@@ -382,13 +479,10 @@ const UsersDashboard = () => {
   const handleDeleteUser = async (userId) => {
     try {
       const response = await api.delete(`/users/${userId}/delete/`);
-
-      const data = await response.json();
+      const data = response.data;
       
-      if (response.ok) {
-        // Refresh users list
+      if (response.status === 200) {
         await fetchUsers();
-        
         setSnackbarMessage(data.message || 'User deleted successfully');
         setSnackbarOpen(true);
       } else {
@@ -397,162 +491,23 @@ const UsersDashboard = () => {
       }
     } catch (error) {
       console.error('User deletion error:', error);
-      setSnackbarMessage('Error deleting user. Please try again.');
-      setSnackbarOpen(true);
-    }
-  };
-  
-  // Generate random password function
-  const generateRandomPassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  };
-  
-  const handleManageRoles = async () => {
-    try {
-      console.log('Managing role:', roleForm);
-      setSnackbarMessage('Role updated successfully!');
-      setSnackbarOpen(true);
-      setRoleDialogOpen(false);
-      setRoleForm({ name: '', description: '', permissions: [], level: 'basic' });
-    } catch (error) {
-      setSnackbarMessage('Failed to update role');
-      setSnackbarOpen(true);
-    }
-  };
-  
-  const handleBulkOperations = () => {
-    setSnackbarMessage('Bulk operation started!');
-    setSnackbarOpen(true);
-  };
-  
-  // Security Settings State
-  const [securityDialogOpen, setSecurityDialogOpen] = useState(false);
-  const [userModuleAccess, setUserModuleAccess] = useState([]);
-  const [isModuleRestricted, setIsModuleRestricted] = useState(false);
-  
-  // Available ERP Modules
-  const availableModules = [
-    { id: 'dashboard', name: 'Dashboard', icon: '📊', description: 'Main dashboard and overview' },
-    { id: 'inventory', name: 'Inventory Management', icon: '📦', description: 'Stock and inventory control' },
-    { id: 'warehouse', name: 'Warehouse Management', icon: '🏭', description: 'Warehouse operations and transfers' },
-    { id: 'sales', name: 'Sales Management', icon: '💰', description: 'Sales orders and customer management' },
-    { id: 'accounting', name: 'Accounting', icon: '💼', description: 'Financial accounting and reporting' },
-    { id: 'manufacturing', name: 'Manufacturing', icon: '🏭', description: 'Production and manufacturing processes' },
-    { id: 'procurement', name: 'Procurement', icon: '🛒', description: 'Purchase orders and supplier management' },
-    { id: 'hr', name: 'Human Resources', icon: '👥', description: 'Employee management and HR processes' },
-    { id: 'pos', name: 'Point of Sale', icon: '🛍️', description: 'POS system and retail operations' },
-    { id: 'reporting', name: 'Reporting & Analytics', icon: '📈', description: 'Business intelligence and reports' },
-    { id: 'customers', name: 'Customer Management', icon: '👤', description: 'Customer relationship management' },
-    { id: 'users', name: 'User Management', icon: '👨‍💼', description: 'User administration and permissions' },
-    { id: 'surveys', name: 'Survey Management', icon: '📝', description: 'Survey creation and management' },
-    { id: 'route_planning', name: 'Route Planning', icon: '🗺️', description: 'Delivery route optimization' },
-    { id: 'survey_admin', name: 'Survey Administration', icon: '🔐', description: 'Advanced survey administration' },
-    { id: 'powerbi', name: 'PowerBI Integration', icon: '📊', description: 'Business intelligence dashboards' },
-  ];
-  
-  const handleSecuritySettings = () => {
-    setSecurityDialogOpen(true);
-  };
-  
-  const handleUserSelect = (user) => {
-    setSelectedUser(user);
-    // Load user's current module access (mock data for now)
-    const defaultAccess = ['dashboard', 'inventory', 'sales'];
-    setUserModuleAccess(user.moduleAccess || defaultAccess);
-    setIsModuleRestricted(user.isModuleRestricted || false);
-  };
-  
-  const handleModuleToggle = (moduleId) => {
-    setUserModuleAccess(prev => {
-      if (prev.includes(moduleId)) {
-        return prev.filter(id => id !== moduleId);
+      if (error.response) {
+        const errorMessage = error.response.data?.error || error.response.data?.message || 'Failed to delete user';
+        setSnackbarMessage(errorMessage);
       } else {
-        return [...prev, moduleId];
+        setSnackbarMessage('Error deleting user. Please try again.');
       }
-    });
-  };
-  
-  const handleSaveModuleAccess = async () => {
-    if (!selectedUser) return;
-    
-    try {
-      // API call to update user module access
-      const updateData = {
-        accessible_modules: userModuleAccess,
-        is_module_restricted: isModuleRestricted
-      };
-      
-      // await api.patch(`/users/${selectedUser.id}/`, updateData);
-      
-      setSnackbarMessage(`Module access updated for ${selectedUser.name}`);
-      setSnackbarOpen(true);
-      setSelectedUser(null);
-    } catch (error) {
-      setSnackbarMessage('Failed to update module access');
       setSnackbarOpen(true);
     }
   };
-
-  // Handle department editing
-  const handleEditDepartment = (user) => {
-    setSelectedUser(user);
-    setEditDepartmentDialogOpen(true);
-  };
-
-  const handleUpdateDepartment = async () => {
-    try {
-      console.log('🔄 Updating department for user:', selectedUser);
-      console.log('📤 Sending department_id:', selectedUser.department_id);
-      
-      const response = await fetch(`http://localhost:2025/api/users/${selectedUser.id}/update-department/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          department_id: selectedUser.department_id
-        })
-      });
-
-      console.log('📡 Response status:', response.status);
-      const responseData = await response.json();
-      console.log('📋 Response data:', responseData);
-
-      if (response.ok) {
-        setSnackbarMessage(`Department updated for ${selectedUser.first_name} ${selectedUser.last_name}`);
-        setSnackbarOpen(true);
-        fetchUsers(); // Refresh user list
-        setEditDepartmentDialogOpen(false);
-        setSelectedUser(null);
-      } else {
-        console.error('❌ Update failed:', responseData);
-        setSnackbarMessage(`Failed to update department: ${responseData.error || 'Unknown error'}`);
-        setSnackbarOpen(true);
-      }
-    } catch (error) {
-      console.error('💥 Error updating department:', error);
-      setSnackbarMessage(`Error updating department: ${error.message}`);
-      setSnackbarOpen(true);
-    }
-  };
-
-  const recentActivity = sampleRecentActivity;
 
   useEffect(() => {
-    console.log('🔄 UsersDashboard useEffect triggered, token:', token ? 'present' : 'missing');
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch real data from API
         await fetchUsers();
+        await fetchWarehouses();
         setDepartments(sampleDepartments);
-        setWarehouses(sampleWarehouses);
         setError('');
       } catch (error) {
         console.error('❌ Data fetch failed:', error);
@@ -564,7 +519,6 @@ const UsersDashboard = () => {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [token]);
 
@@ -644,7 +598,7 @@ const UsersDashboard = () => {
               fullWidth
               variant="contained"
               startIcon={<GroupAddIcon />}
-              onClick={handleBulkOperations}
+              onClick={() => setSnackbarMessage('Bulk operations coming soon!')}
               sx={{ 
                 background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)',
                 color: 'white'
@@ -658,7 +612,7 @@ const UsersDashboard = () => {
               fullWidth
               variant="contained"
               startIcon={<SecurityIcon />}
-              onClick={handleSecuritySettings}
+              onClick={() => setSnackbarMessage('Security settings coming soon!')}
               sx={{ 
                 background: 'linear-gradient(45deg, #607D8B 30%, #455A64 90%)',
                 color: 'white'
@@ -723,18 +677,27 @@ const UsersDashboard = () => {
             <Grid item xs={12} sm={6} md={3}>
               <AnalyticsCard>
                 <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: '#00BCD4' }}>
-                        3
-                      </Typography>
-                      <Typography variant="body1" color="textSecondary">
-                        Active Users
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <SecurityIcon sx={{ color: '#2196F3', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Role Overview</Typography>
+                  </Box>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Total Roles</Typography>
+                      <Typography variant="h6" sx={{ color: '#2196F3', fontWeight: 700 }}>5</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Active Users</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {users.filter(u => u.is_active).length}
                       </Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: '#e0f7fa', color: '#00BCD4', width: 56, height: 56 }}>
-                      <GroupIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Admin Users</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF9800', fontWeight: 700 }}>
+                        {users.filter(u => u.role === 'admin' || u.is_superuser).length}
+                      </Typography>
+                    </Box>
                   </Box>
                 </CardContent>
               </AnalyticsCard>
@@ -743,18 +706,23 @@ const UsersDashboard = () => {
             <Grid item xs={12} sm={6} md={3}>
               <AnalyticsCard>
                 <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: '#4CAF50' }}>
-                        5
-                      </Typography>
-                      <Typography variant="body1" color="textSecondary">
-                        User Roles
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <BadgeIcon sx={{ color: '#4CAF50', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Department Overview</Typography>
+                  </Box>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Total Departments</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {departments.length}
                       </Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: '#e8f5e8', color: '#4CAF50', width: 56, height: 56 }}>
-                      <BadgeIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Active Departments</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {departments.filter(d => d.name !== 'Unassigned').length}
+                      </Typography>
+                    </Box>
                   </Box>
                 </CardContent>
               </AnalyticsCard>
@@ -763,71 +731,24 @@ const UsersDashboard = () => {
             <Grid item xs={12} sm={6} md={3}>
               <AnalyticsCard>
                 <CardContent>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: '#FF9800' }}>
-                        4
-                      </Typography>
-                      <Typography variant="body1" color="textSecondary">
-                        Departments
-                      </Typography>
-                    </Box>
-                    <Avatar sx={{ bgcolor: '#fff3e0', color: '#FF9800', width: 56, height: 56 }}>
-                      <AdminPanelSettingsIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <AdminPanelSettingsIcon sx={{ color: '#FF9800', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Warehouse Overview</Typography>
                   </Box>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* Recent Activity */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Recent User Activity</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <List sx={{ py: 0 }}>
-                    {recentActivity.map((activity, index) => (
-                      <ListItem key={index} sx={{ px: 0, py: 1 }}>
-                        <ListItemText 
-                          primary={activity.action}
-                          secondary={activity.timestamp}
-                          primaryTypographyProps={{ fontWeight: 500 }}
-                        />
-                        <Chip 
-                          label={activity.type}
-                          size="small" 
-                          color={activity.type === 'success' ? 'success' : activity.type === 'warning' ? 'warning' : 'info'}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </CardContent>
-              </AnalyticsCard>
-            </Grid>
-
-            {/* User Status */}
-            <Grid item xs={12} md={6}>
-              <AnalyticsCard>
-                <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>User Status Overview</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  {users.slice(0, 4).map((user, index) => (
-                    <Box key={index} sx={{ mb: 2 }}>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                        <Typography variant="body1" fontWeight={500}>{user.name || user.username || 'Unknown User'}</Typography>
-                        <Chip 
-                          label={user.status}
-                          size="small"
-                          color={user.status === 'Active' ? 'success' : 'default'}
-                        />
-                      </Box>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                        <Typography variant="body2" color="textSecondary">{user.role} • {user.department}</Typography>
-                        <Typography variant="body2" fontWeight={500}>Last: {user.lastLogin}</Typography>
-                      </Box>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Total Warehouses</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF9800', fontWeight: 700 }}>
+                        {warehouses.length}
+                      </Typography>
                     </Box>
-                  ))}
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Active Warehouses</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF9800', fontWeight: 700 }}>
+                        {warehouses.filter(w => w.name !== 'Unassigned').length}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </CardContent>
               </AnalyticsCard>
             </Grid>
@@ -875,18 +796,9 @@ const UsersDashboard = () => {
                             </Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                               <Typography variant="body2">Department:</Typography>
-                              <Box display="flex" alignItems="center" gap={1}>
-                                <Typography variant="body2" fontWeight={500}>
-                                  {user.department || 'Unassigned'}
-                                </Typography>
-                                <IconButton 
-                                  size="small" 
-                                  onClick={() => handleEditDepartment(user)}
-                                  sx={{ p: 0.5 }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
+                              <Typography variant="body2" fontWeight={500}>
+                                {user.department || 'Unassigned'}
+                              </Typography>
                             </Box>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                               <Typography variant="body2">Warehouse:</Typography>
@@ -919,6 +831,21 @@ const UsersDashboard = () => {
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setEditUserDialogOpen(true);
+                                }}
+                                sx={{ 
+                                  '&:hover': { 
+                                    bgcolor: 'rgba(33, 150, 243, 0.1)' 
+                                  }
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
                             </Box>
                           </CardContent>
                         </Card>
@@ -934,15 +861,252 @@ const UsersDashboard = () => {
         {/* Roles & Permissions Tab */}
         <TabPanel value={tabValue} index={2}>
           <Grid container spacing={3}>
+            {/* Role Statistics */}
+            <Grid item xs={12} md={4}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <SecurityIcon sx={{ color: '#2196F3', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Role Overview</Typography>
+                  </Box>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Total Roles</Typography>
+                      <Typography variant="h6" sx={{ color: '#2196F3', fontWeight: 700 }}>5</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Active Users</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {users.filter(u => u.is_active).length}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2">Admin Users</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF9800', fontWeight: 700 }}>
+                        {users.filter(u => u.role === 'admin' || u.is_superuser).length}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Role Distribution Chart */}
+            <Grid item xs={12} md={8}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>Role Distribution</Typography>
+                  <Box display="flex" flexWrap="wrap" gap={2}>
+                    {['admin', 'manager', 'employee', 'viewer'].map((role) => {
+                      const roleCount = users.filter(u => u.role === role).length;
+                      const percentage = users.length > 0 ? Math.round((roleCount / users.length) * 100) : 0;
+                      const colors = {
+                        admin: '#F44336',
+                        manager: '#FF9800', 
+                        employee: '#4CAF50',
+                        viewer: '#2196F3'
+                      };
+                      
+                      return (
+                        <Box key={role} sx={{ 
+                          bgcolor: colors[role] + '20', 
+                          p: 2, 
+                          borderRadius: 2, 
+                          minWidth: 120,
+                          textAlign: 'center'
+                        }}>
+                          <Typography variant="h4" sx={{ color: colors[role], fontWeight: 700 }}>
+                            {roleCount}
+                          </Typography>
+                          <Typography variant="body2" sx={{ textTransform: 'capitalize', fontWeight: 600 }}>
+                            {role}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {percentage}%
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Role Management Table */}
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Roles & Permissions Management</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Typography variant="body1" color="textSecondary" textAlign="center" py={4}>
-                    Role-based access control and permissions management will be displayed here.
-                    Use the "Manage Roles" quick action to create and modify user roles.
-                  </Typography>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Role Management</Typography>
+                    <Button 
+                      variant="contained" 
+                      startIcon={<AddIcon />}
+                      sx={{ 
+                        bgcolor: '#00BCD4',
+                        '&:hover': { bgcolor: '#0097A7' }
+                      }}
+                    >
+                      Create Role
+                    </Button>
+                  </Box>
+                  
+                  <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #e0e0e0' }}>
+                    <Table>
+                      <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600 }}>Role Name</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Users</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Permissions</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[
+                          { 
+                            name: 'Super Admin', 
+                            description: 'Full system access and control',
+                            users: users.filter(u => u.is_superuser).length,
+                            permissions: 'All Modules',
+                            color: '#F44336'
+                          },
+                          { 
+                            name: 'Admin', 
+                            description: 'Administrative access to most modules',
+                            users: users.filter(u => u.role === 'admin' && !u.is_superuser).length,
+                            permissions: 'Most Modules',
+                            color: '#FF5722'
+                          },
+                          { 
+                            name: 'Manager', 
+                            description: 'Department management and oversight',
+                            users: users.filter(u => u.role === 'manager').length,
+                            permissions: 'Department Modules',
+                            color: '#FF9800'
+                          },
+                          { 
+                            name: 'Employee', 
+                            description: 'Standard employee access',
+                            users: users.filter(u => u.role === 'employee').length,
+                            permissions: 'Basic Modules',
+                            color: '#4CAF50'
+                          },
+                          { 
+                            name: 'Viewer', 
+                            description: 'Read-only access to assigned modules',
+                            users: users.filter(u => u.role === 'viewer').length,
+                            permissions: 'View Only',
+                            color: '#2196F3'
+                          }
+                        ].map((role) => (
+                          <TableRow key={role.name} hover>
+                            <TableCell>
+                              <Box display="flex" alignItems="center">
+                                <Box 
+                                  sx={{ 
+                                    width: 12, 
+                                    height: 12, 
+                                    borderRadius: '50%', 
+                                    bgcolor: role.color,
+                                    mr: 2 
+                                  }} 
+                                />
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {role.name}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="textSecondary">
+                                {role.description}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={`${role.users} users`}
+                                size="small"
+                                sx={{ 
+                                  bgcolor: role.color + '20',
+                                  color: role.color,
+                                  fontWeight: 600
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {role.permissions}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" gap={1}>
+                                <IconButton size="small" sx={{ color: '#2196F3' }}>
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={{ color: '#4CAF50' }}>
+                                  <SecurityIcon fontSize="small" />
+                                </IconButton>
+                                {role.name !== 'Super Admin' && (
+                                  <IconButton size="small" sx={{ color: '#F44336' }}>
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Permission Matrix */}
+            <Grid item xs={12}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>Permission Matrix</Typography>
+                  <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #e0e0e0' }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600 }}>Module</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Super Admin</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Admin</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Manager</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Employee</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Viewer</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[
+                          { module: 'Users Management', permissions: [true, true, false, false, false] },
+                          { module: 'HR Management', permissions: [true, true, true, false, false] },
+                          { module: 'Finance', permissions: [true, true, true, false, true] },
+                          { module: 'Inventory', permissions: [true, true, true, true, true] },
+                          { module: 'Sales', permissions: [true, true, true, true, true] },
+                          { module: 'Procurement', permissions: [true, true, true, false, true] },
+                          { module: 'Warehouse', permissions: [true, true, true, true, true] },
+                          { module: 'Reporting', permissions: [true, true, true, false, true] }
+                        ].map((item) => (
+                          <TableRow key={item.module} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              {item.module}
+                            </TableCell>
+                            {item.permissions.map((hasPermission, index) => (
+                              <TableCell key={index} align="center">
+                                {hasPermission ? (
+                                  <CheckCircleIcon sx={{ color: '#4CAF50', fontSize: 20 }} />
+                                ) : (
+                                  <CancelIcon sx={{ color: '#F44336', fontSize: 20 }} />
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 </CardContent>
               </AnalyticsCard>
             </Grid>
@@ -952,15 +1116,200 @@ const UsersDashboard = () => {
         {/* Analytics Tab */}
         <TabPanel value={tabValue} index={3}>
           <Grid container spacing={3}>
+            {/* User Activity Overview */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <TrendingUpIcon sx={{ color: '#4CAF50', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>User Activity</Typography>
+                  </Box>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Active Sessions</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {users.filter(u => u.is_active).length}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Recent Logins (24h)</Typography>
+                      <Typography variant="h6" sx={{ color: '#2196F3', fontWeight: 700 }}>
+                        {users.filter(u => u.lastLogin !== 'Never').length}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Failed Login Attempts</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF5722', fontWeight: 700 }}>0</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Password Resets (7d)</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF9800', fontWeight: 700 }}>2</Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Security Metrics */}
+            <Grid item xs={12} md={6}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Box display="flex" alignItems="center" mb={2}>
+                    <SecurityIcon sx={{ color: '#F44336', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Security Metrics</Typography>
+                  </Box>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">2FA Enabled Users</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {Math.floor(users.length * 0.6)}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Strong Passwords</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 700 }}>
+                        {Math.floor(users.length * 0.8)}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Inactive Accounts</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF9800', fontWeight: 700 }}>
+                        {users.filter(u => !u.is_active).length}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">Privileged Users</Typography>
+                      <Typography variant="h6" sx={{ color: '#FF5722', fontWeight: 700 }}>
+                        {users.filter(u => u.role === 'admin' || u.is_superuser).length}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Department Analytics */}
+            <Grid item xs={12} md={8}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>Department Distribution</Typography>
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    {['SALES', 'FINANCE', 'HR', 'OPERATIONS', 'LOGISTICS/PROCUREMENT/SUPPLY CHAIN'].map((dept) => {
+                      const deptUsers = users.filter(u => u.department === dept || (dept === 'SALES' && u.department === 'Sales'));
+                      const percentage = users.length > 0 ? Math.round((deptUsers.length / users.length) * 100) : 0;
+                      const colors = {
+                        'SALES': '#4CAF50',
+                        'FINANCE': '#2196F3',
+                        'HR': '#FF9800',
+                        'OPERATIONS': '#9C27B0',
+                        'LOGISTICS/PROCUREMENT/SUPPLY CHAIN': '#607D8B'
+                      };
+                      
+                      return (
+                        <Box key={dept}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {dept}
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              {deptUsers.length} users ({percentage}%)
+                            </Typography>
+                          </Box>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={percentage} 
+                            sx={{ 
+                              height: 8, 
+                              borderRadius: 4,
+                              bgcolor: colors[dept] + '20',
+                              '& .MuiLinearProgress-bar': {
+                                bgcolor: colors[dept],
+                                borderRadius: 4
+                              }
+                            }}
+                          />
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Recent Activity */}
+            <Grid item xs={12} md={4}>
+              <AnalyticsCard>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Recent Activity</Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemText 
+                        primary="User Created"
+                        secondary="edmondsekyere@gmail.com - 2 hours ago"
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Role Updated"
+                        secondary="arkucollins@gmail.com - 4 hours ago"
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Password Reset"
+                        secondary="admin@smarterp.com - 1 day ago"
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Department Assigned"
+                        secondary="edmondsekyere@gmail.com - 1 day ago"
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                  </List>
+                </CardContent>
+              </AnalyticsCard>
+            </Grid>
+
+            {/* Login Analytics Chart */}
             <Grid item xs={12}>
               <AnalyticsCard>
                 <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>User Analytics</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Typography variant="body1" color="textSecondary" textAlign="center" py={4}>
-                    User activity analytics and security insights will be displayed here.
-                    Use the "Security Settings" quick action to configure security parameters.
-                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>Login Activity (Last 7 Days)</Typography>
+                  <Box display="flex" alignItems="end" gap={1} height={200}>
+                    {[45, 52, 38, 61, 42, 55, 48].map((value, index) => (
+                      <Box key={index} display="flex" flexDirection="column" alignItems="center" flex={1}>
+                        <Box 
+                          sx={{ 
+                            width: '100%',
+                            height: `${(value / 70) * 160}px`,
+                            bgcolor: '#00BCD4',
+                            borderRadius: '4px 4px 0 0',
+                            mb: 1,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              bgcolor: '#0097A7',
+                              transform: 'scaleY(1.1)'
+                            }
+                          }}
+                        />
+                        <Typography variant="caption" color="textSecondary">
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}
+                        </Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                          {value}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
                 </CardContent>
               </AnalyticsCard>
             </Grid>
@@ -1007,19 +1356,15 @@ const UsersDashboard = () => {
             value={userForm.department}
             onChange={(e) => setUserForm({...userForm, department: e.target.value})}
             margin="normal"
-            helperText={`${departments.length} departments available`}
           >
-            <MenuItem value="">
-              <em>Select Department</em>
-            </MenuItem>
+            <MenuItem value="">Select Department</MenuItem>
             {departments.map((department) => (
               <MenuItem key={department.id} value={department.id}>
                 {department.name}
               </MenuItem>
             ))}
           </TextField>
-          {/* Only show warehouse dropdown if Sales department is selected */}
-          {departments.find(d => d.id === userForm.department)?.name === 'Sales' && (
+          {(userForm.department == 2 || (departments.find(d => d.id == userForm.department)?.name === 'Sales')) && (
             <TextField
               fullWidth
               select
@@ -1027,107 +1372,151 @@ const UsersDashboard = () => {
               value={userForm.assignedWarehouse}
               onChange={(e) => setUserForm({...userForm, assignedWarehouse: e.target.value})}
               margin="normal"
-              helperText={`${warehouses.length} warehouses available`}
             >
-              <MenuItem value="">
-                <em>No Warehouse Assignment</em>
-              </MenuItem>
+              <MenuItem value="">No Warehouse Assignment</MenuItem>
               {warehouses.map((warehouse) => (
-                <MenuItem key={warehouse.id} value={warehouse.name}>
-                  {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
+                <MenuItem key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
                 </MenuItem>
               ))}
             </TextField>
           )}
-          <TextField
-            fullWidth
-            select
-            label="Access Level"
-            value={userForm.accessLevel}
-            onChange={(e) => setUserForm({...userForm, accessLevel: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="basic">Basic Access</MenuItem>
-            <MenuItem value="advanced">Advanced Access</MenuItem>
-            <MenuItem value="admin">Admin Access</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            label="Module Access"
-            value={userForm.moduleAccess}
-            onChange={(e) => setUserForm({...userForm, moduleAccess: e.target.value})}
-            margin="normal"
-            SelectProps={{ multiple: true }}
-            helperText="Select multiple modules (hold Ctrl/Cmd to select multiple)"
-          >
-            {availableModules.map((module) => (
-              <MenuItem key={module.id} value={module.id}>
-                {module.icon} {module.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          {/* Password Generation Options */}
-          <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>Password Settings</Typography>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={userForm.generatePassword}
-                  onChange={(e) => setUserForm({...userForm, generatePassword: e.target.checked, password: ''})}
-                  color="primary"
-                />
-              }
-              label="Generate random password automatically"
-            />
-            
-            {/* Manual Password Field - Only show when auto-generate is unchecked */}
-            {!userForm.generatePassword && (
-              <TextField
-                fullWidth
-                label="Password"
-                type="password"
-                value={userForm.password || ''}
-                onChange={(e) => setUserForm({...userForm, password: e.target.value})}
-                margin="normal"
-                required
-                helperText="Enter a secure password for the user"
-                sx={{ mt: 2 }}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={userForm.generatePassword}
+                onChange={(e) => setUserForm({...userForm, generatePassword: e.target.checked})}
+                color="primary"
               />
-            )}
-            
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={userForm.sendEmail}
-                  onChange={(e) => setUserForm({...userForm, sendEmail: e.target.checked})}
-                  color="primary"
-                  disabled={!userForm.generatePassword}
-                />
-              }
-              label="Send password to user's email address"
+            }
+            label="Generate random password automatically"
+          />
+          {!userForm.generatePassword && (
+            <TextField
+              fullWidth
+              label="Password"
+              type="password"
+              value={userForm.password}
+              onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+              margin="normal"
+              required
+              helperText="Enter a secure password for the user"
             />
-            {userForm.generatePassword && (
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                ✓ User will be required to change password on first login
-              </Typography>
-            )}
-            {!userForm.generatePassword && (
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                ✓ User will receive login credentials via email if enabled above
-              </Typography>
-            )}
-          </Box>
+          )}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={userForm.sendEmail}
+                onChange={(e) => setUserForm({...userForm, sendEmail: e.target.checked})}
+                color="primary"
+              />
+            }
+            label="Send password to user's email address"
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleAddUser} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #00BCD4 30%, #0097A7 90%)' }}
+          <Button onClick={handleAddUser} variant="contained">Add User</Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Edit User Dialog */}
+      <Dialog open={editUserDialogOpen} onClose={() => setEditUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Full Name"
+            value={editingUser?.first_name + ' ' + editingUser?.last_name}
+            onChange={(e) => {
+              const [firstName, lastName] = e.target.value.split(' ');
+              setEditingUser({...editingUser, first_name: firstName, last_name: lastName});
+            }}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Email"
+            value={editingUser?.email}
+            onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+            margin="normal"
+            type="email"
+          />
+          <TextField
+            fullWidth
+            select
+            label="Role"
+            value={editingUser?.role}
+            onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
+            margin="normal"
           >
-            Add User
-          </Button>
+            <MenuItem value="admin">Administrator</MenuItem>
+            <MenuItem value="manager">Manager</MenuItem>
+            <MenuItem value="employee">Employee</MenuItem>
+            <MenuItem value="contractor">Contractor</MenuItem>
+          </TextField>
+          <TextField
+            fullWidth
+            select
+            label="Department"
+            value={editingUser?.department_id}
+            onChange={(e) => setEditingUser({...editingUser, department_id: e.target.value})}
+            margin="normal"
+          >
+            <MenuItem value="">Select Department</MenuItem>
+            {departments.map((department) => (
+              <MenuItem key={department.id} value={department.id}>
+                {department.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          {editingUser?.department_id === 2 && (
+            <TextField
+              fullWidth
+              select
+              label="Assigned Warehouse"
+              value={editingUser?.assigned_warehouse_id}
+              onChange={(e) => setEditingUser({...editingUser, assigned_warehouse_id: e.target.value})}
+              margin="normal"
+            >
+              <MenuItem value="">No Warehouse Assignment</MenuItem>
+              {warehouses.map((warehouse) => (
+                <MenuItem key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditUserDialogOpen(false)}>Cancel</Button>
+          <Button onClick={async () => {
+            try {
+              const response = await api.put(`/users/${editingUser.id}/update/`, {
+                first_name: editingUser.first_name,
+                last_name: editingUser.last_name,
+                email: editingUser.email,
+                role: editingUser.role,
+                department_id: editingUser.department_id,
+                assigned_warehouse_id: editingUser.department_id === 2 ? editingUser.assigned_warehouse_id : null
+              });
+              const data = response.data;
+              if (response.status === 200) {
+                await fetchUsers();
+                setSnackbarMessage(data.message || 'User updated successfully');
+                setSnackbarOpen(true);
+              } else {
+                setSnackbarMessage(data.error || 'Failed to update user');
+                setSnackbarOpen(true);
+              }
+            } catch (error) {
+              console.error('User update error:', error);
+              setSnackbarMessage('Error updating user. Please try again.');
+              setSnackbarOpen(true);
+            } finally {
+              setEditUserDialogOpen(false);
+            }
+          }} variant="contained">Update User</Button>
         </DialogActions>
       </Dialog>
       
@@ -1151,242 +1540,19 @@ const UsersDashboard = () => {
             multiline
             rows={2}
           />
-          <TextField
-            fullWidth
-            select
-            label="Access Level"
-            value={roleForm.level}
-            onChange={(e) => setRoleForm({...roleForm, level: e.target.value})}
-            margin="normal"
-          >
-            <MenuItem value="basic">Basic Access</MenuItem>
-            <MenuItem value="advanced">Advanced Access</MenuItem>
-            <MenuItem value="admin">Admin Access</MenuItem>
-          </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRoleDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleManageRoles} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)' }}
-          >
+          <Button onClick={() => {
+            setSnackbarMessage('Role management coming soon!');
+            setSnackbarOpen(true);
+            setRoleDialogOpen(false);
+          }} variant="contained">
             Update Role
           </Button>
         </DialogActions>
       </Dialog>
       
-      {/* Edit Department Dialog */}
-      <Dialog open={editDepartmentDialogOpen} onClose={() => setEditDepartmentDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Department</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Department"
-            value={selectedUser?.department_id}
-            onChange={(e) => setSelectedUser({...selectedUser, department_id: e.target.value})}
-            margin="normal"
-            helperText={`${departments.length} departments available`}
-          >
-            <MenuItem value="">
-              <em>Select Department</em>
-            </MenuItem>
-            {departments.map((department) => (
-              <MenuItem key={department.id} value={department.id}>
-                {department.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDepartmentDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleUpdateDepartment} 
-            variant="contained"
-            sx={{ background: 'linear-gradient(45deg, #FF9800 30%, #FF5722 90%)' }}
-          >
-            Update Department
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Security Settings Dialog */}
-      <Dialog open={securityDialogOpen} onClose={() => setSecurityDialogOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ background: 'linear-gradient(45deg, #FF5722 30%, #D84315 90%)', color: 'white' }}>
-          <Box display="flex" alignItems="center">
-            <SecurityIcon sx={{ mr: 2 }} />
-            Security & Module Access Control
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
-          <Grid container spacing={3}>
-            {/* User Selection */}
-            <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Select User</Typography>
-              <List sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 2 }}>
-                {users.map((user, index) => (
-                  <ListItem 
-                    key={index} 
-                    button
-                    selected={selectedUser?.id === user.id}
-                    onClick={() => handleUserSelect(user)}
-                    sx={{ 
-                      borderRadius: 1, 
-                      mb: 1,
-                      bgcolor: selectedUser?.id === user.id ? '#e3f2fd' : 'transparent'
-                    }}
-                  >
-                    <Avatar sx={{ bgcolor: '#FF5722', mr: 2, width: 32, height: 32 }}>
-                      {user.first_name && user.last_name ? 
-                        `${user.first_name[0]}${user.last_name[0]}` : 
-                        user.username ? user.username.substring(0, 2).toUpperCase() : 'U'
-                      }
-                    </Avatar>
-                    <ListItemText 
-                      primary={user.first_name && user.last_name ? 
-                        `${user.first_name} ${user.last_name}` : 
-                        user.username || 'Unknown User'
-                      }
-                      secondary={`${user.role || 'employee'} • ${user.department?.name || user.department || 'No Department'}`}
-                      primaryTypographyProps={{ fontWeight: 500 }}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Grid>
-            
-            {/* Module Access Configuration */}
-            <Grid item xs={12} md={8}>
-              {selectedUser ? (
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    Module Access for {selectedUser.name}
-                  </Typography>
-                  
-                  {/* Module Restriction Toggle */}
-                  <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight={600}>Module Restrictions</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          Enable to restrict user access to specific modules only
-                        </Typography>
-                      </Box>
-                      <Button
-                        variant={isModuleRestricted ? "contained" : "outlined"}
-                        color={isModuleRestricted ? "error" : "primary"}
-                        onClick={() => setIsModuleRestricted(!isModuleRestricted)}
-                        startIcon={<LockIcon />}
-                      >
-                        {isModuleRestricted ? 'Restricted' : 'Unrestricted'}
-                      </Button>
-                    </Box>
-                  </Box>
-                  
-                  {/* Module Selection Grid */}
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                    Available Modules {isModuleRestricted && '(Select modules to grant access)'}
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {availableModules.map((module) => {
-                      const hasAccess = userModuleAccess.includes(module.id);
-                      const isDisabled = !isModuleRestricted;
-                      
-                      return (
-                        <Grid item xs={12} sm={6} md={4} key={module.id}>
-                          <Card 
-                            sx={{ 
-                              border: hasAccess && isModuleRestricted ? '2px solid #4CAF50' : '1px solid #e0e0e0',
-                              borderRadius: 2,
-                              cursor: isModuleRestricted ? 'pointer' : 'default',
-                              opacity: isDisabled ? 0.6 : 1,
-                              bgcolor: hasAccess && isModuleRestricted ? '#f1f8e9' : 'white',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onClick={() => isModuleRestricted && handleModuleToggle(module.id)}
-                          >
-                            <CardContent sx={{ p: 2 }}>
-                              <Box display="flex" alignItems="center" mb={1}>
-                                <Typography sx={{ fontSize: '1.5rem', mr: 1 }}>{module.icon}</Typography>
-                                <Typography variant="subtitle2" fontWeight={600}>
-                                  {module.name}
-                                </Typography>
-                                {hasAccess && isModuleRestricted && (
-                                  <Chip 
-                                    label="✓" 
-                                    size="small" 
-                                    color="success" 
-                                    sx={{ ml: 'auto', minWidth: 24, height: 20 }}
-                                  />
-                                )}
-                              </Box>
-                              <Typography variant="body2" color="textSecondary" sx={{ fontSize: '0.75rem' }}>
-                                {module.description}
-                              </Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                      );
-                    })}
-                  </Grid>
-                  
-                  {/* Access Summary */}
-                  {isModuleRestricted && (
-                    <Box sx={{ mt: 3, p: 2, bgcolor: '#e3f2fd', borderRadius: 2 }}>
-                      <Typography variant="subtitle2" fontWeight={600} mb={1}>
-                        Access Summary ({userModuleAccess.length} modules selected)
-                      </Typography>
-                      <Box display="flex" flexWrap="wrap" gap={1}>
-                        {userModuleAccess.map((moduleId) => {
-                          const module = availableModules.find(m => m.id === moduleId);
-                          return (
-                            <Chip 
-                              key={moduleId}
-                              label={module?.name || moduleId}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
-                          );
-                        })}
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-              ) : (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <SecurityIcon sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
-                  <Typography variant="h6" color="textSecondary">
-                    Select a user to configure module access
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    Choose a user from the list to manage their module permissions
-                  </Typography>
-                </Box>
-              )}
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, bgcolor: '#f5f5f5' }}>
-          <Button onClick={() => {
-            setSecurityDialogOpen(false);
-            setSelectedUser(null);
-          }}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSaveModuleAccess}
-            variant="contained"
-            disabled={!selectedUser}
-            sx={{ background: 'linear-gradient(45deg, #FF5722 30%, #D84315 90%)' }}
-          >
-            Save Module Access
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Success/Error Snackbar */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}

@@ -1,0 +1,6 @@
+id,name,sku,quantity,description,created_at,updated_at,category_id,cost,max_stock,min_stock,unit
+1,Test Product,TEST001,100,Test product for PostgreSQL migration,2025-08-26 20:55:35.96763+00,2025-08-26 20:55:35.967638+00,1,0.00,,0,piece
+2,Fiesta,S657,100,A type of Condom,2025-08-27 02:24:48.794422+00,2025-08-27 03:04:08.578688+00,3,10.00,40,20,1piece
+3,ALL NIGHT,SKE1003,150,FIESTA,2025-08-27 04:28:47.187542+00,2025-08-27 04:28:47.187627+00,4,22.00,70,30,1piece
+4,Lydia Emergency,SKU24315,225,Emergency Contraceptive,2025-08-27 05:37:41.967576+00,2025-08-27 05:39:52.988483+00,5,25.00,150,100,1piece
+5,KISS STRAWBERRY,SKU26354,1000,KISS,2025-08-27 06:09:02.164317+00,2025-08-27 06:12:17.587189+00,6,3.00,300,100,1piece

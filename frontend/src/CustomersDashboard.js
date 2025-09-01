@@ -96,13 +96,6 @@ const periods = [
   { value: 'custom', label: 'Custom' },
 ];
 
-const mockSummary = [
-  { title: 'Total Customers', value: 310, icon: <PeopleIcon />, color: 'primary' },
-  { title: 'New This Month', value: 25, icon: <AssessmentIcon />, color: 'success' },
-  { title: 'Active', value: 280, icon: <InventoryIcon />, color: 'info' },
-  { title: 'Inactive', value: 30, icon: <SwapHorizIcon />, color: 'warning' },
-];
-
 const mockLineData = [
   { date: 'Jul 14', New: 2, Active: 40 },
   { date: 'Jul 15', New: 4, Active: 50 },
@@ -593,7 +586,7 @@ const CustomersDashboard = () => {
                     <Box>
                       <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Total Customers</Typography>
                       <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        {customers.length || 310}
+                        {customers.length}
                       </Typography>
                     </Box>
                     <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
@@ -611,7 +604,11 @@ const CustomersDashboard = () => {
                     <Box>
                       <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>New This Month</Typography>
                       <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        25
+                        {customers.filter(c => {
+                          const created = new Date(c.created_at || c.date_created);
+                          const now = new Date();
+                          return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                        }).length}
                       </Typography>
                     </Box>
                     <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
@@ -629,7 +626,7 @@ const CustomersDashboard = () => {
                     <Box>
                       <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Active</Typography>
                       <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        280
+                        {customers.filter(c => c.status === 'active' || !c.status).length}
                       </Typography>
                     </Box>
                     <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
@@ -647,7 +644,7 @@ const CustomersDashboard = () => {
                     <Box>
                       <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>Inactive</Typography>
                       <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                        30
+                        {customers.filter(c => c.status === 'inactive').length}
                       </Typography>
                     </Box>
                     <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
@@ -789,7 +786,7 @@ const CustomersDashboard = () => {
                         <Avatar sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', width: 64, height: 64, mx: 'auto', mb: 2 }}>
                           <PeopleIcon sx={{ fontSize: 32 }} />
                         </Avatar>
-                        <Typography variant="h4" color="secondary" fontWeight={700}>310</Typography>
+                        <Typography variant="h4" color="secondary" fontWeight={700}>{customers.length}</Typography>
                         <Typography variant="body2" color="textSecondary">Total Customers</Typography>
                       </Box>
                     </Grid>
@@ -798,7 +795,13 @@ const CustomersDashboard = () => {
                         <Avatar sx={{ bgcolor: '#e8f5e8', color: '#388e3c', width: 64, height: 64, mx: 'auto', mb: 2 }}>
                           <PersonAddIcon sx={{ fontSize: 32 }} />
                         </Avatar>
-                        <Typography variant="h4" sx={{ color: '#4caf50', fontWeight: 700 }}>25</Typography>
+                        <Typography variant="h4" sx={{ color: '#4caf50', fontWeight: 700 }}>
+                          {customers.filter(c => {
+                            const created = new Date(c.created_at || c.date_created);
+                            const now = new Date();
+                            return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                          }).length}
+                        </Typography>
                         <Typography variant="body2" color="textSecondary">New This Month</Typography>
                       </Box>
                     </Grid>
@@ -837,9 +840,9 @@ const CustomersDashboard = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
                       {[
-                        { type: 'Retailers', count: 185, percentage: 60, color: '#4CAF50' },
-                        { type: 'Wholesalers', count: 78, percentage: 25, color: '#2196F3' },
-                        { type: 'Distributors', count: 47, percentage: 15, color: '#FF9800' }
+                        { type: 'Retailers', count: customers.filter(c => c.customer_type === 'retailer').length, percentage: (customers.filter(c => c.customer_type === 'retailer').length / customers.length) * 100, color: '#4CAF50' },
+                        { type: 'Wholesalers', count: customers.filter(c => c.customer_type === 'wholesaler').length, percentage: (customers.filter(c => c.customer_type === 'wholesaler').length / customers.length) * 100, color: '#2196F3' },
+                        { type: 'Distributors', count: customers.filter(c => c.customer_type === 'distributor').length, percentage: (customers.filter(c => c.customer_type === 'distributor').length / customers.length) * 100, color: '#FF9800' }
                       ].map((segment, idx) => (
                         <Box key={segment.type}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -876,9 +879,9 @@ const CustomersDashboard = () => {
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
                       {[
-                        { region: 'Greater Accra', count: 170, color: '#4CAF50' },
-                        { region: 'Ashanti', count: 80, color: '#2196F3' },
-                        { region: 'Western', count: 60, color: '#FF9800' }
+                        { region: 'Greater Accra', count: customers.filter(c => c.location === 'Accra').length, color: '#4CAF50' },
+                        { region: 'Ashanti', count: customers.filter(c => c.location === 'Kumasi').length, color: '#2196F3' },
+                        { region: 'Western', count: customers.filter(c => c.location === 'Takoradi').length, color: '#FF9800' }
                       ].map((region, idx) => (
                         <Paper key={region.region} sx={{ p: 1.5, textAlign: 'center', bgcolor: `${region.color}20` }}>
                           <Typography variant="h6" color={region.color}>
@@ -912,7 +915,10 @@ const CustomersDashboard = () => {
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'end', height: 100 }}>
                         {['Jan', 'Feb', 'Mar', 'Apr'].map((month, i) => {
-                          const newCustomers = [28, 35, 22, 41][i];
+                          const newCustomers = customers.filter(c => {
+                            const created = new Date(c.created_at || c.date_created);
+                            return created.getMonth() === i && created.getFullYear() === new Date().getFullYear();
+                          }).length;
                           const height = (newCustomers / 50) * 80;
                           return (
                             <Box key={month} sx={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -939,7 +945,13 @@ const CustomersDashboard = () => {
                     {/* Key Metrics */}
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
                       <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
-                        <Typography variant="h4">126</Typography>
+                        <Typography variant="h4">
+                          {customers.filter(c => {
+                            const created = new Date(c.created_at || c.date_created);
+                            const now = new Date();
+                            return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                          }).length}
+                        </Typography>
                         <Typography variant="caption">New Customers</Typography>
                       </Paper>
                       <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
@@ -984,9 +996,9 @@ const CustomersDashboard = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
                       {[
-                        { level: 'Highly Active', count: 89, percentage: 29, color: '#4CAF50' },
-                        { level: 'Moderately Active', count: 156, percentage: 50, color: '#FF9800' },
-                        { level: 'Low Activity', count: 65, percentage: 21, color: '#F44336' }
+                        { level: 'Highly Active', count: customers.filter(c => c.activity_level === 'high').length, percentage: (customers.filter(c => c.activity_level === 'high').length / customers.length) * 100, color: '#4CAF50' },
+                        { level: 'Moderately Active', count: customers.filter(c => c.activity_level === 'medium').length, percentage: (customers.filter(c => c.activity_level === 'medium').length / customers.length) * 100, color: '#FF9800' },
+                        { level: 'Low Activity', count: customers.filter(c => c.activity_level === 'low').length, percentage: (customers.filter(c => c.activity_level === 'low').length / customers.length) * 100, color: '#F44336' }
                       ].map((activity, idx) => (
                         <Box key={activity.level}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -1142,9 +1154,9 @@ const CustomersDashboard = () => {
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {[
-                          { risk: 'Low Risk', count: 245, percentage: 79, color: '#4CAF50' },
-                          { risk: 'Medium Risk', count: 52, percentage: 17, color: '#FF9800' },
-                          { risk: 'High Risk', count: 13, percentage: 4, color: '#F44336' }
+                          { risk: 'Low Risk', count: customers.filter(c => c.risk_level === 'low').length, percentage: (customers.filter(c => c.risk_level === 'low').length / customers.length) * 100, color: '#4CAF50' },
+                          { risk: 'Medium Risk', count: customers.filter(c => c.risk_level === 'medium').length, percentage: (customers.filter(c => c.risk_level === 'medium').length / customers.length) * 100, color: '#FF9800' },
+                          { risk: 'High Risk', count: customers.filter(c => c.risk_level === 'high').length, percentage: (customers.filter(c => c.risk_level === 'high').length / customers.length) * 100, color: '#F44336' }
                         ].map((risk, idx) => (
                           <Box key={risk.risk}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>

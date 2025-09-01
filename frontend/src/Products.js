@@ -50,7 +50,7 @@ const Products = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/sales/products/', {
+      const res = await api.get('/inventory/products/', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProducts(res.data);
@@ -85,9 +85,9 @@ const Products = () => {
     e.preventDefault();
     try {
       if (editProduct) {
-        await api.put(`/sales/products/${editProduct.id}/`, form, { headers: { Authorization: `Bearer ${token}` } });
+        await api.put(`/inventory/products/${editProduct.id}/`, form, { headers: { Authorization: `Bearer ${token}` } });
       } else {
-        await api.post('/sales/products/', form, { headers: { Authorization: `Bearer ${token}` } });
+        await api.post('/inventory/products/', form, { headers: { Authorization: `Bearer ${token}` } });
       }
       fetchProducts();
       handleClose();
@@ -99,7 +99,7 @@ const Products = () => {
   const handleDelete = async id => {
     if (!window.confirm('Delete this product?')) return;
     try {
-      await api.delete(`/sales/products/${id}/`, { headers: { Authorization: `Bearer ${token}` } });
+      await api.delete(`/inventory/products/${id}/`, { headers: { Authorization: `Bearer ${token}` } });
       fetchProducts();
     } catch (err) {
       setError('Failed to delete product.');

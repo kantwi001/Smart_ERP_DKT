@@ -1,37 +1,33 @@
 #!/bin/bash
-echo "🚀 Building mobile apps with warehouse transfer updates..."
 
-# Navigate to frontend directory
-cd /Users/kwadwoantwi/CascadeProjects/erp-system/frontend
+echo "📱 Building Mobile Apps"
+echo "======================"
 
-# Install dependencies if needed
-echo "1. Installing dependencies..."
-npm install
+# Set Java environment
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
+export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 
-# Build the React app
-echo "2. Building React app..."
-npm run build
+# Build mobile production
+cd frontend
+cp .env.production .env
+echo "Building mobile production version..."
+REACT_APP_MOBILE_MODE=true npm run build
+cd ..
 
-# Sync with Capacitor
-echo "3. Syncing with Capacitor..."
+# Build mobile apps
+echo "Syncing Capacitor..."
 npx cap sync
+npx cap copy
 
-# Build iOS app
-echo "4. Building iOS app..."
-npx cap build ios
-
-# Build Android app
-echo "5. Building Android app..."
+echo ""
+echo "Building Android..."
 npx cap build android
 
-# Copy built files
-echo "6. Copying built files..."
-cp -r build/* ../build/
-
-echo "✅ Mobile apps built successfully!"
-echo "📱 iOS app: ios/App/App.xcworkspace"
-echo "🤖 Android app: android/app/build/outputs/apk/"
 echo ""
-echo "To run on devices:"
-echo "iOS: npx cap run ios"
-echo "Android: npx cap run android"
+echo "Preparing iOS..."
+npx cap sync ios
+
+echo ""
+echo "✅ Mobile apps built!"
+echo "📱 Android: ./smart-erp-mobile.apk or open android/ in Android Studio"
+echo "🍎 iOS: Open ios/App/App.xcworkspace in Xcode"

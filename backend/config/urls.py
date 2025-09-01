@@ -28,6 +28,7 @@ class APIRootView(View):
                 'pos': '/api/pos/',
                 'reporting': '/api/reporting/',
                 'procurement': '/api/procurement/',
+                'warehouse': '/api/warehouse/',
             },
             'frontend_url': 'http://localhost:3000',
             'note': 'This is the API backend. Access the frontend at http://localhost:3000'
@@ -57,6 +58,7 @@ class APIListView(View):
                     'pos': '/api/pos/',
                     'reporting': '/api/reporting/',
                     'procurement': '/api/procurement/',
+                    'warehouse': '/api/warehouse/',
                     'workflows': '/api/workflows/',
                 }
             }

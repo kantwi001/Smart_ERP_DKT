@@ -1,10 +1,15 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from .views import (
     WarehouseListCreateView, WarehouseDetailView, WarehouseLocationListCreateView,
     WarehouseTransferListCreateView, WarehouseTransferDetailView,
-    StockMovementListCreateView, warehouse_stats, create_warehouse, add_location,
-    create_transfer_request, approve_transfer, reject_transfer, complete_transfer, generate_waybill
+    StockMovementListCreateView, WarehouseStockViewSet, warehouse_stats, create_warehouse, add_location,
+    create_transfer_request, approve_transfer, reject_transfer, complete_transfer, generate_waybill,
+    upload_waybill, view_waybill
 )
+
+router = DefaultRouter()
+router.register(r'stock', WarehouseStockViewSet)
 
 urlpatterns = [
     path('', WarehouseListCreateView.as_view(), name='warehouse-list-create'),
@@ -18,7 +23,9 @@ urlpatterns = [
     path('transfers/<int:transfer_id>/reject/', reject_transfer, name='reject-transfer'),
     path('transfers/<int:transfer_id>/complete/', complete_transfer, name='complete-transfer'),
     path('transfers/<int:transfer_id>/waybill/', generate_waybill, name='generate-waybill'),
+    path('transfers/<int:transfer_id>/upload-waybill/', upload_waybill, name='upload-waybill'),
+    path('transfers/<int:transfer_id>/view-waybill/', view_waybill, name='view-waybill'),
     path('movements/', StockMovementListCreateView.as_view(), name='stock-movement-list-create'),
     path('stats/', warehouse_stats, name='warehouse-stats'),
     path('create/', create_warehouse, name='create-warehouse'),
-]
+] + router.urls

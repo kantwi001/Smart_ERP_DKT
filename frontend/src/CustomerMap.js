@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { createCustomerIcon } from './components/LeafletIconFix';
 
 const CustomerMap = ({ customers, height = 400 }) => {
+  const [icon, setIcon] = useState(null);
+
+  useEffect(() => {
+    const customerIcon = createCustomerIcon();
+    setIcon(customerIcon);
+  }, []);
+
   // Defensive: always use array
   const safeCustomers = Array.isArray(customers) ? customers : [];
   // Default to a center if no customers
@@ -21,9 +29,9 @@ const CustomerMap = ({ customers, height = 400 }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {safeCustomers.map(cust =>
+        {icon && safeCustomers.map(cust =>
           cust.gps_lat && cust.gps_lng ? (
-            <Marker key={cust.id} position={[cust.gps_lat, cust.gps_lng]}>
+            <Marker key={cust.id} position={[cust.gps_lat, cust.gps_lng]} icon={icon}>
               <Popup>
                 <b>{cust.name}</b><br />
                 {cust.email}<br />

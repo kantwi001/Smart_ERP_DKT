@@ -247,64 +247,42 @@ class SalesOrderSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         
-        # Set sales_agent to current user if not provided or null
+        # Set sales_agent to current user if not provided
         if 'sales_agent' not in validated_data or validated_data.get('sales_agent') is None:
             validated_data['sales_agent'] = self.context['request'].user
         
         sales_order = SalesOrder.objects.create(**validated_data)
         
-        # Create order items and deduct stock
-        try:
-            from inventory.models import Product, StockMovement
+        # Create order items and handle inventory deduction
+        from inventory.models import Product
+        from warehouse.models import StockMovement, Warehouse
+        
+        for item_data in items_data:
+            # Create the order item
+            SalesOrderItem.objects.create(sales_order=sales_order, **item_data)
             
-            for item_data in items_data:
-                # Create the order item
-                order_item = SalesOrderItem.objects.create(sales_order=sales_order, **item_data)
-                
-                # Deduct stock from inventory
+            # Deduct inventory for cash/mobile money payments immediately
+            if sales_order.payment_method in ['cash', 'momo']:
                 try:
-                    product = Product.objects.get(id=item_data['product'].id)
+                    product = item_data['product']
                     if product.quantity >= item_data['quantity']:
                         product.quantity -= item_data['quantity']
                         product.save()
                         
-                        # Log stock movement
-                        StockMovement.objects.create(
-                            product=product,
-                            movement_type='out',
-                            quantity=item_data['quantity'],
-                            reference_number=sales_order.order_number,
-                            notes=f"Stock deducted for sales order {sales_order.order_number}",
-                            created_by=self.context['request'].user
-                        )
-                    else:
-                        # If insufficient stock, still create the order but log a warning
-                        print(f"Warning: Insufficient stock for product {product.name}. Available: {product.quantity}, Required: {item_data['quantity']}")
-                        
-                except Product.DoesNotExist:
-                    print(f"Warning: Product with ID {item_data['product'].id} not found for stock deduction")
+                        # Create stock movement record
+                        warehouse = Warehouse.objects.first()
+                        if warehouse:
+                            StockMovement.objects.create(
+                                warehouse=warehouse,
+                                product=product,
+                                movement_type='out',
+                                quantity=-item_data['quantity'],
+                                reference=f'Sales Order {sales_order.order_number}',
+                                notes=f'Sale to {sales_order.customer.name if sales_order.customer else "Customer"}',
+                                created_by=self.context['request'].user
+                            )
                 except Exception as e:
-                    print(f"Warning: Error processing stock for product {item_data.get('product', 'Unknown')}: {e}")
-        
-        except ImportError:
-            print("Warning: Inventory models not available, skipping stock deduction")
-        except Exception as e:
-            print(f"Warning: Error in stock processing: {e}")
-        
-        # Create finance transaction for receivables if credit sale
-        try:
-            if sales_order.payment_method == 'credit':
-                FinanceTransaction.objects.create(
-                    sales_order=sales_order,
-                    customer=sales_order.customer,
-                    transaction_type='receivable',
-                    amount=sales_order.total,
-                    due_date=sales_order.due_date,
-                    created_by=self.context['request'].user,
-                    description=f"Accounts receivable for order {sales_order.order_number}"
-                )
-        except Exception as e:
-            print(f"Warning: Error creating finance transaction: {e}")
+                    print(f"Error deducting inventory: {e}")
         
         return sales_order
 

@@ -76,6 +76,7 @@ class WarehouseTransfer(models.Model):
     
     # Tracking
     waybill_number = models.CharField(max_length=100, blank=True)
+    waybill_attachment = models.FileField(upload_to='waybills/', null=True, blank=True)
     tracking_notes = models.TextField(blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -127,3 +128,40 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return f"{self.warehouse.name} - {self.movement_type} - {self.quantity}"
+
+class WarehouseStock(models.Model):
+    """Track product stock levels per warehouse"""
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name='stock_items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='warehouse_stocks')
+    quantity = models.PositiveIntegerField(default=0)
+    reserved_quantity = models.PositiveIntegerField(default=0)  # For pending orders/transfers
+    min_stock_level = models.PositiveIntegerField(default=0)
+    max_stock_level = models.PositiveIntegerField(null=True, blank=True)
+    location = models.ForeignKey(WarehouseLocation, on_delete=models.SET_NULL, null=True, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['warehouse', 'product']
+        indexes = [
+            models.Index(fields=['warehouse', 'product']),
+            models.Index(fields=['quantity']),
+        ]
+
+    def __str__(self):
+        return f"{self.warehouse.name} - {self.product.name}: {self.quantity}"
+
+    @property
+    def available_quantity(self):
+        """Available quantity after reservations"""
+        return max(0, self.quantity - self.reserved_quantity)
+
+    @property
+    def is_low_stock(self):
+        """Check if stock is below minimum level"""
+        return self.quantity <= self.min_stock_level
+
+    @property
+    def is_out_of_stock(self):
+        """Check if completely out of stock"""
+        return self.quantity == 0

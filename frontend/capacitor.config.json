@@ -1,0 +1,28 @@
+{
+  "appId": "com.smarterp.software",
+  "appName": "Smart ERP Software",
+  "webDir": "build",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "allowNavigation": [
+      "https://backend-shy-sun-4450.fly.dev",
+      "https://*.fly.dev"
+    ]
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  },
+  "ios": {
+    "scrollEnabled": true,
+    "swipeToGoBack": true,
+    "handleApplicationURL": true
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true
+  }
+}

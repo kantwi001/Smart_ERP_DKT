@@ -1,0 +1,75 @@
+import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+
+// Get local network IP for mobile connectivity
+const getLocalIP = () => {
+  // For mobile apps, check if running in simulator
+  if (Capacitor.isNativePlatform()) {
+    // iOS Simulator can't reach network IP, use localhost
+    if (Capacitor.getPlatform() === 'ios') {
+      return 'localhost:2025';
+    }
+    // Android emulator and real devices use network IP
+    return '192.168.2.185:2025';
+  }
+  // For web development, use localhost
+  return 'localhost:2025';
+};
+
+// Dynamic backend configuration
+const API_BASE_URL = `http://${getLocalIP()}/api`;
+
+// Create axios instance with development settings
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  }
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Add platform info for mobile apps
+    if (Capacitor.isNativePlatform()) {
+      config.headers['X-Platform'] = Capacitor.getPlatform();
+      config.headers['X-App-Version'] = '2.0.0';
+    }
+    
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (Capacitor.isNativePlatform()) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// API endpoints for development
+export const authEndpoints = [
+  '/token/',
+  '/token/refresh/',
+  '/users/me/',
+  '/users/system/settings/'
+];
+
+export { API_BASE_URL };
+export default api;

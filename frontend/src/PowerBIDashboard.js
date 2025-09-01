@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Paper, Typography, Box, CircularProgress, Alert } from '@mui/material';
 import axios from 'axios';
+import { getApiBaseUrl } from './api';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:2025/api/reporting';
+const API_BASE = process.env.REACT_APP_API_BASE || `${getApiBaseUrl()}/reporting`;
 
 export default function PowerBIDashboard() {
   const [embedUrl, setEmbedUrl] = useState('');

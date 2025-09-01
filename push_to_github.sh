@@ -1,72 +1,72 @@
 #!/bin/bash
 
-echo "🚀 Pushing ERP System Updates to GitHub..."
-echo "=========================================="
+echo "📤 Pushing ERP System Changes to GitHub"
+echo "======================================"
 
 # Navigate to project root
-cd "$(dirname "$0")"
+cd /Users/kwadwoantwi/CascadeProjects/erp-system
 
-# Step 1: Check git status
-echo "📋 Checking current git status..."
+# Check git status
+echo "1️⃣ Checking git status..."
 git status
 
-# Step 2: Add all changes
-echo "📦 Adding all changes..."
+# Add all changes
+echo ""
+echo "2️⃣ Adding all changes..."
 git add .
 
-# Step 3: Create comprehensive commit message
-echo "💬 Creating commit..."
-git commit -m "🚀 Mobile App Integration with Warehouse Management
+# Check what will be committed
+echo ""
+echo "3️⃣ Changes to be committed:"
+git diff --cached --name-only
 
-✨ Features Added:
-- Connected mobile apps to erp.tarinnovation.com backend
-- Full warehouse transfer functionality (create, approve, track)
-- iOS and Android build fixes with proper schemes
-- Offline sync capabilities with automatic data synchronization
-- Comprehensive build scripts for mobile deployment
+# Create commit message with timestamp
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+COMMIT_MSG="feat: Complete PostgreSQL migration and Android connectivity fixes
 
-🔧 Technical Updates:
-- Updated mobile_app_config.js with production backend URL
-- Fixed iOS Xcode scheme configuration (App.xcscheme)
-- Resolved Android Java Runtime and Gradle issues
-- Added warehouse transfer endpoints and storage keys
-- Updated Capacitor configuration for cross-platform builds
+- Fixed PostgreSQL connection and database setup
+- Resolved Android app backend connectivity issues
+- Created comprehensive diagnostic and setup scripts
+- Updated API configuration for cross-platform compatibility
+- Fixed mobile app authentication and data synchronization
+- Enhanced backend startup scripts with proper database validation
 
-📱 Mobile Apps:
-- iOS: frontend/ios/App/App.xcworkspace ready for Xcode
-- Android: APK generation with smart-erp-backend-connected.apk
-- Both platforms include full ERP functionality with warehouse management
+Scripts added/updated:
+- setup_postgres_database.sh
+- start_backend_with_postgres.sh
+- check_postgres_connection.py
+- diagnose_android_connectivity.sh
+- fix_android_backend_connectivity.sh
+- test_android_login.sh
+- fix_psycopg2_install.sh
 
-🛠️ Build Scripts:
-- build_mobile_with_backend.sh - Comprehensive mobile build
-- fix_ios_build.sh - iOS specific fixes
-- fix_android_build.sh - Android specific fixes
-- rebuild_mobile_apps.sh - Complete rebuild from scratch
+Updated: $TIMESTAMP"
 
-🗄️ Database:
-- PostgreSQL database: erp_system
-- Warehouse transfer models and migrations included
-- Backend API endpoints for mobile synchronization
+echo ""
+echo "4️⃣ Committing changes..."
+git commit -m "$COMMIT_MSG"
 
-Ready for production deployment with full warehouse management capabilities."
-
-# Step 4: Push to GitHub
-echo "⬆️ Pushing to GitHub..."
+# Push to remote repository
+echo ""
+echo "5️⃣ Pushing to GitHub..."
 git push origin main
 
-# Check if push was successful
 if [ $? -eq 0 ]; then
-    echo "✅ Successfully pushed to GitHub!"
     echo ""
-    echo "📋 Summary of pushed updates:"
-    echo "   🏗️ Mobile app builds with backend connection"
-    echo "   📱 iOS and Android projects ready for deployment"
-    echo "   🏪 Complete warehouse transfer functionality"
-    echo "   🔧 Build fix scripts for development team"
-    echo "   📊 Database schema with PostgreSQL (erp_system)"
-    echo ""
-    echo "🌐 Repository updated with production-ready mobile apps!"
+    echo "🎉 Successfully pushed to GitHub!"
+    echo "📊 Changes include:"
+    echo "   ✅ PostgreSQL database setup and migration"
+    echo "   ✅ Android app connectivity fixes"
+    echo "   ✅ Backend authentication improvements"
+    echo "   ✅ Comprehensive diagnostic scripts"
+    echo "   ✅ Database connection validation"
 else
-    echo "❌ Failed to push to GitHub. Please check your git configuration."
-    echo "🔧 Try running: git remote -v to check your remote repository"
+    echo ""
+    echo "❌ Push failed. Possible issues:"
+    echo "   - Check internet connection"
+    echo "   - Verify GitHub credentials"
+    echo "   - Check if remote repository exists"
+    echo ""
+    echo "🔧 Try manual push:"
+    echo "   git push origin main"
 fi

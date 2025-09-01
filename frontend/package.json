@@ -2,50 +2,53 @@
   "name": "smart-erp-software",
   "version": "0.1.0",
   "private": true,
-  "port": 2026,
+  "homepage": "./",
   "dependencies": {
-    "@capacitor/android": "^7.4.3",
-    "@capacitor/app": "^7.0.1",
-    "@capacitor/core": "^7.4.2",
-    "@capacitor/haptics": "^7.0.1",
-    "@capacitor/ios": "^7.4.3",
-    "@capacitor/keyboard": "^7.0.1",
-    "@capacitor/preferences": "^7.0.2",
-    "@capacitor/splash-screen": "^7.0.1",
-    "@capacitor/status-bar": "^7.0.1",
-    "@capacitor/toast": "^7.0.1",
-    "@date-io/date-fns": "^3.2.1",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^7.2.0",
-    "@mui/lab": "^7.0.0-beta.14",
-    "@mui/material": "^7.2.0",
-    "@mui/x-date-pickers": "^8.10.0",
-    "axios": "^1.10.0",
-    "cra-template-pwa": "2.0.0",
-    "date-fns": "^4.1.0",
-    "jspdf": "^3.0.1",
-    "jspdf-autotable": "^5.0.2",
+    "@capacitor/android": "^5.7.8",
+    "@capacitor/app": "^5.0.7",
+    "@capacitor/core": "^5.7.8",
+    "@capacitor/haptics": "^5.0.7",
+    "@capacitor/ios": "^5.7.8",
+    "@capacitor/keyboard": "^5.0.8",
+    "@capacitor/preferences": "^5.0.7",
+    "@capacitor/status-bar": "^5.0.7",
+    "@date-io/date-fns": "^2.17.0",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.15",
+    "@mui/lab": "^5.0.0-alpha.170",
+    "@mui/material": "^5.14.20",
+    "@mui/x-date-pickers": "^5.0.20",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.6.8",
+    "date-fns": "^2.30.0",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.5.31",
     "leaflet": "^1.9.4",
     "localforage": "^1.10.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.7.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.22.3",
     "react-scripts": "5.0.1",
-    "recharts": "^3.1.0",
-    "web-vitals": "^5.0.3"
+    "recharts": "^2.8.0",
+    "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "SKIP_PREFLIGHT_CHECK=true PORT=3000 react-scripts start",
+    "start:web": "SKIP_PREFLIGHT_CHECK=true PORT=3000 react-scripts start",
+    "start:mobile": "SKIP_PREFLIGHT_CHECK=true PORT=2026 react-scripts start",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "build:web": "SKIP_PREFLIGHT_CHECK=true REACT_APP_MOBILE_MODE=false react-scripts build",
+    "build:mobile": "SKIP_PREFLIGHT_CHECK=true REACT_APP_MOBILE_MODE=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
-      "react-app",
-      "react-app/jest"
+      "react-app"
     ]
   },
   "browserslist": {
@@ -61,6 +64,7 @@
     ]
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.2"
+    "fork-ts-checker-webpack-plugin": "^6.5.3",
+    "typescript": "^4.9.5"
   }
 }

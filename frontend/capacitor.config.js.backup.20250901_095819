@@ -1,0 +1,14 @@
+const config = {
+  appId: 'com.smarterpsoftware.app',
+  appName: 'SmartERPSoftware',
+  webDir: 'build',
+  server: {
+    androidScheme: 'https',
+    allowNavigation: [
+      'https://backend-shy-sun-4450.fly.dev',
+      'backend-shy-sun-4450.fly.dev'
+    ]
+  }
+};
+
+module.exports = config;

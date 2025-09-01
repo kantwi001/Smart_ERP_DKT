@@ -7,8 +7,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import { getApiBaseUrl } from './api';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:2025/api/surveys';
 const QUESTION_TYPES = [
   { value: 'text', label: 'Text' },
   { value: 'number', label: 'Number' },
@@ -31,6 +31,8 @@ export default function SurveyAdmin() {
   const [qType, setQType] = useState('text');
   const [qOptions, setQOptions] = useState('');
   const [qOrder, setQOrder] = useState(0);
+
+  const API_BASE = process.env.REACT_APP_API_BASE || `${getApiBaseUrl()}/surveys`;
 
   useEffect(() => { fetchSurveys(); }, []);
 

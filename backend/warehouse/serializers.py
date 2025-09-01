@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Warehouse, WarehouseLocation, StockMovement, WarehouseTransfer
+from .models import Warehouse, WarehouseLocation, StockMovement, WarehouseTransfer, WarehouseStock
 from users.serializers import UserSerializer
 from inventory.models import Product
 
@@ -31,6 +31,7 @@ class WarehouseTransferSerializer(serializers.ModelSerializer):
     completed_by_name = serializers.CharField(source='completed_by.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    waybill_attachment_url = serializers.SerializerMethodField()
     
     class Meta:
         model = WarehouseTransfer
@@ -42,9 +43,14 @@ class WarehouseTransferSerializer(serializers.ModelSerializer):
             'approved_by', 'approved_by_name', 'approval_date', 'approval_notes',
             'completed_by', 'completed_by_name', 'completion_date', 
             'actual_quantity_sent', 'actual_quantity_received',
-            'waybill_number', 'tracking_notes', 'created_at', 'updated_at'
+            'waybill_number', 'waybill_attachment', 'waybill_attachment_url', 'tracking_notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['transfer_number', 'request_date', 'created_at', 'updated_at']
+    
+    def get_waybill_attachment_url(self, obj):
+        if obj.waybill_attachment:
+            return obj.waybill_attachment.url
+        return None
     
     def create(self, validated_data):
         validated_data['requested_by'] = self.context['request'].user
@@ -63,3 +69,8 @@ class StockMovementSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
+
+class WarehouseStockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WarehouseStock
+        fields = '__all__'

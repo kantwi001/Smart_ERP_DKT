@@ -1,8 +1,9 @@
 /**
  * Utility functions for handling image URLs in the ERP system
  */
+import { getApiBaseUrl } from '../api';
 
-const API_BASE_URL = 'http://localhost:2025';
+const API_BASE_URL = getApiBaseUrl().replace('/api', '');
 
 /**
  * Converts a relative or absolute profile picture URL to a fully qualified URL

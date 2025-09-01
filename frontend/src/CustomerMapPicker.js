@@ -1,23 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { createCustomerIcon } from './components/LeafletIconFix';
 
 // Fix default marker icon for leaflet in React
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
-  iconAnchor: [12, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+// const DefaultIcon = L.icon({
+//   iconUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png',
+//   shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
+//   iconAnchor: [12, 41],
+// });
+// L.Marker.prototype.options.icon = DefaultIcon;
 
 const MapClickMarker = ({ value, onChange }) => {
+  const [icon, setIcon] = useState(null);
+
+  useEffect(() => {
+    const customerIcon = createCustomerIcon();
+    setIcon(customerIcon);
+  }, []);
+
   useMapEvents({
     click(e) {
       onChange([e.latlng.lat, e.latlng.lng]);
     },
   });
-  return value ? <Marker position={value} /> : null;
+  
+  return value && icon ? <Marker position={value} icon={icon} /> : null;
 };
 
 const CustomerMapPicker = ({ value, onChange, height = 250 }) => {

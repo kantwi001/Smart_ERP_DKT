@@ -579,53 +579,46 @@ def test_smtp_settings(request):
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_user_department(request, user_id):
-    """Update user's department assignment"""
+    """Update user department and warehouse assignment"""
     try:
-        print(f"🔄 Updating department for user ID: {user_id}")
-        print(f"📤 Request data: {request.data}")
-        
         user = User.objects.get(id=user_id)
-        print(f"👤 Found user: {user.first_name} {user.last_name}")
+        print(f"🔄 Updating department for user: {user.username}")
         
         department_id = request.data.get('department_id')
-        print(f"🏢 Department ID to assign: {department_id}")
+        warehouse_id = request.data.get('warehouse_id')
         
         if department_id:
-            from hr.models import Department
             try:
+                from hr.models import Department
                 department = Department.objects.get(id=department_id)
-                print(f"✅ Found department: {department.name}")
                 user.department = department
+                print(f"📋 Department updated to: {department.name}")
             except Department.DoesNotExist:
-                print(f"❌ Department with ID {department_id} not found")
-                return Response({'error': f'Department with ID {department_id} not found'}, status=404)
-        else:
-            print("🔄 Removing department assignment")
-            user.department = None
-            
-        user.save()
-        print(f"💾 User saved successfully")
+                return Response({'error': 'Department not found'}, status=status.HTTP_400_BAD_REQUEST)
         
-        response_data = {
-            'success': True,
-            'message': f'Department updated for {user.first_name} {user.last_name}',
-            'user': {
-                'id': user.id,
-                'department_id': user.department.id if user.department else None,
-                'department_name': user.department.name if user.department else None
-            }
-        }
-        print(f"📤 Sending response: {response_data}")
-        return Response(response_data)
+        if warehouse_id:
+            try:
+                from warehouse.models import Warehouse
+                warehouse = Warehouse.objects.get(id=warehouse_id)
+                user.assigned_warehouse = warehouse
+                print(f"🏭 Warehouse updated to: {warehouse.name}")
+            except Warehouse.DoesNotExist:
+                return Response({'error': 'Warehouse not found'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.save()
+        
+        # Return updated user data
+        serializer = UserSerializer(user, context={'request': request})
+        return Response({
+            'message': 'User updated successfully',
+            'user': serializer.data
+        }, status=status.HTTP_200_OK)
         
     except User.DoesNotExist:
-        print(f"❌ User with ID {user_id} not found")
-        return Response({'error': 'User not found'}, status=404)
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        print(f"💥 Unexpected error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return Response({'error': str(e)}, status=500)
+        print(f"❌ Error updating user: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

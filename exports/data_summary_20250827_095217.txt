@@ -1,0 +1,15 @@
+ERP System Database Export Summary
+Generated: Wed Aug 27 09:52:18 GMT 2025
+Database: erp_system
+Host: localhost:5432
+
+Table Row Counts:
+auth_user: 1 rows
+hr_employee: 1 rows
+hr_department: 0 rows
+inventory_product: 5 rows
+inventory_warehouse:  rows
+sales_customer: 6 rows
+sales_salesorder: 21 rows
+accounting_account:  rows
+accounting_transaction:  rows

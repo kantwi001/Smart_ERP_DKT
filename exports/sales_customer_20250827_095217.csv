@@ -1,0 +1,7 @@
+id,name,email,phone,address,customer_type,is_blacklisted,payment_terms,latitude,location_accuracy,location_timestamp,longitude
+1,Test Customer Ltd,test@customer.com,+1234567890,123 Test Street,retailer,f,30,6.6745,,,-1.5716
+11,Ernest Chemist,info@ernest.com,0200757473,Tema,distributor,f,30,5.71819960739227,,,-0.2997476949684275
+12,Ernest Chemist,ernest@ernest.com,0202030405,Tamale,distributor,f,30,5.718249317486632,39.333333333333336,2025-08-27 02:13:01.818+00,-0.29975571970200937
+13,Ernest Chemist,info@chemist.com,0203948576,Temale,distributor,f,30,5.718197915281445,35,2025-08-27 02:18:35.482+00,-0.2997471722272408
+14,Fii Chemist,info@fii.com,0546758635,Okaishie,wholesaler,f,30,5.7181857367672455,35,2025-08-27 05:22:55.273+00,-0.29974393669145455
+15,AKWESI PHARMACY,akwesi@gmail.com,0548585858,Mile 7,wholesaler,f,60,5.718185063732294,35,2025-08-27 06:11:15.644+00,-0.29974503527098995

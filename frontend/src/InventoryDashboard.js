@@ -1,4 +1,4 @@
-            import React, { useState, useEffect, useContext } from 'react';
+            import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { 
   Box, Typography, Grid, Card, CardContent, CircularProgress, Alert,
   Tabs, Tab, Paper, Chip, Avatar, LinearProgress, Divider, IconButton, List, ListItem, ListItemText, Button,
@@ -18,7 +18,7 @@ import AddIcon from '@mui/icons-material/Add';
 import api from './api';
 import { AuthContext } from './AuthContext';
 import { 
-  loadWarehousesWithFallback, 
+  loadWarehousesWithStock, 
   loadProductsWithFallback, 
   getGlobalProducts, 
   getGlobalTransferHistory
@@ -137,69 +137,91 @@ const InventoryDashboard = () => {
     toWarehouse: ''
   });
 
-  // Enhanced data fetching with shared data fallback
-  const fetchDashboardData = React.useCallback(async () => {
+  const fetchInventoryData = useCallback(async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
       
-      // Load products and warehouses using global state
-      const [productsData, warehousesData] = await Promise.all([
-        loadProductsWithFallback(api),
-        loadWarehousesWithFallback(api)
-      ]);
+      // Load products from inventory API
+      const productsResponse = await api.get('/inventory/products/');
+      const products = productsResponse.data;
+      setProducts(products);
       
-      // Use global products to ensure sync across modules
-      setProducts(getGlobalProducts());
-      setWarehouses(warehousesData);
+      // Load warehouses from warehouse API
+      const warehousesResponse = await api.get('/warehouse/');
+      const warehouses = warehousesResponse.data;
+      setWarehouses(warehouses);
       
-      // Load transfer history as stock movements
-      const transferHistory = getGlobalTransferHistory();
-      setStockMovements(transferHistory);
+      // Update global state for cross-module synchronization
+      if (window.globalProducts) {
+        window.globalProducts = products;
+      }
+      if (window.globalWarehouses) {
+        window.globalWarehouses = warehouses;
+      }
       
-      // Update derived state based on current products
-      const currentProducts = getGlobalProducts();
-      setLowStockItems(currentProducts.filter(p => (p.quantity || 0) < 10));
-      setLowStockProducts(currentProducts.filter(p => (p.quantity || 0) < (p.reorder_level || 10)));
-      setPendingTransfers(transferHistory.filter(m => m.status === 'pending'));
-      setCategories([]);
+      // Dispatch events for other modules to sync
+      window.dispatchEvent(new CustomEvent('productsUpdated', { 
+        detail: { products: products, source: 'inventory_dashboard' } 
+      }));
+      window.dispatchEvent(new CustomEvent('warehousesUpdated', { 
+        detail: { warehouses: warehouses, source: 'inventory_dashboard' } 
+      }));
       
-      console.log('[Inventory Dashboard] Loaded data:', {
-        products: getGlobalProducts().length,
-        warehouses: warehousesData.length,
-        transfers: transferHistory.length
-      });
+      // Load additional inventory-specific data
+      const movementHistory = await getGlobalTransferHistory();
+      setStockMovements(movementHistory);
       
     } catch (error) {
-      console.error('[Inventory Dashboard] Error loading data:', error);
-      // Fallback to global state
-      setProducts(getGlobalProducts());
-      setWarehouses([]);
-      setStockMovements(getGlobalTransferHistory());
+      console.error('Error fetching inventory data:', error);
+      setError('Failed to load inventory data. Please try again.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Listen for global product updates
   useEffect(() => {
-    const handleProductsUpdate = (event) => {
-      const updatedProducts = event.detail;
-      setProducts(updatedProducts);
-      
-      // Update derived state when products change
-      setLowStockItems(updatedProducts.filter(p => (p.quantity || 0) < 10));
-      setLowStockProducts(updatedProducts.filter(p => (p.quantity || 0) < (p.reorder_level || 10)));
-      
-      console.log('[Inventory Dashboard] Products updated from global state:', updatedProducts.length);
+    fetchInventoryData();
+
+    const handleProductUpdate = (event) => {
+      const { products: updatedProducts, source } = event.detail;
+      if (source !== 'inventory_dashboard') {
+        setProducts(updatedProducts);
+        // Update global state
+        if (window.globalProducts) {
+          window.globalProducts = updatedProducts;
+        }
+      }
     };
 
-    window.addEventListener('productsUpdated', handleProductsUpdate);
-    return () => window.removeEventListener('productsUpdated', handleProductsUpdate);
-  }, []);
+    const handleWarehouseUpdate = (event) => {
+      const { warehouses: updatedWarehouses, source } = event.detail;
+      if (source !== 'inventory_dashboard') {
+        setWarehouses(updatedWarehouses);
+        // Update global state
+        if (window.globalWarehouses) {
+          window.globalWarehouses = updatedWarehouses;
+        }
+      }
+    };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    const handleStockMovement = (event) => {
+      const { movement } = event.detail;
+      setStockMovements(prev => [movement, ...prev]);
+      // Refresh inventory data to reflect stock changes
+      fetchInventoryData();
+    };
+
+    window.addEventListener('productsUpdated', handleProductUpdate);
+    window.addEventListener('warehousesUpdated', handleWarehouseUpdate);
+    window.addEventListener('stockMovementAdded', handleStockMovement);
+
+    return () => {
+      window.removeEventListener('productsUpdated', handleProductUpdate);
+      window.removeEventListener('warehousesUpdated', handleWarehouseUpdate);
+      window.removeEventListener('stockMovementAdded', handleStockMovement);
+    };
+  }, [fetchInventoryData]);
 
   const handleTransferAction = async (id, action) => {
     try {
@@ -209,7 +231,7 @@ const InventoryDashboard = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Transfer updated:', response.data);
-      fetchDashboardData();
+      // fetchInventoryData();
     } catch (err) {
       console.log('Error updating transfer:', err);
     }
@@ -373,7 +395,7 @@ const InventoryDashboard = () => {
       });
 
       // Refresh data
-      fetchDashboardData();
+      // fetchInventoryData();
     } catch (error) {
       console.error('Transfer stock error:', error);
       alert('Failed to initiate stock transfer. Please try again.');
@@ -467,7 +489,7 @@ const InventoryDashboard = () => {
                     <Button
                       variant="outlined"
                       startIcon={<RefreshIcon />}
-                      onClick={fetchDashboardData}
+                      onClick={() => window.location.reload()}
                       sx={{
                         borderColor: '#2196F3',
                         color: '#2196F3',
@@ -931,7 +953,7 @@ const InventoryDashboard = () => {
                     {/* Reorder Alerts */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'error.light', color: 'error.contrastText', flex: 1, mr: 1 }}>
-                        <Typography variant="h6">{lowStockProducts.length}</Typography>
+                        <Typography variant="h6">{products.filter(p => (p.quantity || 0) <= (p.reorder_level || 10)).length}</Typography>
                         <Typography variant="caption">Reorder Alerts</Typography>
                       </Paper>
                       <Paper sx={{ p: 1.5, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText', flex: 1, ml: 1 }}>

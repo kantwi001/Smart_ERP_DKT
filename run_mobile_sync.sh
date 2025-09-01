@@ -1,40 +1,81 @@
 #!/bin/bash
 
-echo "🚀 Starting Mobile App Data Synchronization..."
-echo "=============================================="
+echo "🚀 Mobile App Build and Sync"
+echo "============================"
 
-# Navigate to project directory
-cd /Users/kwadwoantwi/CascadeProjects/erp-system
+# Set error handling
+set -e
 
-# Make sure backend is running
-echo "📡 Checking backend server..."
-if ! curl -s http://localhost:8000/admin/ > /dev/null; then
-    echo "⚠️  Backend server not running. Starting backend..."
-    cd backend
-    python manage.py runserver 8000 &
-    BACKEND_PID=$!
-    echo "Backend started with PID: $BACKEND_PID"
-    sleep 5
-    cd ..
-else
-    echo "✅ Backend server is running"
+# Navigate to frontend directory
+cd /Users/kwadwoantwi/CascadeProjects/erp-system/frontend
+
+# Set Java environment if available
+if [ -d "/opt/homebrew/opt/openjdk@17" ]; then
+    export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    echo "✅ Java environment configured"
 fi
 
-# Run the sync script
-echo "🔄 Running mobile app data sync..."
-python sync_mobile_app_data.py
+echo "🏗️ Step 1: Building React app..."
+export GENERATE_SOURCEMAP=false
+export CI=false
+export REACT_APP_API_URL=https://erp.tarinnovation.com/api
 
-# Check if sync was successful
+npm run build
+
 if [ $? -eq 0 ]; then
-    echo "✅ Mobile app data sync completed successfully!"
-    echo "🎯 Your Sales Dashboard now has access to all mobile app data"
-    echo ""
-    echo "📊 Next steps:"
-    echo "1. Start the frontend: cd frontend && npm start"
-    echo "2. Open Sales Dashboard in browser"
-    echo "3. All customer and product data from mobile app is now available"
+    echo "✅ React build successful"
 else
-    echo "❌ Sync failed. Please check the error messages above."
+    echo "❌ React build failed"
+    exit 1
 fi
 
-echo "=============================================="
+echo "📱 Step 2: Adding Capacitor platforms..."
+# Only add if they don't exist
+if [ ! -d "ios" ]; then
+    npx cap add ios
+    echo "✅ iOS platform added"
+else
+    echo "✅ iOS platform already exists"
+fi
+
+if [ ! -d "android" ]; then
+    npx cap add android
+    echo "✅ Android platform added"
+else
+    echo "✅ Android platform already exists"
+fi
+
+echo "🔄 Step 3: Syncing Capacitor..."
+npx cap sync
+npx cap copy
+
+echo "🤖 Step 4: Building Android APK..."
+if [ -d "android" ]; then
+    cd android
+    ./gradlew clean
+    ./gradlew assembleRelease
+    cd ..
+    
+    # Copy APK to root
+    if [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+        cp android/app/build/outputs/apk/release/app-release.apk ../smart-erp-mobile-ready.apk
+        echo "✅ Android APK created: smart-erp-mobile-ready.apk"
+    fi
+fi
+
+cd ..
+
+echo ""
+echo "🎉 MOBILE APP BUILD COMPLETED!"
+echo "=============================="
+echo ""
+echo "✅ React Build: Successful"
+echo "✅ Capacitor: Platforms synced"
+echo "✅ Android APK: Generated"
+echo ""
+echo "📱 Deployment artifacts:"
+echo "   • Android APK: smart-erp-mobile-ready.apk"
+echo "   • iOS Project: frontend/ios/App/App.xcworkspace"
+echo ""
+echo "🚀 Ready for app store deployment!"
